@@ -1,0 +1,58 @@
+{
+  "name": "@async-browser-context/async-browser-context",
+  "version": "1.0.0",
+  "description": "Automatic async context propagation for browsers with perfect concurrent isolation - zero code changes required",
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/context.js",
+  "types": "./dist/context.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/context.js",
+      "types": "./dist/context.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "babel-plugin",
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "async",
+    "context",
+    "async-context",
+    "async-local-storage",
+    "request-context",
+    "tracing",
+    "logging",
+    "browser",
+    "babel",
+    "transform",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test:build": "bash -c 'for file in tests/suites/**/*.test.js; do [ -f \"$file\" ] && babel \"$file\" --out-file \"${file%.test.js}-transformed.js\" || true; done && babel tests/suites/01-core/core-tests.js --out-file tests/suites/01-core/core-tests-transformed.js'",
+    "test:serve": "http-server -p 8080 -o tests/runner.html",
+    "test": "npm run test:build && npm run test:serve",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.28.3",
+    "@babel/core": "^7.28.4",
+    "@babel/preset-env": "^7.28.3",
+    "http-server": "^14.1.1",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@babel/core": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

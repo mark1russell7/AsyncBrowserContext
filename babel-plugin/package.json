@@ -1,0 +1,12 @@
+{
+  "name": "@async-context/babel-plugin",
+  "version": "1.0.0",
+  "description": "Babel plugin for automatic async context propagation",
+  "main": "index.js",
+  "keywords": ["babel-plugin", "async", "context", "async-context"],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "@babel/core": "^7.0.0"
+  }
+}
