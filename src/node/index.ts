@@ -8,8 +8,8 @@
  * @packageDocumentation
  */
 import { AsyncLocalStorage as NodeAsyncLocalStorage } from "node:async_hooks";
-import type { AsyncLocalStorageOptions } from "../core/async-local-storage.js";
 import type { VariableOptions } from "../core/variable.js";
+import { createCompatibleStorage } from "./compatible-storage.js";
 
 export type { AsyncLocalStorageOptions } from "../core/async-local-storage.js";
 export type { VariableOptions } from "../core/variable.js";
@@ -83,20 +83,7 @@ function supportsOptions() : boolean {
  */
 export const AsyncLocalStorage : typeof NodeAsyncLocalStorage = supportsOptions()
     ? NodeAsyncLocalStorage
-    : class AsyncLocalStorage<T> extends NodeAsyncLocalStorage<T> {
-        readonly #defaultValue : T | undefined;
-
-        constructor(options : AsyncLocalStorageOptions<T> = {}) {
-            super();
-            this.#defaultValue = options.defaultValue;
-            Object.defineProperty(this, "name", { value : options.name === undefined ? "" : String(options.name), configurable : true });
-        }
-
-        override getStore() : T | undefined {
-            const store = super.getStore();
-            return store === undefined ? this.#defaultValue : store;
-        }
-    };
+    : createCompatibleStorage(NodeAsyncLocalStorage);
 /** The type of the native `AsyncLocalStorage`. */
 export type AsyncLocalStorage<T> = NodeAsyncLocalStorage<T>;
 
