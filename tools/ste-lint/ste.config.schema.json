@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mark1russell7/lag/packages/ste-lint/ste.config.schema.json",
+  "title": "ste-lint configuration",
+  "description": "The configuration of ste-lint. All properties are optional.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "include": {
+      "description": "Glob patterns of the files to examine, relative to this file.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "ignore": {
+      "description": "Glob patterns of the files not to examine, relative to this file.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "technicalNouns": {
+      "description": "Technical nouns of the project glossary. A term can have more than one word.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "technicalVerbs": {
+      "description": "Technical verbs of the project glossary, in the base form.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "properNouns": {
+      "description": "Names of products, organizations and standards. A name with more than one word counts as one word.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "allowedWords": {
+      "description": "Other words that the -ing rule and the unknown-word rule accept.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "rules": {
+      "description": "The severity of each rule.",
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "sentence-length", "paragraph-length", "modal-verb", "semicolon", "latin-abbreviation", "about-quantity",
+          "word-list", "gendered-pronoun", "first-person", "passive-instruction", "noun-cluster", "missing-subject",
+          "ing-verb", "unknown-word"
+        ]
+      },
+      "additionalProperties": { "enum": ["error", "warning", "off"] }
+    },
+    "wordList": {
+      "description": "Entries to add to the project word list, or to change in it.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "anyOf": [{ "required": ["id"] }, { "required": ["match"] }],
+        "properties": {
+          "id": { "description": "The ID of a default entry to change.", "type": "string" },
+          "match": {
+            "description": "The words or phrases to find.",
+            "anyOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" }, "minItems": 1 }]
+          },
+          "suggest": { "description": "The words to write instead, as the message shows them.", "type": ["string", "null"] },
+          "note": { "description": "More help for the message.", "type": ["string", "null"] },
+          "severity": { "enum": ["error", "warning", "off"] },
+          "verbOnly": { "description": "Find the words only where they are verbs.", "type": "boolean" }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "instructionWords": { "type": "integer", "minimum": 1, "default": 20 },
+        "descriptionWords": { "type": "integer", "minimum": 1, "default": 25 },
+        "paragraphSentences": { "type": "integer", "minimum": 1, "default": 6 },
+        "nounClusterNouns": { "type": "integer", "minimum": 1, "default": 3 }
+      }
+    },
+    "dictionaryPath": {
+      "description": "The path of a local dictionary file. Never commit a dictionary. The environment variable STE_DICTIONARY has priority.",
+      "type": ["string", "null"]
+    }
+  }
+}

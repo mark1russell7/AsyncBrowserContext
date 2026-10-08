@@ -29,7 +29,11 @@
     "./dist/index.js",
     "./dist/runtime.js",
     "./dist/install.js",
-    "./dist/patches/*.js"
+    "./dist/patches/*.js",
+    "./src/index.ts",
+    "./src/runtime.ts",
+    "./src/install.ts",
+    "./src/patches/*.ts"
   ],
   "exports": {
     ".": {
@@ -40,6 +44,10 @@
     "./browser": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./browser/runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
     },
     "./runtime": {
       "types": "./dist/runtime.d.ts",
@@ -76,11 +84,12 @@
     "coverage": "vitest run --coverage --project unit --project \"rules (browser runtime, Node.js)\" --project \"rules (node runtime)\"",
     "mutation": "stryker run",
     "bench": "pnpm build && tsx bench/run.ts",
-    "smoke": "tsx test/smoke/run.ts",
+    "smoke": "pnpm build && tsx test/smoke/run.ts",
     "lint:ste": "tsx tools/ste-lint/src/cli.ts",
     "site:dev": "pnpm --filter ./site dev",
     "site:build": "pnpm --filter ./site build",
-    "prepublishOnly": "pnpm build && pnpm test"
+    "prepublishOnly": "pnpm build && pnpm test",
+    "site:data": "tsx scripts/site-data.ts"
   },
   "dependencies": {
     "@babel/core": "^8.0.7",

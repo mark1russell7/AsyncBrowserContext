@@ -7,7 +7,7 @@ import { installTimerPatches } from "./patches/timers.js";
 import { installToStringPatch } from "./patches/to-string.js";
 
 /**
- * Installs all patches. The function installs each patch one time for each
+ * This function installs all patches. It installs each patch one time for each
  * global object, also when the page loads two copies of the library. The
  * browser entry and the runtime entry call it when they load.
  */

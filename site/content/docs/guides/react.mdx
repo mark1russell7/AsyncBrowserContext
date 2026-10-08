@@ -1,0 +1,40 @@
+---
+title: React event handlers
+description: Start a context in a React event handler, and keep it in the async code of the handler.
+order: 33
+---
+
+## Start the context in the handler
+
+React dispatches the events of all components from one listener on the root element. React added that listener when the application started, in the root context. Thus, a React handler starts in the root context. Start the context of the operation in the handler:
+
+```tsx
+function SaveButton({ draft } : { draft : Draft }) {
+    const onClick = () => traced("save", async () => {
+        await api("/api/documents", { method : "POST", body : JSON.stringify(draft) });
+        toast("Saved");
+    });
+    return <button onClick={onClick}>Save</button>;
+}
+```
+
+Each `await` in the function of `traced()` keeps the trace. The `then` callbacks and the timers that the function starts also keep it.
+
+## Effects
+
+An effect starts in the root context. Start a context in the effect if its async code needs one:
+
+```tsx
+useEffect(() => {
+    let active = true;
+    void traced("load profile", async () => {
+        const profile = await api<Profile>(`/api/profiles/${userId}`);
+        if (active) setProfile(profile);
+    });
+    return () => { active = false; };
+}, [userId]);
+```
+
+## Configure the build
+
+Add the Vite plugin, or the Babel preset, to the build of the application. The plugin also transforms the async code of the dependencies. React itself contains no async code that a handler waits for.

@@ -1,0 +1,27 @@
+.status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    white-space: nowrap;
+}
+
+.icon {
+    flex: none;
+    width: 1.1em;
+    height: 1.1em;
+    color: var(--status-neutral);
+}
+
+.status[data-kind="passed"] .icon,
+.status[data-kind="pass"] .icon {
+    color: var(--status-good-ink);
+}
+
+.status[data-kind="failed"] .icon,
+.status[data-kind="fail"] .icon {
+    color: var(--status-critical-ink);
+}
+
+.status[data-kind="todo"] .icon {
+    color: var(--status-warning-ink);
+}

@@ -8,7 +8,7 @@
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 
-/** Gives an async function that runs `generatorFunction`. */
+/** This function gives an async function that operates `generatorFunction`. */
 export function coroutine<T, A extends unknown[], R>(generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>) : (this : T, ...args : A) => Promise<R> {
     return function asyncFunction(this : T, ...args : A) : Promise<R> {
         const generator = generatorFunction.apply(this, args);
@@ -39,7 +39,7 @@ export function coroutine<T, A extends unknown[], R>(generatorFunction : (this :
 type AnyIterator = Iterator<unknown, unknown, unknown> | AsyncIterator<unknown, unknown, unknown>;
 type ResumeMethod = "next" | "throw" | "return";
 
-/** Binds a generator object to the current context (rule C5). */
+/** This function binds a generator object to the current context (rule C5). */
 export function bindGenerator<I extends AnyIterator>(generator : I) : I {
     let run = AsyncLocalStorage.snapshot();
     const target = generator as unknown as Record<ResumeMethod, (argument? : unknown) => unknown>;

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="description" content="AsyncLocalStorage and the TC39 AsyncContext API for browsers. The context stays through await, timers, events and generators." />
+        <meta name="color-scheme" content="light dark" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <title>async-browser-context: AsyncLocalStorage for browsers</title>
+        <script>
+            // Apply the stored theme before the first paint, so the page does not flash.
+            (function () {
+                try {
+                    var theme = window.localStorage.getItem("abc-site:theme");
+                    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+                } catch (error) {
+                    // The storage is not available. The page uses the system theme.
+                }
+            })();
+        </script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <noscript>This site needs JavaScript. The interactive pages start the real library in the page.</noscript>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>

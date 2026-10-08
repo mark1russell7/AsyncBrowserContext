@@ -1,0 +1,53 @@
+---
+title: The transform
+description: What the Babel preset does to async functions, for await loops and generators, and what the runtime does at each step.
+order: 12
+---
+
+## Why a transform is necessary
+
+A native `await` continues the function from the microtask queue of the engine. The engine does not use `Promise.prototype.then` for this, so a patch of `then` cannot see it. JavaScript code also cannot see the start of the next step of a native generator. Thus, the library changes each async function and each generator at build time.
+
+## The parts of the preset
+
+The preset `async-browser-context/babel-preset` contains three Babel plugins, in this order:
+
+1. A plugin of this library binds each generator to the context of its creation (rule C5). It operates first, in the `Program` visitor, so it gets the generators before the other plugins change them.
+2. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops.
+3. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
+
+The Babel transforms of steps 2 and 3 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
+
+```mermaid title="The transform pipeline" caption="The plugin of the library changes the generators first. Then the two Babel plugins change the async code."
+flowchart TB
+    input["Source module"] --> bind["Plugin of the library: bind each generator"]
+    bind --> asyncgen["Babel: async generators and for await"]
+    asyncgen --> asyncfn["Babel: async functions, with coroutine()"]
+    asyncfn --> output["Module that imports async-browser-context/runtime"]
+```
+
+## The output
+
+Select an example to compare the input with the output of the real preset. The build of this site makes the output with the preset of the repository.
+
+<TransformViewer />
+
+## What coroutine() does
+
+`coroutine(generatorFunction)` gives an async function. When the code starts that function, `coroutine` records the current frame. Then it starts the generator, one step at a time:
+
+1. Make the frame of the function current.
+2. Start the next step of the generator. The step operates until the next `yield`, which was an `await` before the transform.
+3. Record the current frame as the frame of the function. A step can change it with `AsyncLocalStorage.enterWith()`.
+4. Make the previous frame current again.
+5. When the value of the `yield` settles, go back to step 1.
+
+The function gives a native promise. For each `await`, the coroutine uses one promise reaction, as a native `await` of a native promise does.
+
+## What bindGenerator() does
+
+The plugin changes each generator function so that it gives `bindGenerator(generator)`. The function keeps its name, its parameters and its kind, so a declaration stays hoisted. The body moves into an inner generator. `bindGenerator` records the frame of the creation. Each `next()`, `throw()` and `return()` starts its step in that frame, and then makes the frame of the caller current again.
+
+## Transform the dependencies
+
+The Vite plugin transforms the dependencies by default. With Babel, configure the loader so that it does not exclude `node_modules`. The [limits](/docs/concepts/limits) page tells what occurs in code that the build does not transform.

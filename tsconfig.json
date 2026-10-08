@@ -24,6 +24,9 @@
       ],
       "async-browser-context/babel-preset": [
         "./src/babel/preset.ts"
+      ],
+      "async-browser-context/browser/runtime": [
+        "./src/runtime.ts"
       ]
     }
   },
@@ -32,7 +35,8 @@
     "test/**/*.ts",
     "bench/**/*.ts",
     "vitest.config.ts",
-    "stryker.config.mjs"
+    "stryker.config.mjs",
+    "scripts/**/*.ts"
   ],
   "exclude": [
     "test/legacy/**",

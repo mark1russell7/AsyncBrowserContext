@@ -1,0 +1,13 @@
+{
+  "name": "@async-browser-context/ste-lint",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The STE linter of the lag project (github.com/mark1russell7/lag, packages/ste-lint, commit 1460848bc13e), copied without its tests.",
+  "type": "module",
+  "bin": {
+    "ste-lint": "./src/cli.ts"
+  },
+  "dependencies": {
+    "typescript": "^5.9.3"
+  }
+}

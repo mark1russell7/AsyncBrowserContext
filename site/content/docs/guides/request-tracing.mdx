@@ -1,0 +1,56 @@
+---
+title: Request tracing
+description: Give each user action a trace ID, and send the ID with each request that the action starts.
+order: 30
+---
+
+## The goal
+
+A user action, for example a click on "Save", starts many requests. A trace ID for each action connects the requests in the logs of the server. With the library, the code that sends a request reads the trace ID from the context. It is not necessary to give the ID to each function.
+
+## Make the storage
+
+```ts
+// trace.ts
+import { AsyncLocalStorage } from "async-browser-context";
+
+export type Trace = { traceId : string; action : string };
+
+export const traceStorage = new AsyncLocalStorage<Trace>({ name : "trace" });
+
+/** Starts `action` in a new trace. */
+export function traced<R>(action : string, fn : () => Promise<R>) : Promise<R> {
+    return traceStorage.run({ traceId : crypto.randomUUID(), action }, fn);
+}
+```
+
+## Add the trace ID to each request
+
+```ts
+// api.ts
+import { traceStorage } from "./trace";
+
+export async function api<T>(path : string, init : RequestInit = {}) : Promise<T> {
+    const headers = new Headers(init.headers);
+    const trace = traceStorage.getStore();
+    if (trace) headers.set("x-trace-id", trace.traceId);
+    const response = await fetch(path, { ...init, headers });
+    return await response.json() as T;
+}
+```
+
+## Start a trace for each action
+
+```ts
+saveButton.addEventListener("click", () => traced("save", async () => {
+    const draft = await api<Draft>("/api/draft");
+    await api("/api/documents", { method : "POST", body : JSON.stringify(draft) });
+    await refreshList(); // its requests also get the trace ID
+}));
+```
+
+Each `api()` use in the action reads the same trace ID: after `await`, in `then` callbacks and in timers. Two actions at the same time keep different IDs.
+
+<Callout type="note">
+  A request that a dependency sends after a native `await` gets the root context. Use the Vite plugin, or configure Babel to transform the dependencies. The [limits](/docs/concepts/limits) page tells more.
+</Callout>

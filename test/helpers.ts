@@ -1,10 +1,9 @@
-import { inject } from "vitest";
 import type { Variable } from "async-browser-context";
 
-/** The runtime under test. */
-export const runtime : "browser" | "node" = inject("runtime");
+/** The runtime under test (a `define` constant of the Vitest project). */
+export const runtime : "browser" | "node" = __TEST_RUNTIME__;
 /** `true` if the Babel preset transformed the test files. */
-export const transformed : boolean = inject("transformed");
+export const transformed : boolean = __TEST_TRANSFORMED__;
 /** `true` in a real browser (Vitest browser mode). */
 export const inBrowser : boolean = typeof window !== "undefined" && typeof document !== "undefined";
 

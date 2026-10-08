@@ -1,0 +1,27 @@
+---
+title: Results
+description: The probes of the review, the mutants of the runtime and the results in each browser.
+order: 2
+---
+
+## Probes
+
+A probe is a small program from the review of 2026-10-08. Each probe shows one problem of the old library. The table gives the result of each probe with the old library and with the new library. The regression tests in `test/regression/probes.test.ts` examine each result of the new library.
+
+<ProbeTable />
+
+## Mutants
+
+A mutant is a copy of the runtime with a known error. A good test suite fails with each mutant.
+
+The chart gives the part of the old tests that passed with each mutant of the old runtime. With the old tests, the runtime without async support (m4) passed 82 of 217 tests. The runtime with one global value (m5) passed 148 of 217 tests. Thus, the old tests could not find these errors.
+
+The table under the chart gives the last run of Stryker on the current tests. Stryker makes a mutant from each small part of the source code and starts the tests for each mutant. The score is the part of the mutants that the tests find.
+
+<MutationChart />
+
+## Browsers
+
+The rule tests and the tests of the browser APIs operate in Chromium, Firefox and WebKit in each CI run. The table gives the last local run.
+
+<BrowserMatrix />

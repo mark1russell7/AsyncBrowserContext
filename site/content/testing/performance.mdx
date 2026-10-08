@@ -1,0 +1,38 @@
+---
+title: Performance
+description: The mean time of six benchmarks, with plain JavaScript, the transform only, and the library.
+order: 3
+---
+
+## The benchmarks
+
+The command `pnpm bench` starts each case in a separate Node.js process. Each process measures each benchmark with tinybench. A value is the mean time of one operation of the benchmark.
+
+| Benchmark | What it does |
+| --- | --- |
+| await loop | One async function with 10,000 `await` steps. |
+| async calls | 10,000 async functions in sequence, each with one `await`. |
+| then chain | A chain of 10,000 `then` callbacks. |
+| concurrent tasks | 1,000 async functions at the same time, each with 10 `await` steps, in one context. |
+| request handlers | 1,000 request handlers, each in its own context, with three `await` steps and one read of the context. |
+| get in nested contexts | 100,000 reads with `get()`, 5 contexts deep. |
+
+## The cases
+
+| Case | What it measures |
+| --- | --- |
+| Plain JavaScript | The same code without the library. A `Variable` class without propagation gives the same API. |
+| Transform only | The Babel preset with a plain coroutine. This case shows the cost of the transform without the cost of the context. |
+| Library | The Babel preset and the browser runtime. |
+
+<BenchChart />
+
+## What the results tell
+
+- **The transform.** Each async function of transformed code is a generator that the coroutine operates. This costs more than a native async function. The number of microtask steps of each `await` does not change.
+- **The context.** Each `then` callback and each step of the coroutine sets the context and sets it again after the step. Each `then` call makes two small wrappers.
+- **`get()`.** One read takes approximately 5 ns. The plain case reads one field, so the factor is large, but the time is small.
+
+<Callout type="note">
+  The values are microbenchmarks. The benchmarks do no other work, so the factors are the largest possible factors. Measure your own application before and after you add the library.
+</Callout>

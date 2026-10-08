@@ -1,0 +1,82 @@
+---
+title: Patched APIs
+description: Each browser API that the runtime patches, and the context that its callbacks get.
+order: 13
+---
+
+The runtime patches these APIs when it loads. It patches each API one time for each global object, also when the page loads two copies of the library. Each patched function keeps its name, its length and its other properties. `Function.prototype.toString` shows the source text of the original function.
+
+## Promises
+
+| API | Callback context |
+| --- | --- |
+| `Promise.prototype.then` | The context of the code that uses `then()` (rule C4). |
+| `catch`, `finally`, `Promise.all`, `race`, `allSettled`, `any` | These functions use `then()`, so they get the same rule. |
+
+The runtime does not replace the `Promise` constructor (rule C11).
+
+## Timers and schedulers
+
+| API | Callback context |
+| --- | --- |
+| `setTimeout`, `setInterval`, `setImmediate` | The context of the code that scheduled the callback (rule C6). |
+| `queueMicrotask` | The same. |
+| `requestAnimationFrame`, `requestIdleCallback` | The same. |
+| `Scheduler.prototype.postTask` | The same. |
+| `HTMLVideoElement.prototype.requestVideoFrameCallback` | The same. |
+| `XRSession.prototype.requestAnimationFrame` | The same. |
+
+A `setTimeout` callback in text form does not change.
+
+## Events
+
+| API | Callback context |
+| --- | --- |
+| `EventTarget.prototype.addEventListener` and `removeEventListener` | Rule C13: the context of the dispatch, or the registration context. |
+| Each `on...` property of each `EventTarget` class and of `window` | The same. The getter gives the original handler. |
+| `MediaQueryList.prototype.addListener` and `removeListener` | The same. |
+
+The patch keeps the rules of the DOM: a second registration of the same listener has no effect, and `once` and `signal` remove the listener.
+
+## Observers and registries
+
+These constructors get a callback. The callback gets the context of the construction. The runtime replaces each constructor with a `Proxy`, so `instanceof`, subclasses and static members do not change.
+
+| Constructor | Callback context |
+| --- | --- |
+| `MutationObserver`, `ResizeObserver`, `IntersectionObserver` | The context of the construction. |
+| `PerformanceObserver`, `ReportingObserver`, `PressureObserver` | The same. |
+| `FinalizationRegistry` | The same. The TC39 draft specifies this rule. |
+
+## Streams
+
+The constructors `ReadableStream`, `WritableStream` and `TransformStream` get an object with methods. The stream uses these methods later, from its own queue. Each method gets the context of the construction.
+
+| Constructor | Methods |
+| --- | --- |
+| `ReadableStream` | `start`, `pull`, `cancel` |
+| `WritableStream` | `start`, `write`, `close`, `abort` |
+| `TransformStream` | `start`, `transform`, `flush`, `cancel` |
+
+## Other callback APIs
+
+Each function argument of these methods gets the context of the method use.
+
+| API | Methods |
+| --- | --- |
+| `Geolocation` | `getCurrentPosition`, `watchPosition` |
+| `LockManager` | `request` |
+| `HTMLCanvasElement` | `toBlob` |
+| `DataTransferItem` | `getAsString` |
+| `FileSystemDirectoryReader`, `FileSystemFileEntry`, `FileSystemDirectoryEntry`, `FileSystemEntry` | `readEntries`, `file`, `getFile`, `getDirectory`, `getParent`, `getMetadata` |
+| `BaseAudioContext` | `decodeAudioData` |
+| `MediaSession` | `setActionHandler` |
+| `RTCPeerConnection` | The old callback forms of `createOffer`, `createAnswer`, `setLocalDescription`, `setRemoteDescription`, `addIceCandidate` and `getStats` |
+| `Notification` | `requestPermission` |
+| `Array` | `fromAsync` |
+| `Document` | `startViewTransition`, also with an object that has an `update` callback |
+| `NavigateEvent` | `intercept`, for the `handler` callback |
+
+## APIs that the runtime does not patch
+
+The library does not patch other callback APIs. For a callback of such an API, use `AsyncContext.Snapshot.wrap(callback)` or `AsyncLocalStorage.bind(callback)`. The [limits](/docs/concepts/limits) page tells more.

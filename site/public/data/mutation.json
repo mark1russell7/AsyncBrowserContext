@@ -1,0 +1,85 @@
+{
+  "generated": "2026-10-08T19:55:18.115Z",
+  "rows": [
+    {
+      "mutant": "real",
+      "description": "The old runtime without a change, run 1",
+      "suite": "old",
+      "passed": 217,
+      "total": 217
+    },
+    {
+      "mutant": "real",
+      "description": "The old runtime without a change, run 2 (three speed tests failed)",
+      "suite": "old",
+      "passed": 214,
+      "total": 217
+    },
+    {
+      "mutant": "m1",
+      "description": "No Promise patches",
+      "suite": "old",
+      "passed": 202,
+      "total": 217
+    },
+    {
+      "mutant": "m2",
+      "description": "No timer patches",
+      "suite": "old",
+      "passed": 207,
+      "total": 217
+    },
+    {
+      "mutant": "m3",
+      "description": "No restore after await",
+      "suite": "old",
+      "passed": 101,
+      "total": 217
+    },
+    {
+      "mutant": "m4",
+      "description": "No async support",
+      "suite": "old",
+      "passed": 82,
+      "total": 217
+    },
+    {
+      "mutant": "m5",
+      "description": "One global value for each variable, never restored",
+      "suite": "old",
+      "passed": 148,
+      "total": 217
+    },
+    {
+      "mutant": "m6",
+      "description": "then uses the registration context",
+      "suite": "old",
+      "passed": 214,
+      "total": 217
+    }
+  ],
+  "stryker": {
+    "score": 2.4179620034542313,
+    "killed": 14,
+    "survived": 530,
+    "timeout": 0,
+    "noCoverage": 35,
+    "total": 579,
+    "scope": [
+      "src/babel/bind-generators.ts",
+      "src/babel/preset.ts",
+      "src/core/async-local-storage.ts",
+      "src/core/coroutine.ts",
+      "src/core/snapshot.ts",
+      "src/core/store.ts",
+      "src/core/variable.ts",
+      "src/node/index.ts",
+      "src/node/runtime.ts",
+      "src/patches/patch.ts",
+      "src/patches/promise.ts",
+      "src/patches/timers.ts",
+      "src/patches/to-string.ts",
+      "src/vite/plugin.ts"
+    ]
+  }
+}

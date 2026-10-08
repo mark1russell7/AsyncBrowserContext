@@ -25,7 +25,7 @@ export interface Intrinsics {
 }
 
 export interface ContextStore {
-    /** The frame of the code that runs now. */
+    /** The frame of the code that operates at this time. */
     current : Frame;
     /** The frame with no values. */
     readonly root : Frame;
@@ -70,7 +70,7 @@ function getOrCreateStore() : ContextStore {
 /** The store of this global object. */
 export const store : ContextStore = getOrCreateStore();
 
-/** Makes `frame` the current frame. Returns the frame that was current before. */
+/** This function makes `frame` the current frame. It gives the frame that was current before. */
 export function enter(frame : Frame) : Frame {
     const previous = store.current;
     store.current = frame;
@@ -83,8 +83,8 @@ export const NOT_FOUND : unique symbol = Symbol("not found");
 /**
  * A frame that sets the value of one variable. The variable and the value are
  * private fields, so only this module can read them. A frame of another copy
- * of the library is an instance of another class, so `#variable in frame` is
- * `false` for it, and the search goes on to its parent.
+ * of the library is an instance of another class. Thus, `#variable in frame`
+ * is `false` for it, and the search continues to its parent.
  */
 class ValueFrame implements Frame {
     readonly parent : Frame;
@@ -104,7 +104,7 @@ class ValueFrame implements Frame {
         this.#value = value;
     }
 
-    /** Gives the value that the nearest frame sets for `variable`, or `NOT_FOUND`. */
+    /** This method gives the value that the nearest frame sets for `variable`, or `NOT_FOUND`. */
     static find(start : Frame, variable : object) : unknown {
         if (!(#variable in start)) {
             return ValueFrame.#search(start, variable);
@@ -131,20 +131,20 @@ class ValueFrame implements Frame {
     }
 }
 
-/** Makes a new frame that has `parent` as its parent and sets `variable` to `value`. */
+/** This function makes a new frame that has `parent` as its parent and sets `variable` to `value`. */
 export function createFrame(parent : Frame, variable : object, value : unknown) : Frame {
     return new ValueFrame(parent, variable, value);
 }
 
-/** Gives the value of `variable` in `frame`, or `NOT_FOUND` if no frame sets it. */
+/** This function gives the value of `variable` in `frame`, or `NOT_FOUND` if no frame sets it. */
 export function findValue(frame : Frame, variable : object) : unknown {
     return ValueFrame.find(frame, variable);
 }
 
 /**
- * Wraps `fn`. The wrapper runs `fn` in `frame`, with the `this` value and the
- * arguments of the call. After `fn` returns or throws, the previous frame is
- * current again.
+ * This function wraps `fn`. The wrapper starts `fn` in `frame`, with the `this`
+ * value and the arguments of the call. After `fn` ends, also with an error, the
+ * previous frame is current again.
  */
 export function bindToFrame<T, A extends unknown[], R>(frame : Frame, fn : (this : T, ...args : A) => R) : (this : T, ...args : A) => R {
     return function boundToFrame(this : T, ...args : A) : R {
@@ -159,7 +159,7 @@ export function bindToFrame<T, A extends unknown[], R>(frame : Frame, fn : (this
 }
 
 /**
- * Wraps a callback that gets one argument, for example a `then` callback. This
+ * This function wraps a callback that gets one argument, for example a `then` callback. This
  * wrapper does not make an array of the arguments, so it is faster than
  * `bindToFrame` on the hot path.
  */

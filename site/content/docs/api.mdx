@@ -1,0 +1,133 @@
+---
+title: API reference
+description: Each class, method and option of the library, with its type.
+order: 20
+---
+
+The entry `async-browser-context` gives the same API in the browser and on Node.js. In the browser, the entry installs the patches of the runtime when it loads.
+
+## AsyncContext
+
+```ts
+const AsyncContext : {
+    readonly Variable : typeof Variable;
+    readonly Snapshot : typeof Snapshot;
+};
+```
+
+The namespace object of the TC39 AsyncContext proposal. `AsyncContext.Variable` is the same class as `Variable`, and `AsyncContext.Snapshot` is the same class as `Snapshot`.
+
+## Variable
+
+```ts
+class Variable<T> {
+    constructor(options? : { name? : string; defaultValue? : T });
+    get name() : string;
+    get() : T | undefined;
+    run<R, A extends unknown[]>(value : T, fn : (...args : A) => R, ...args : A) : R;
+}
+```
+
+A value that is different in each context. This class is `AsyncContext.Variable` of the TC39 proposal.
+
+| Member | What it does |
+| --- | --- |
+| `constructor(options)` | `name` is for debug tools only. The default is the empty string. `defaultValue` is the value outside a context. |
+| `name` | The name of the variable. |
+| `get()` | Gives the value of the variable in the current context, or the default value. |
+| `run(value, fn, ...args)` | Starts `fn` with `args` in a new context in which `get()` gives `value`. Gives the result of `fn`. After `fn`, the previous context is current again. |
+
+`AsyncVariable` is another name for `Variable`.
+
+## Snapshot
+
+```ts
+class Snapshot {
+    constructor();
+    run<R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) : R;
+    static wrap<T, A extends unknown[], R>(fn : (this : T, ...args : A) => R) : (this : T, ...args : A) => R;
+}
+```
+
+A record of the current context. This class is `AsyncContext.Snapshot` of the TC39 proposal.
+
+| Member | What it does |
+| --- | --- |
+| `constructor()` | Records the current context. |
+| `run(fn, ...args)` | Starts `fn` with `args` in the recorded context. Gives the result of `fn`. |
+| `Snapshot.wrap(fn)` | Records the current context and gives a wrapper of `fn`. The wrapper starts `fn` in the recorded context, with its `this` value and its arguments. If `fn` is not a function, `wrap` throws a `TypeError`. |
+
+`AsyncSnapshot` is another name for `Snapshot`.
+
+## AsyncLocalStorage
+
+```ts
+class AsyncLocalStorage<T> {
+    constructor(options? : { defaultValue? : T; name? : string });
+    get name() : string;
+    getStore() : T | undefined;
+    run<R, A extends unknown[]>(store : T, callback : (...args : A) => R, ...args : A) : R;
+    exit<R, A extends unknown[]>(callback : (...args : A) => R, ...args : A) : R;
+    enterWith(store : T) : void;
+    disable() : void;
+    static bind<T, A extends unknown[], R>(fn : (this : T, ...args : A) => R) : (this : T, ...args : A) => R;
+    static snapshot() : <R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) => R;
+}
+```
+
+The class of `node:async_hooks`, for browsers. On Node.js, the package gives the native class.
+
+| Member | What it does |
+| --- | --- |
+| `constructor(options)` | The options of Node.js 24: `defaultValue` and `name`. |
+| `getStore()` | Gives the store of the current context. Outside `run()`, it gives the default value. After `disable()`, it gives `undefined`. |
+| `run(store, callback, ...args)` | Starts `callback` in a new context in which `getStore()` gives `store`. |
+| `exit(callback, ...args)` | Starts `callback` in a new context in which `getStore()` gives `undefined`. |
+| `enterWith(store)` | Sets `store` for the rest of the current step, and for the code that this step starts later. |
+| `disable()` | `getStore()` gives `undefined` until the next `run()` or `enterWith()`. |
+| `AsyncLocalStorage.bind(fn)` | The same as `Snapshot.wrap(fn)`. |
+| `AsyncLocalStorage.snapshot()` | Records the current context and gives a function that starts a function in that context. |
+
+<Callout type="caution" title="enterWith()">
+  Use `run()` if possible. `enterWith()` also changes the store of the code that started the current function, until the end of the current step.
+</Callout>
+
+## The Vite plugin
+
+```ts
+import { asyncContext } from "async-browser-context/vite";
+
+function asyncContext(options? : {
+    include? : RegExp | ((id : string) => boolean);
+    exclude? : RegExp | ((id : string) => boolean);
+    runtime? : string;
+    ssr? : boolean;
+}) : Plugin;
+```
+
+The plugin applies the Babel preset to each JavaScript and TypeScript module. It operates after the other plugins (`enforce: "post"`).
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `include` | All modules, also in `node_modules` | The modules to transform. |
+| `exclude` | No module | The modules not to transform. |
+| `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. |
+| `ssr` | `false` | Also transform the modules of server-side rendering. On Node.js, the native `AsyncLocalStorage` keeps the context, so the default is `false`. Set it to `true` for tests in the Node.js environment of Vitest. |
+
+The plugin does not change a module that has no async function, no generator and no `for await` loop. It does not transform the runtime of the library.
+
+## The Babel preset
+
+```js
+presets : [["async-browser-context/babel-preset", { runtime : "async-browser-context/runtime" }]];
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. |
+
+The preset operates with Babel 7.22 and later and with Babel 8. Put it last in the `presets` list.
+
+## The runtime
+
+`async-browser-context/runtime` exports `coroutine` and `bindGenerator`. The transformed code uses them. Do not use them in your code. The [transform](/docs/concepts/transform) page tells what they do.

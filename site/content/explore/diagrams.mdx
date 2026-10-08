@@ -1,0 +1,61 @@
+---
+title: Diagrams
+description: The parts of the runtime, the steps of the coroutine and the transform pipeline.
+order: 6
+---
+
+## The parts of the runtime
+
+```mermaid title="The parts of the runtime" caption="The variables read the current frame. The coroutine, the generator binder and the patches set the current frame for one step at a time."
+flowchart TB
+    subgraph api["Public API"]
+        variable["AsyncContext.Variable"]
+        snapshot["AsyncContext.Snapshot"]
+        als["AsyncLocalStorage"]
+    end
+    subgraph runtime["Runtime"]
+        store["Store: the current frame"]
+        frames["Frames: one variable and one value each"]
+        coroutine["coroutine()"]
+        bind["bindGenerator()"]
+        patches["Patches: then, timers, events, observers, streams"]
+    end
+    als --> variable
+    variable -->|"run() makes"| frames
+    variable -->|"get() reads"| store
+    snapshot -->|"records"| store
+    coroutine -->|"sets for each step"| store
+    bind -->|"sets for each step"| store
+    patches -->|"sets for each callback"| store
+    store --> frames
+```
+
+## The steps of the coroutine
+
+```mermaid title="One await in transformed code" caption="The coroutine sets the frame of the function before each step and sets the previous frame after the step."
+sequenceDiagram
+    participant Caller
+    participant Coroutine as coroutine()
+    participant Body as Generator body
+    participant Queue as Microtask queue
+    Caller->>Coroutine: start the async function
+    Coroutine->>Body: step 1 in the frame of the function
+    Body-->>Coroutine: yield (was await)
+    Coroutine->>Coroutine: set the previous frame
+    Coroutine->>Queue: then() on the value
+    Queue->>Coroutine: the value settles
+    Coroutine->>Body: step 2 in the frame of the function
+    Body-->>Coroutine: the function is complete
+    Coroutine->>Coroutine: set the previous frame
+```
+
+## The transform pipeline
+
+```mermaid title="The transform pipeline" caption="The Vite plugin gives each module to the preset. The preset contains three Babel plugins."
+flowchart TB
+    module["Module (also in node_modules)"] --> plugin["Vite plugin, after the other plugins"]
+    plugin --> bind["Bind the generators"]
+    bind --> asyncgen["Async generators and for await"]
+    asyncgen --> asyncfn["Async functions with coroutine()"]
+    asyncfn --> out["Module that imports the runtime"]
+```

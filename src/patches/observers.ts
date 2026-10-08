@@ -2,8 +2,8 @@ import { bindToFrame, store } from "../core/store.js";
 import { claim, ownDataValue, rememberOriginal } from "./patch.js";
 
 /**
- * The constructors that get a callback as their first argument and call it
- * later. The callback runs in the context of the construction. The TC39 draft
+ * The constructors that get a callback as their first argument and use it
+ * later. The callback operates in the context of the construction. The TC39 draft
  * specifies this rule for `FinalizationRegistry`.
  */
 const CONSTRUCTORS = [
@@ -20,7 +20,7 @@ const CONSTRUCTORS = [
 type Constructor = new (...args : unknown[]) => object;
 
 /**
- * Replaces each constructor with a `Proxy`. A `Proxy` keeps `instanceof`,
+ * This function replaces each constructor with a `Proxy`. A `Proxy` keeps `instanceof`,
  * subclasses, the static members and the native `toString()` of the
  * constructor.
  */

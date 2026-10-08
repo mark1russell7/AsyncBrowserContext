@@ -1,0 +1,62 @@
+---
+title: Test your code with Vitest
+description: Configure Vitest so that your tests use the browser runtime and the transform of the library.
+order: 34
+---
+
+## Tests in a browser
+
+Vitest browser mode uses the Vite configuration. Add the Vite plugin to the test configuration, and the tests and the code under test get the transform:
+
+```ts
+// vitest.config.ts
+import { defineConfig } from "vitest/config";
+import { asyncContext } from "async-browser-context/vite";
+import { playwright } from "@vitest/browser-playwright";
+
+export default defineConfig({
+    plugins : [asyncContext()],
+    test : {
+        browser : {
+            enabled : true,
+            provider : playwright(),
+            instances : [{ browser : "chromium" }, { browser : "firefox" }, { browser : "webkit" }],
+        },
+    },
+});
+```
+
+## Tests in the Node.js environment
+
+In the Node.js environment, the `node` export condition selects the Node.js entry, and the native `AsyncLocalStorage` keeps the context. A transform is not necessary for the rules C1 to C4. In this environment, Vitest uses the SSR transform of Vite. If your tests need rule C5 for generators, set the `ssr` option of the plugin to `true`:
+
+```ts
+export default defineConfig({
+    plugins : [asyncContext({ ssr : true })],
+    test : { environment : "node" },
+});
+```
+
+To examine the behavior of the browser runtime, use browser mode.
+
+## Write a test that can find a leak
+
+A test with one context at a time cannot find a context leak: the leaked value is the same as the correct value. Use two contexts, and let the other context continue first:
+
+```ts
+it("keeps the context after await, while another request continues", async () => {
+    const requestId = new AsyncContext.Variable<string>();
+    const other = requestId.run("other", async () => {
+        await null;
+        await null;
+    });
+    const seen = await requestId.run("mine", async () => {
+        const value = { first : await null, id : requestId.get() };
+        return value.id;
+    });
+    await other;
+    expect(seen).toBe("mine");
+});
+```
+
+The [testing section](/testing) tells how the library tests itself.

@@ -17,7 +17,7 @@ const BIND_GENERATOR_NAME = /^_?bindGenerator\d*$/;
 
 type FunctionPath = NodePath<types.Function>;
 
-/** Gives `true` if `path` is the generator that Babel gives to its async generator helper. */
+/** This function gives `true` if `path` is the generator that Babel gives to its async generator helper. */
 function isAsyncGeneratorHelperArgument(path : FunctionPath) : boolean {
     const parent = path.parentPath;
     if (parent === null || !parent.isCallExpression()) {
@@ -34,7 +34,7 @@ function isBindGeneratorCallee(callee : types.Node, path : NodePath, runtime : s
     return types.isMemberExpression(callee) && types.isIdentifier(callee.property) && callee.property.name === "bindGenerator";
 }
 
-/** Gives `true` if this plugin already changed the generator: `bindGenerator((function* () {...})())`. */
+/** This function gives `true` if this plugin already changed the generator: `bindGenerator((function* () {...})())`. */
 function isAlreadyBound(path : FunctionPath, runtime : string) : boolean {
     const call = path.parentPath;
     if (call === null || !call.isCallExpression() || call.node.callee !== path.node) {
@@ -48,7 +48,7 @@ function isAlreadyBound(path : FunctionPath, runtime : string) : boolean {
 }
 
 /**
- * Changes one generator function. The function stays the same kind of
+ * This function changes one generator function. The function stays the same kind of
  * function, with the same name and parameters, so declarations stay hoisted
  * and `length` does not change. The body moves into an inner generator, and
  * the function gives `bindGenerator(inner())`:

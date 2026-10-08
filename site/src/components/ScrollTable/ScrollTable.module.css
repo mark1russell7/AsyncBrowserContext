@@ -1,0 +1,44 @@
+.scroll {
+    max-width: 100%;
+    margin: 0 0 var(--space-5);
+    overflow-x: auto;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.scroll > table {
+    margin: 0;
+    min-width: 100%;
+    border-collapse: collapse;
+}
+
+.scroll > table :is(th, td) {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-rule);
+    text-align: left;
+    vertical-align: top;
+}
+
+.scroll > table thead th {
+    border-bottom-color: var(--color-rule-strong);
+    background: var(--color-surface-sunken);
+    font-size: var(--text-sm);
+}
+
+.scroll > table tbody tr:last-child > :is(th, td) {
+    border-bottom: 0;
+}
+
+/* A technical name in a cell stays on one line; the region scrolls instead. */
+.scroll > table code {
+    overflow-wrap: normal;
+    white-space: nowrap;
+}
+
+.scroll > table caption {
+    padding: var(--space-3) var(--space-3) var(--space-2);
+    caption-side: top;
+    text-align: left;
+    font-weight: 700;
+}

@@ -1,0 +1,20 @@
+---
+title: Transform viewer
+description: The input and the output of the Babel preset of the library for five examples.
+order: 4
+---
+
+## The examples
+
+Select an example. The left pane shows the input. The right pane shows the output of the preset. The build of this site makes the output with the real preset of the repository.
+
+<TransformViewer />
+
+## What to look for
+
+- Each async function becomes a generator function that `coroutine()` wraps. Each `await` becomes a `yield`.
+- The function keeps its name and its parameters. A declaration stays a declaration, so it stays hoisted.
+- A generator gives `bindGenerator(...)`. The body moves into an inner generator.
+- The output imports `coroutine` and `bindGenerator` from `async-browser-context/runtime`.
+
+The [transform](/docs/concepts/transform) page tells what the runtime does at each step.

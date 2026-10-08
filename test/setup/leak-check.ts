@@ -1,4 +1,4 @@
-import { afterEach, expect, inject } from "vitest";
+import { afterEach, expect } from "vitest";
 import { store } from "../../src/core/store.js";
 
 /**
@@ -7,7 +7,7 @@ import { store } from "../../src/core/store.js";
  * keeps the contexts.
  */
 afterEach(() => {
-    if (inject("runtime") !== "browser") {
+    if (__TEST_RUNTIME__ !== "browser") {
         return;
     }
     expect(store.current, "a context stayed current after the test").toBe(store.root);

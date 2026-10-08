@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Build, types, Node.js tests, STE lint (Node.js ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # The Babel 8 packages need Node.js 22.18 or later, or 24.11 or later
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test:node
+      - name: Memory tests
+        run: pnpm exec vitest run --project memory
+      # The writing rules (ASD-STE100) of the README, the documents, the site and the TSDoc comments
+      - name: STE lint
+        run: pnpm lint:ste
+
+  browser:
+    name: Browser tests (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    env:
+      BROWSERS: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install the browser and its system dependencies
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Browser tests
+        run: pnpm exec vitest run --project "browser (${{ matrix.browser }})"
+
+  smoke:
+    name: Smoke test (the packed package in a new Vite application)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium and its system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm smoke

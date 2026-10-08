@@ -1,0 +1,35 @@
+---
+title: Context timeline
+description: Six scenarios that read a variable at the points of risk, with the library and with a global variable.
+order: 2
+---
+
+## How to read the timeline
+
+Select a scenario. The page starts the scenario with the library and records each read of the variable. Each lane is one task. Each dot is one read, in the order of the reads. The fill color is the context that the read got:
+
+- A ring of normal width marks a read that got the expected context.
+- A thick yellow ring marks a read that got the root context. The value was lost.
+- A thick red ring marks a read that got the context of a different task.
+
+Point to a dot to look at the read. The tip shows the place in the code, the expected context and the context that the read got. Each chart also has a table of the reads.
+
+## Compare with a global variable
+
+Select a global variable in the "Compare" list to start the same scenario with it:
+
+- **Global variable, set back.** `run()` sets the value, and sets the previous value again when `fn` gives its result. After the first `await`, the value is gone.
+- **Global variable, not set back.** `run()` sets the value and does not set it back. Code gets the value of the last `run()`, also from a different task. The old runtime of this library had this problem after each `await`.
+
+<ContextTimeline />
+
+## The scenarios
+
+| Scenario | Rule | What to look for |
+| --- | --- | --- |
+| `await` in an expression | C3 | Task B continues first after each microtask. Each read of task A must still get A. |
+| A cached promise | C4 | Two requests and the root context use `then()` on one promise. Each callback gets the context of its `then()` use. |
+| Timers and microtasks | C6 | Each callback gets the context of the code that scheduled it. |
+| A click event | C13 | A click from the root context gives the registration context. A click from context C gives C. |
+| A generator | C5 | The body of the generator gets the context of its creation. |
+| An untransformed dependency | C7 | The callback after a native `await` gets the root context, not the context of request B. |

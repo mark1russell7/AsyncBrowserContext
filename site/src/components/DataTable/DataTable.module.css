@@ -1,0 +1,26 @@
+.table {
+    font-size: var(--text-sm);
+}
+
+.table [data-align="right"] {
+    text-align: right;
+}
+
+.disclosure {
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
+}
+
+.disclosure > summary {
+    width: fit-content;
+    color: var(--color-accent);
+    cursor: pointer;
+}
+
+.disclosure > summary:hover {
+    color: var(--color-accent-strong);
+}
+
+.disclosure[open] > summary {
+    margin-bottom: var(--space-2);
+}

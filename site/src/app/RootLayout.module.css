@@ -1,0 +1,39 @@
+.shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.skip {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: 100;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius);
+    background: var(--color-accent);
+    color: var(--color-surface);
+    font-weight: 700;
+    transform: translateY(-200%);
+}
+
+.skip:focus {
+    transform: none;
+    color: var(--color-surface);
+}
+
+.main {
+    flex: 1;
+    width: 100%;
+}
+
+.main:focus {
+    outline: none;
+}
+
+.loading {
+    max-width: var(--page-width);
+    margin: 0 auto;
+    padding: var(--space-8) var(--gutter);
+    color: var(--color-ink-secondary);
+}

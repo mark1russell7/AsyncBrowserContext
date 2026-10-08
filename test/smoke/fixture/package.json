@@ -1,0 +1,10 @@
+{
+  "name": "smoke-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview --strictPort",
+    "dev": "vite --strictPort"
+  }
+}

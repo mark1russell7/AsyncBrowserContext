@@ -1,0 +1,115 @@
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    border-bottom: 1px solid var(--color-rule);
+    background: color-mix(in srgb, var(--color-page) 92%, transparent);
+    backdrop-filter: blur(6px);
+}
+
+.inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-5);
+    width: 100%;
+    max-width: var(--page-width);
+    min-height: var(--header-height);
+    margin: 0 auto;
+    padding: var(--space-2) var(--gutter);
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--color-ink);
+    font-size: var(--text-xl);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+}
+
+.brand:hover {
+    color: var(--color-ink);
+    text-decoration: none;
+}
+
+.nav {
+    display: flex;
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.menuButton {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* On a narrow screen, the open list is a panel under the header. */
+.list {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+    padding: var(--space-2) var(--gutter) var(--space-4);
+    border-bottom: 1px solid var(--color-rule);
+    background: var(--color-page);
+    list-style: none;
+}
+
+.list[data-open="true"] {
+    display: flex;
+}
+
+.link {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius);
+    color: var(--color-ink-secondary);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.link:hover {
+    color: var(--color-ink);
+    text-decoration: none;
+    background: var(--color-surface-sunken);
+}
+
+.link[aria-current="page"] {
+    color: var(--color-ink);
+    box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+@media (min-width: 52rem) {
+    .nav {
+        justify-content: flex-start;
+    }
+
+    .menuButton {
+        display: none;
+    }
+
+    .list {
+        display: flex;
+        position: static;
+        flex-direction: row;
+        padding: 0;
+        border-bottom: 0;
+        background: transparent;
+    }
+
+    .link[aria-current="page"] {
+        border-radius: var(--radius) var(--radius) 0 0;
+    }
+}

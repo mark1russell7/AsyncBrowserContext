@@ -1,0 +1,54 @@
+---
+title: Test strategy
+description: The layers of the tests, the rule suites, the leak check and the browsers.
+order: 1
+---
+
+## Why the old tests were not sufficient
+
+The old tests used one context at a time, so a leaked value was the same as the correct value. They read the variable only at the start of a statement, and only in callbacks that the runtime wrapped. Thus, a runtime with no async support passed 82 of the 217 old tests. The [results](/testing/results) page shows this with the mutants of the review.
+
+## The rules for each test
+
+1. Use two or more contexts. Let a different context continue immediately before each read.
+2. Read the value at the points of risk. These are the same expression after `await`, the callbacks that the library does not wrap and the code that the transform does not change.
+3. Do not put assertions in callbacks that the test does not wait for.
+4. Do not use time limits to examine correctness. Put the speed checks in the benchmarks.
+5. Do not skip a test silently. Use `test.skipIf` with a reason.
+6. Use a fixed seed for random values. Record the seed when a test fails.
+7. Make each test name tell the rule and the expected result.
+
+## The test layers
+
+| Layer | Tool | What the layer shows |
+| --- | --- | --- |
+| Unit | Vitest on Node.js | Each part of the runtime operates correctly. |
+| Rules | Vitest on Node.js and in browsers | The context rules C1 to C13. |
+| Transform fixtures | Vitest and Babel | The output and the results of transformed code. |
+| Reference | Vitest and `AsyncLocalStorage` | The library gives the same results as Node.js. |
+| Order variation | Vitest with a random scheduler that has a fixed seed | No leak occurs in many different orders of steps. |
+| Browser APIs | Vitest browser mode in three engines | The patched APIs operate correctly. |
+| Memory | Node.js with `--expose-gc` | Rule C12. |
+| Mutation | StrykerJS | The tests find errors that a mutant adds to the runtime. |
+| Speed | tinybench in separate processes | The [benchmarks](/testing/performance). |
+
+## The projects
+
+One Vitest configuration starts the same rule tests on each runtime:
+
+| Project | Runtime | Transform |
+| --- | --- | --- |
+| `rules (browser runtime, Node.js)` | The browser runtime, on Node.js | Yes |
+| `rules (node runtime)` | The Node.js entry with the native `AsyncLocalStorage` | Yes |
+| `rules (node runtime, no transform)` | The Node.js entry | No |
+| `browser (chromium)`, `browser (firefox)`, `browser (webkit)` | The browser runtime, in a real browser | Yes |
+
+The test files import the package by its name, as your code does. The Vite plugin of the library transforms the test files.
+
+## The leak check
+
+After each test of the browser runtime, a check makes sure that the root context is current. A test that leaves a context current fails, also if its assertions pass.
+
+## The tests of this site
+
+The site has its own tests. One test starts each scenario of the [context timeline](/explore/timeline) in Chromium and examines each read. Another test opens each page of the site and fails at an error.

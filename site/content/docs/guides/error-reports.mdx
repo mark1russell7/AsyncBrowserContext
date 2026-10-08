@@ -1,0 +1,46 @@
+---
+title: Error reports with context
+description: Add the context of the operation to the report of an error, also for an error that the code does not catch.
+order: 32
+---
+
+## Errors that the code catches
+
+In a `catch` block, the context of the operation is current (rule C3). Read the context and add it to the report:
+
+```ts
+try {
+    await traced("save", () => saveDocument(draft));
+} catch (error) {
+    report(error, { trace : traceStorage.getStore() });
+}
+```
+
+The `catch` block above is outside `traced()`, so it gets the outer context. Put the `try` statement inside the function of `traced()` to get the trace of the action.
+
+## Errors that the code does not catch
+
+A `window.onerror` handler or an `unhandledrejection` listener gets its registration context (rule C13), because the browser dispatches the event. The registration context is usually the root context. Thus, record the context in the error object before the error leaves the operation:
+
+```ts
+const CONTEXT = Symbol("context");
+
+export function traced<R>(action : string, fn : () => Promise<R>) : Promise<R> {
+    return traceStorage.run({ traceId : crypto.randomUUID(), action }, async () => {
+        try {
+            return await fn();
+        } catch (error) {
+            if (typeof error === "object" && error !== null) {
+                Object.defineProperty(error, CONTEXT, { value : traceStorage.getStore() });
+            }
+            throw error;
+        }
+    });
+}
+
+window.addEventListener("unhandledrejection", (event) => {
+    const reason : unknown = event.reason;
+    const trace = typeof reason === "object" && reason !== null ? (reason as Record<symbol, unknown>)[CONTEXT] : undefined;
+    report(reason, { trace });
+});
+```

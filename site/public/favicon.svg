@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .rule { fill: none; stroke: #454f67; }
+    @media (prefers-color-scheme: dark) {
+      .rule { stroke: #aeb6c7; }
+    }
+  </style>
+  <rect class="rule" x="2" y="2" width="28" height="28" rx="5" stroke-width="2" />
+  <rect class="rule" x="7" y="7" width="18" height="18" rx="4" stroke-width="2" />
+  <circle cx="16" cy="16" r="4.5" fill="#2346c4" />
+</svg>

@@ -1,0 +1,49 @@
+---
+title: Overview
+description: What the library does, the problem that it solves, and the parts of this documentation.
+order: 1
+---
+
+## What the library does
+
+`async-browser-context` keeps a value for each asynchronous operation in a browser. The value is the *context* of the operation. For example, the context of a click handler can contain a request ID. Each function that the handler starts can read the request ID. It is not necessary to give the ID to each function as a parameter.
+
+The library gives two APIs for the same mechanism:
+
+- The `AsyncLocalStorage` class, with the API and the behavior of the class in `node:async_hooks` of Node.js.
+- `AsyncContext.Variable` and `AsyncContext.Snapshot` of the TC39 AsyncContext proposal.
+
+On Node.js, the package gives the native `AsyncLocalStorage`. The browser runtime and the Babel transform are not necessary there.
+
+## The problem
+
+Node.js keeps the context with hooks in its engine. A browser has no such hooks. Also, JavaScript code cannot know when a native `await` continues: `await` does not use `Promise.prototype.then`. Thus, a library that only patches `then` loses the context after each `await`.
+
+The library solves the problem in two parts:
+
+1. A Babel preset, or the Vite plugin, changes each async function into a generator function. A small function of the runtime, the coroutine, starts each step of the generator in the context of the async function. After the step, the coroutine sets the previous context again.
+2. The runtime patches `Promise.prototype.then`, the timers, the event listeners, the observers and other browser APIs. Each callback gets the context of the code that registered it.
+
+```mermaid title="The two parts of the library" caption="The build transforms the code. The runtime keeps the context while the code operates."
+flowchart TB
+    source["Your code with async and await"] --> transform["Babel preset or Vite plugin"]
+    transform --> output["Generators and coroutine()"]
+    output --> runtime["Runtime: coroutine, bindGenerator, patches"]
+    runtime --> value["get() gives the value of the current context"]
+```
+
+## The parts of this documentation
+
+| Page | What it tells |
+| --- | --- |
+| [Get started](/docs/getting-started) | How to install the library and configure Vite, Babel, webpack or Node.js. |
+| [Contexts and frames](/docs/concepts/contexts-and-frames) | The words of this documentation: context, root context, frame and registration. |
+| [Context rules](/docs/concepts/rules) | The 13 rules that the library obeys, with an example for each rule. |
+| [The transform](/docs/concepts/transform) | What the Babel preset does to async functions, `for await` loops and generators. |
+| [Patched APIs](/docs/concepts/patched-apis) | Each browser API that the runtime patches. |
+| [Limits](/docs/concepts/limits) | The conditions in which the library cannot keep the context. |
+| [API reference](/docs/api) | Each class, method and option. |
+| [Guides](/docs/guides/request-tracing) | Request tracing, logging, error reports, React and tests. |
+| [Design](/docs/design) | The problems of the old design, and the reasons for the new design. |
+
+The [Explore](/explore) section has interactive pages. They start the real library in this page.

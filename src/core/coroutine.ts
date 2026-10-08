@@ -1,10 +1,10 @@
 import { store, type Frame } from "./store.js";
 
 /**
- * The runtime functions that the code from the Babel preset calls. Do not call
- * them directly.
+ * The code from the Babel preset uses these runtime functions. Do not use them
+ * directly.
  *
- * Each async function becomes a generator function, and `coroutine` runs it.
+ * Each async function becomes a generator function, and `coroutine` operates it.
  * Each `await` becomes a `yield`. Before each step of the generator,
  * `coroutine` sets the context of the async function. After the step, it sets
  * the previous context again. Thus, the context is correct after each `await`,
@@ -14,7 +14,7 @@ import { store, type Frame } from "./store.js";
 type StepMethod = "next" | "throw";
 
 /**
- * Gives an async function that runs `generatorFunction`. The preset gives
+ * This function gives an async function that operates `generatorFunction`. The preset gives
  * this function to `@babel/plugin-transform-async-to-generator` as its
  * `method` option.
  */
@@ -60,8 +60,8 @@ type AnyIterator = Iterator<unknown, unknown, unknown> | AsyncIterator<unknown, 
 type ResumeMethod = "next" | "throw" | "return";
 
 /**
- * Binds a generator object to the current context. The body of the generator
- * runs in the context of the call that made the generator, as the TC39
+ * This function binds a generator object to the current context. The body of
+ * the generator operates in the context of the call that made the generator, as the TC39
  * proposal specifies (`GeneratorStart` and `GeneratorResume`). After each step,
  * the context of the caller is current again.
  *

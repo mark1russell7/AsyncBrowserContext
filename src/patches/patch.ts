@@ -1,8 +1,8 @@
 import { bindToFrame, store } from "../core/store.js";
 
 /**
- * Marks the patch `name` as installed. Gives `true` if the patch was not
- * installed before. Each patch is installed one time for each global object,
+ * This function marks the patch `name` as installed. It gives `true` if the
+ * patch was not installed before. Each patch is installed one time for each global object,
  * also when the page loads two copies of the library.
  */
 export function claim(name : string) : boolean {
@@ -13,12 +13,12 @@ export function claim(name : string) : boolean {
     return true;
 }
 
-/** Records `original` as the original of `replacement`. `Function.prototype.toString` then shows the original. */
+/** This function records `original` as the original of `replacement`. `Function.prototype.toString` then shows the original. */
 export function rememberOriginal(replacement : object, original : object) : void {
     store.originals.set(replacement, store.originals.get(original) ?? original);
 }
 
-/** Copies the name, the length and the other own properties of `original` to `replacement`. */
+/** This function copies the name, the length and the other own properties of `original` to `replacement`. */
 function copyFunctionProperties(replacement : object, original : object) : void {
     for (const key of Reflect.ownKeys(original)) {
         if (key === "prototype" || key === "arguments" || key === "caller") {
@@ -39,10 +39,10 @@ function copyFunctionProperties(replacement : object, original : object) : void 
 type AnyFunction = (this : unknown, ...args : never[]) => unknown;
 
 /**
- * Replaces the function property `key` of `owner`. `create` gets the original
+ * This function replaces the function property `key` of `owner`. `create` gets the original
  * function and gives the replacement. The replacement gets the property
  * attributes, the name, the length and the other own properties of the
- * original. Gives `false` if `owner` has no function with that key.
+ * original. The function gives `false` if `owner` has no function with that key.
  */
 export function replaceFunction<F extends AnyFunction>(owner : object, key : string, create : (original : F) => F) : boolean {
     const descriptor = Object.getOwnPropertyDescriptor(owner, key);
@@ -57,13 +57,13 @@ export function replaceFunction<F extends AnyFunction>(owner : object, key : str
     return true;
 }
 
-/** Gives the value of the own data property `key` of `owner`, without a call to a getter. */
+/** This function gives the value of the own data property `key` of `owner`, without the use of a getter. */
 export function ownDataValue(owner : object, key : string) : unknown {
     const descriptor = Object.getOwnPropertyDescriptor(owner, key);
     return descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
 }
 
-/** Gives the prototype of the global constructor `name`, if it exists. */
+/** This function gives the prototype of the global constructor `name`, if it exists. */
 export function globalPrototype(name : string) : object | undefined {
     const constructor = ownDataValue(globalThis, name);
     if (typeof constructor !== "function") {
@@ -73,7 +73,7 @@ export function globalPrototype(name : string) : object | undefined {
     return typeof prototype === "object" && prototype !== null ? prototype : undefined;
 }
 
-/** Wraps each function argument with the current frame. Other arguments do not change. */
+/** This function wraps each function argument with the current frame. Other arguments do not change. */
 export function wrapFunctionArguments(args : unknown[]) : unknown[] {
     const frame = store.current;
     let changed : unknown[] | undefined;

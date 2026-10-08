@@ -1,0 +1,45 @@
+.figure {
+    margin: 0 0 var(--space-6);
+    min-width: 0;
+}
+
+.title {
+    margin: 0 0 var(--space-2);
+    font-weight: 700;
+}
+
+.status {
+    margin: 0;
+    color: var(--color-ink-secondary);
+    font-size: var(--text-sm);
+}
+
+.plot {
+    width: 100%;
+    min-width: 0;
+    color: var(--color-ink-muted);
+}
+
+.plot :global(svg) {
+    --plot-background: var(--color-surface);
+    display: block;
+    max-width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.plot :global(text) {
+    fill: currentColor;
+}
+
+/* The tooltip that Plot draws. */
+.plot :global([aria-label="tip"]) {
+    color: var(--color-ink);
+}
+
+.caption {
+    margin-top: var(--space-2);
+    max-width: var(--measure);
+    color: var(--color-ink-secondary);
+    font-size: var(--text-sm);
+}

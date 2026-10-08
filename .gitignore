@@ -10,3 +10,6 @@ test-results/
 *.tsbuildinfo
 .DS_Store
 bench/.out/
+*.log
+bench/results/*
+!bench/results/latest.json

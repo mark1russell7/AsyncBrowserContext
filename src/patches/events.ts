@@ -4,10 +4,10 @@ import { claim, globalPrototype, ownDataValue, rememberOriginal, replaceFunction
 /**
  * The event patch (rule C13).
  *
- * An event listener runs in the context of the code that dispatches the
+ * An event listener operates in the context of the code that dispatches the
  * event, if that context is not the root context. This is the case for
  * `dispatchEvent()`, `element.click()` and the other events that code
- * dispatches synchronously. Else, the listener runs in the context of the
+ * dispatches synchronously. Else, the listener operates in the context of the
  * `addEventListener()` call, or of the assignment to the `on...` property.
  * This is the case for the events that the browser dispatches, for example a
  * `load` event of an `XMLHttpRequest` or a click of the user.
@@ -31,7 +31,7 @@ function keyOf(type : string, options : boolean | EventListenerOptions | undefin
     return `${type}\u0000${capture ? "1" : "0"}`;
 }
 
-/** Gives the frame for a listener call: the current frame, or the registration frame in the root context. */
+/** This function gives the frame for a listener call: the current frame, or the registration frame in the root context. */
 function frameForCall(registered : Frame) : Frame {
     const current = store.current;
     return current === store.root ? registered : current;
@@ -139,7 +139,7 @@ function createHandlerWrapper(handler : Handler, frame : Frame) : Handler {
     };
 }
 
-/** Patches each `on...` accessor property of `owner`. */
+/** This function patches each `on...` accessor property of `owner`. */
 function patchHandlerProperties(owner : object) : void {
     for (const name of Object.getOwnPropertyNames(owner)) {
         if (!name.startsWith("on")) {
@@ -185,7 +185,7 @@ function patchHandlerProperties(owner : object) : void {
     }
 }
 
-/** Patches the `on...` properties of the global object and of each prototype of an `EventTarget` class. */
+/** This function patches the `on...` properties of the global object and of each prototype of an `EventTarget` class. */
 function installHandlerPropertyPatch() : void {
     const eventTarget = ownDataValue(globalThis, "EventTarget");
     if (typeof eventTarget !== "function") {
@@ -213,7 +213,7 @@ function installHandlerPropertyPatch() : void {
 
 type LegacyListenerMethod = (this : unknown, callback : ((this : MediaQueryList, event : MediaQueryListEvent) => unknown) | null) => void;
 
-/** `MediaQueryList.addListener()` and `removeListener()` do not call the JavaScript `addEventListener()`. */
+/** `MediaQueryList.addListener()` and `removeListener()` do not use the JavaScript `addEventListener()`. */
 function installMediaQueryListPatch() : void {
     const prototype = globalPrototype("MediaQueryList");
     if (prototype === undefined) {
@@ -235,7 +235,7 @@ function installMediaQueryListPatch() : void {
     });
 }
 
-/** Installs the event patch (rule C13). */
+/** This function installs the event patch (rule C13). */
 export function installEventPatches() : void {
     if (!claim("events")) {
         return;

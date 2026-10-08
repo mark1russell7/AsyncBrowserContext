@@ -37,7 +37,7 @@ export class AsyncLocalStorage<T> {
     }
 
     /**
-     * Gives the store of the current context. Outside `run()`, the method gives
+     * This method gives the store of the current context. Outside `run()`, the method gives
      * the default value. After `disable()`, the method gives `undefined`.
      */
     getStore() : T | undefined {
@@ -45,21 +45,22 @@ export class AsyncLocalStorage<T> {
     }
 
     /**
-     * Runs `callback` with `args` in a new context in which `getStore()` gives
-     * `store`. After the callback, the previous context is current again.
+     * This method starts `callback` with `args` in a new context in which
+     * `getStore()` gives `store`. After the callback, the previous context is
+     * current again.
      */
     run<R, A extends unknown[]>(store : T, callback : (...args : A) => R, ...args : A) : R {
         this.#enabled = true;
         return this.#variable.run(store, callback, ...args);
     }
 
-    /** Runs `callback` with `args` in a new context in which `getStore()` gives `undefined`. */
+    /** This method starts `callback` with `args` in a new context in which `getStore()` gives `undefined`. */
     exit<R, A extends unknown[]>(callback : (...args : A) => R, ...args : A) : R {
         return this.#variable.run(undefined as T, callback, ...args);
     }
 
     /**
-     * Sets `store` for the rest of the current synchronous step, and for the
+     * This method sets `store` for the rest of the current synchronous step, and for the
      * code that this step starts later. Prefer `run()`: `enterWith()` can also
      * change the store of the code that called the current function.
      */
@@ -68,17 +69,17 @@ export class AsyncLocalStorage<T> {
         enterValue(this.#variable, store);
     }
 
-    /** Disables the storage. `getStore()` gives `undefined` until the next `run()` or `enterWith()`. */
+    /** This method disables the storage. `getStore()` gives `undefined` until the next `run()` or `enterWith()`. */
     disable() : void {
         this.#enabled = false;
     }
 
-    /** Records the current context and gives a wrapper of `fn` that runs in that context. */
+    /** This method records the current context. It gives a wrapper of `fn` that operates in that context. */
     static bind<T, A extends unknown[], R>(fn : (this : T, ...args : A) => R) : (this : T, ...args : A) => R {
         return Snapshot.wrap(fn);
     }
 
-    /** Records the current context and gives a function that runs a function in that context. */
+    /** This method records the current context. It gives a function that starts other functions in that context. */
     static snapshot() : <R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) => R {
         const snapshot = new Snapshot();
         return <R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) : R => snapshot.run(fn, ...args);

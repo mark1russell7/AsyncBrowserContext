@@ -39,7 +39,7 @@ function matches(filter : ModuleFilter, id : string) : boolean {
  * the modules of the application and of its dependencies. Thus, the context
  * stays through `await` also in dependencies.
  *
- * The plugin runs after the other plugins (`enforce: "post"`), so it gets
+ * The plugin operates after the other plugins (`enforce: "post"`), so it gets
  * JavaScript, after TypeScript and JSX are compiled.
  *
  * @example

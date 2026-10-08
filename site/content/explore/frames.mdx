@@ -1,0 +1,20 @@
+---
+title: Frame tree
+description: The frames that run() makes, step by step, from the real store of the runtime.
+order: 3
+---
+
+## How to read the tree
+
+Each box is one frame. The root frame has a dashed border. An arrow goes from a frame to its children. The box with the "Current" mark is the current frame of the runtime at the selected step. A dim box is a frame that a later step makes.
+
+Use "Next step" and "Previous step", or the slider, to move through the steps. "Show all steps" moves through the steps one at a time. The panel shows the step, the current frame and the values that `get()` gives at that step.
+
+The page reads the current frame from the real store of the runtime. A frame keeps its value in a private field, so the page records the value of each frame when the scenario makes the frame.
+
+<FrameTree />
+
+## What to look for
+
+- In the scenario "Nested run() calls", `userId.get()` finds its value in frame F2, and `requestId.get()` finds its value in the parent frame F1.
+- In the scenario "Two requests at the same time", the current frame alternates between F1 and F2. Between the two `run()` uses, the root frame is current.

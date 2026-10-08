@@ -46,7 +46,7 @@ describe("the Babel preset", () => {
         it(`transforms ${name} (output snapshot)`, async () => {
             const output = await transform(input);
             expect(output.changed).toBe(true);
-            await expect(`// Input:\n// ${input}\n\n${output.code}\n`).toMatchFileSnapshot(`./__snapshots__/${name}.js`);
+            await expect(`// Input:\n// ${input}\n\n${output.code}\n`).toMatchFileSnapshot(`./__snapshots__/${name}.js.txt`);
         });
     }
 

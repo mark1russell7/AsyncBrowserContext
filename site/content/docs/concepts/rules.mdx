@@ -1,0 +1,110 @@
+---
+title: Context rules
+description: The 13 rules that the library obeys. The tests examine each rule in Node.js and in browsers.
+order: 11
+---
+
+The rules C1 to C12 come from the remediation plan of the library (`docs/remediation-plan.md`, section 4.1). Rule C13 tells the behavior of events. Rules C3, C4 and C5 are the rules of the TC39 AsyncContext proposal (Stage 2, specification draft of 2026-06-16). In the draft, `PerformPromiseThen` records the context when the code uses `then()`, and `GeneratorStart` and `GeneratorResume` keep the context of the generator. The draft lets each host decide the rules for timers and events.
+
+## C1: the root context outside a context
+
+Outside a callback of the library, `get()` gives the default value. Between tasks, the current context is the root context.
+
+```ts
+const requestId = new AsyncContext.Variable<string>({ defaultValue : "none" });
+requestId.get(); // "none"
+```
+
+## C2: run() sets the value while fn operates
+
+While `fn` of `run(value, fn, ...args)` operates, `get()` gives `value`. After `fn` gives its result or throws an error, the previous context is current again.
+
+```ts
+requestId.run("r-1", () => {
+    requestId.get(); // "r-1"
+});
+requestId.get(); // "none"
+```
+
+## C3: an async function keeps its context
+
+An async function keeps the context in which it starts. This is also true after each `await`, in the same expression as the `await`, and when the promise rejects.
+
+```ts
+await requestId.run("r-1", async () => {
+    const record = { user : await loadUser(), id : requestId.get() }; // id is "r-1"
+});
+```
+
+The [context timeline](/explore/timeline) shows this rule with a second request that continues first.
+
+## C4: a then callback gets the context of then()
+
+A callback of `then()`, `catch()` or `finally()` gets the context of the code that uses `then()`, `catch()` or `finally()`. The context of the code that made the promise is not important.
+
+```ts
+const config = requestId.run("r-1", () => loadConfig()); // a promise in a cache
+requestId.run("r-2", () => config.then(() => requestId.get())); // "r-2"
+```
+
+## C5: a generator keeps the context of its creation
+
+The body of a generator operates in the context in which the code made the generator. After each step of the generator, the context of the code that started the step is current again. This rule applies to sync generators and to async generators.
+
+```ts
+function* pages() {
+    yield requestId.get();
+}
+const iterator = requestId.run("r-1", () => pages());
+requestId.run("r-2", () => iterator.next().value); // "r-1"
+```
+
+## C6: a timer gets the context of the code that scheduled it
+
+A callback of `setTimeout`, `setInterval`, `queueMicrotask`, `requestAnimationFrame` or `requestIdleCallback` gets the context of the code that scheduled it. The [patched APIs](/docs/concepts/patched-apis) page gives the other schedulers.
+
+## C7: untransformed code gets the root context
+
+After an `await`, code that the transform does not change gets the root context. Callbacks from APIs that the library does not patch also get the root context. They do not get the context of a different operation.
+
+<Callout type="caution" title="A missing value, not a wrong value">
+  The library cannot know the context after a native `await`. It gives the root context, so the code sees no value. It does not give the value of a different request. Configure the Vite plugin or Babel to transform the dependencies.
+</Callout>
+
+## C8: a snapshot keeps a context
+
+`snapshot.run(fn, ...args)` starts `fn` in the context of the snapshot. A function from `Snapshot.wrap(fn)` also operates in the context of the snapshot.
+
+```ts
+const snapshot = requestId.run("r-1", () => new AsyncContext.Snapshot());
+snapshot.run(() => requestId.get()); // "r-1"
+```
+
+## C9: only the variable can read its values
+
+Only code that has a `Variable` object can read the values of that object. The library does not put values on `globalThis`.
+
+## C10: two copies use one store
+
+When a page contains two copies of the library, the two copies use one context store. A variable of one copy keeps its value in the code that the other copy transformed.
+
+## C11: the Promise constructor does not change
+
+The library does not replace the `Promise` constructor. `Promise` subclasses, `constructor` checks and `Promise.toString()` operate as they do without the library.
+
+## C12: no promise stays in memory
+
+The library does not keep a promise in memory after the program has no reference to that promise.
+
+## C13: an event listener gets the context of the dispatch or of the registration
+
+An event listener operates in the context of the code that dispatches the event, if that context is not the root context. Else, the listener operates in the context of the `addEventListener()` use, or of the assignment to the `on...` property.
+
+- `element.click()` and `dispatchEvent()` in context C give C to the listener.
+- An event that the browser dispatches gives the registration context to the listener. Examples are a click of the user and a `load` event of an `XMLHttpRequest`.
+
+The [event demonstration](/explore/events) lets you examine the two cases with real clicks.
+
+## The rules on Node.js
+
+On Node.js, the native `AsyncLocalStorage` keeps the context. The rules C1 to C4, C6 and C8 are true. Rules C9 to C12 are true because the Node.js entry installs no patch. Rule C7 is better on Node.js: all code keeps the context, also code that Babel does not transform. Rule C5 is true only in code that the preset transforms. A native generator of Node.js uses the context of the code that starts each step.

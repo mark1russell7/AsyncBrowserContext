@@ -1,0 +1,212 @@
+/* The shared look of the interactive components of the Explore section. */
+
+.widget {
+    margin: var(--space-5) 0 var(--space-6);
+    padding: var(--space-4);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: end;
+    margin-bottom: var(--space-4);
+}
+
+.field {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--color-ink-secondary);
+}
+
+.field select {
+    min-width: 14rem;
+}
+
+.choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-4);
+    padding: 0;
+    list-style: none;
+}
+
+.choice {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--color-control-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.choice[aria-pressed="true"] {
+    border-color: var(--color-accent);
+    background: var(--color-accent-wash);
+    color: var(--color-accent-strong);
+    font-weight: 600;
+}
+
+.summary {
+    margin: 0 0 var(--space-3);
+    color: var(--color-ink-secondary);
+}
+
+.meta {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--color-ink-muted);
+}
+
+.code {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3);
+    overflow-x: auto;
+    border-radius: var(--radius-small);
+    background: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    white-space: pre;
+}
+
+.panels {
+    display: grid;
+    gap: var(--space-4);
+    container-type: inline-size;
+}
+
+.panel {
+    min-width: 0;
+    padding: var(--space-3);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-page);
+}
+
+.panelTitle {
+    margin: 0 0 var(--space-1);
+    font-weight: 700;
+}
+
+.counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-2);
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+}
+
+.count[data-status="correct"] {
+    color: var(--status-good-ink);
+}
+
+.count[data-status="lost"] {
+    color: var(--status-warning-ink);
+}
+
+.count[data-status="wrong"] {
+    color: var(--status-critical-ink);
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+    color: var(--color-ink-secondary);
+}
+
+.swatch {
+    display: inline-block;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin-right: var(--space-1);
+    border-radius: 50%;
+    vertical-align: -0.1rem;
+}
+
+.ring {
+    display: inline-block;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin-right: var(--space-1);
+    border-radius: 50%;
+    border: 3px solid currentColor;
+    vertical-align: -0.15rem;
+}
+
+.error {
+    color: var(--status-critical-ink);
+}
+
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+}
+
+@container (min-width: 52rem) {
+    .split {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+
+.label {
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--color-ink-secondary);
+}
+
+.log {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.logEntry {
+    padding: var(--space-2) var(--space-3);
+    border-left: 4px solid var(--color-rule-strong);
+    border-radius: var(--radius-small);
+    background: var(--color-page);
+    font-size: var(--text-sm);
+}
+
+.logEntry[data-status="correct"] {
+    border-left-color: var(--status-good);
+}
+
+.logEntry[data-status="wrong"] {
+    border-left-color: var(--status-critical);
+}
+
+.target {
+    min-height: 4rem;
+    min-width: 14rem;
+    font-size: var(--text-lg);
+}
+
+.steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+.steps input[type="range"] {
+    flex: 1 1 12rem;
+}

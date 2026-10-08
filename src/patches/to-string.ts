@@ -4,7 +4,7 @@ import { claim, replaceFunction } from "./patch.js";
 type ToString = (this : unknown) => string;
 
 /**
- * Patches `Function.prototype.toString`. For a patched function, it gives
+ * This function patches `Function.prototype.toString`. For a patched function, the patch gives
  * the source text of the original function. Some libraries examine this text
  * to find native functions, and a changed text can stop them.
  */

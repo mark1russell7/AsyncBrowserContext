@@ -1,0 +1,55 @@
+---
+title: Contexts and frames
+description: The words of this documentation, and how the runtime keeps a context.
+order: 10
+---
+
+## Context
+
+A *context* is the set of values that all variables give at one point in a program. A variable is an `AsyncContext.Variable` or an `AsyncLocalStorage`. `get()` and `getStore()` give the value of the variable in the current context.
+
+An operation gets a context when it starts in `run()`:
+
+```ts
+requestId.run("r-1", () => {
+    // In this function, and in each function that it starts later, requestId.get() gives "r-1"
+});
+```
+
+## Root context
+
+The *root context* is the context with no values. In the root context, `get()` gives the default value of the variable. Between two tasks, the root context is current. Thus, a task that starts without a context gets no value of a different operation.
+
+## Frame
+
+The runtime keeps a context as a chain of *frames*. Each `run()` makes a new frame. The frame sets the value of one variable, and its parent is the frame that was current before. The root frame has no parent.
+
+`get()` examines the current frame, then its parent, then the parent of the parent. It gives the value of the nearest frame that sets the variable. If no frame sets the variable, it gives the default value.
+
+```mermaid title="A chain of frames" caption="Two nested run() calls make two frames. userId.get() finds u-7 in F2. requestId.get() finds r-1 in F1."
+flowchart BT
+    F2["F2: userId = u-7"] -->|parent| F1["F1: requestId = r-1"]
+    F1 -->|parent| root["Root frame: no value"]
+```
+
+A frame keeps its variable and its value in private fields. Thus, code that gets a frame cannot read the value. Only code that has the variable object can read its value.
+
+The [frame tree](/explore/frames) shows the frames of real `run()` calls, step by step.
+
+## The current frame
+
+The runtime keeps the current frame in one store. The store is a property of `globalThis` with a `Symbol.for` key. When a page loads two copies of the library, the two copies use the same store.
+
+The runtime changes the current frame only for one synchronous step at a time:
+
+1. Before the step, the runtime makes the frame of the step current.
+2. The step operates. For example, a `then` callback, a timer callback or one step of an async function.
+3. After the step, the runtime makes the previous frame current again.
+
+Thus, the context of one operation does not stay current after its step. The next task starts in the root context.
+
+## Registration context
+
+The *registration context* of a callback is the context of the code that registers the callback. For example, the registration context of a `then` callback is the context of the code that uses `then()`. Most callbacks of the library get their registration context. The [context rules](/docs/concepts/rules) give each case.
+
+The *creation context* of a promise is the context in which the code made the promise. The library does not use the creation context. A promise from a cache can have the creation context of a different request.

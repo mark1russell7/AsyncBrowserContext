@@ -3,8 +3,8 @@ import { claim, ownDataValue, rememberOriginal } from "./patch.js";
 
 /**
  * The stream constructors and the methods of the object that each constructor
- * gets as its first argument. The stream calls these methods later, from its
- * own queue. Each method runs in the context of the construction.
+ * gets as its first argument. The stream uses these methods later, from its
+ * own queue. Each method operates in the context of the construction.
  */
 const STREAMS : readonly (readonly [string, readonly string[]])[] = [
     ["ReadableStream", ["start", "pull", "cancel"]],
@@ -15,7 +15,7 @@ const STREAMS : readonly (readonly [string, readonly string[]])[] = [
 type Method = (this : unknown, ...args : unknown[]) => unknown;
 
 /**
- * Gives an object that inherits from `underlying` and has a wrapper for each
+ * This function gives an object that inherits from `underlying` and has a wrapper for each
  * method. The other properties, for example `type`, come from `underlying`.
  * Each method gets `underlying` as its `this` value, as the specification
  * tells.
@@ -41,7 +41,7 @@ function wrapUnderlying(underlying : object, methods : readonly string[], frame 
     return wrapped;
 }
 
-/** Patches the stream constructors. */
+/** This function patches the stream constructors. */
 export function installStreamPatches() : void {
     if (!claim("streams")) {
         return;

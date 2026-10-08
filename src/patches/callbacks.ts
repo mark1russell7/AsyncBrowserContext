@@ -4,8 +4,8 @@ import { claim, globalPrototype, ownDataValue, replaceFunction, wrapFunctionArgu
 type Method = (this : unknown, ...args : unknown[]) => unknown;
 
 /**
- * The methods that get callbacks and call them later. Each function argument
- * runs in the context of the method call.
+ * The methods that get callbacks and use them later. Each function argument
+ * operates in the context of the method call.
  */
 const PROTOTYPE_METHODS : readonly (readonly [string, readonly string[]])[] = [
     ["Geolocation", ["getCurrentPosition", "watchPosition"]],
@@ -21,7 +21,7 @@ const PROTOTYPE_METHODS : readonly (readonly [string, readonly string[]])[] = [
     ["RTCPeerConnection", ["createOffer", "createAnswer", "setLocalDescription", "setRemoteDescription", "addIceCandidate", "getStats"]],
 ];
 
-/** The static methods that get callbacks and call them later. */
+/** The static methods that get callbacks and use them later. */
 const STATIC_METHODS : readonly (readonly [string, readonly string[]])[] = [
     ["Notification", ["requestPermission"]],
     ["Array", ["fromAsync"]],
@@ -58,7 +58,7 @@ function wrapIntercept(original : Method) : Method {
     };
 }
 
-/** Patches the callback APIs that are not events, timers or observers. */
+/** This function patches the callback APIs that are not events, timers or observers. */
 export function installCallbackPatches() : void {
     if (!claim("callbacks")) {
         return;

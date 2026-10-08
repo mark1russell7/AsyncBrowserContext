@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | Draft. Work has not started. Section 3 lists the decisions that are necessary before work starts. |
+| Status | Done. The maintainer accepted the proposed options on 2026-10-08, with the changes in section 11. |
 | Date | 2026-10-08 |
 | Base commit | `c83992a` on `main` |
 | Source | The review of 2026-10-08: code reading, 23 probes, 6 mutants, benchmarks, and a prototype. |
@@ -20,6 +20,7 @@
 8. Risks
 9. Out of scope
 10. Terms
+11. Execution
 
 Appendix A. Problem list
 Appendix B. Probe results
@@ -845,3 +846,25 @@ vitest.config.ts            Vitest configuration
 
 12. Do not use words that you cannot measure, for example perfect, zero, seamless, beautiful, or comprehensive. Do not use emoji as status marks.
 13. Give a test or a measurement for each claim.
+
+## 11. Execution
+
+The work was done on 2026-10-08. These items are different from the plan:
+
+| Item | Plan | Execution | Reason |
+|---|---|---|---|
+| D11 | A branch and a pull request | Commits directly on `main` | The maintainer asked for this. |
+| D12 | Review gates after Phases 1, 3 and 7 | One review at the end | The maintainer asked for this. |
+| D14 | Option A: no patches of events and observers | Option B: patches of events, `on...` properties, observers, streams and callback APIs, with rule C13 for events | The maintainer asked for the library to operate in all cases. |
+| Storage | One `WeakMap` for each variable | Private fields of the frames, with a cache of the last search | The `WeakMap` storage made `run()` and the garbage collector slow (docs/performance.md). |
+| Package manager | npm | pnpm, with a workspace for the website and the STE linter | The other projects of the maintainer use pnpm. |
+| Website | Not in the plan | A documentation website with interactive diagrams in `site/` | The maintainer asked for it. |
+
+The results are in these documents:
+
+- `CHANGELOG.md`: the changes of version 0.1.0.
+- `docs/design.md`: the design.
+- `docs/testing.md`: the test projects and layers.
+- `docs/performance.md`: the benchmark results.
+- `docs/legacy-test-triage.md`: the result for each legacy test.
+

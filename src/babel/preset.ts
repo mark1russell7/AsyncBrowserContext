@@ -26,10 +26,10 @@ export const DEFAULT_RUNTIME = "async-browser-context/runtime";
  * 2. `@babel/plugin-transform-async-generator-functions` changes async
  *    generators and `for await` loops.
  * 3. `@babel/plugin-transform-async-to-generator` changes each async function
- *    into a generator that the `coroutine` function of the runtime runs.
+ *    into a generator that the `coroutine` function of the runtime operates.
  *
  * The preset operates with Babel 7.22 and later and with Babel 8. Put it last
- * in the `presets` list: Babel runs the presets in reverse order.
+ * in the `presets` list: Babel uses the presets in reverse order.
  */
 export default function asyncBrowserContextPreset(api : PresetAPI, options : PresetOptions = {}) : PresetObject {
     api.assertVersion("^7.22.0 || ^8.0.0");

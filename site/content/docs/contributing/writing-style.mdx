@@ -1,0 +1,113 @@
+---
+title: Writing style
+description: The writing rules of this site, the linter that examines them, and how to add a page.
+order: 70
+---
+
+The text of this site, the README and the TSDoc comments follow the writing rules of ASD-STE100 Simplified Technical English as a style target. The rules make the text short, clear and the same for all readers, also for readers whose first language is not English. The project is not certified by ASD. The linter is an automated approximation of the rules.
+
+## The main rules
+
+- Write an instruction in 20 words or fewer, and a description in 25 words or fewer. A code span, a number with its unit, and a product name each count as one word.
+- Write 6 sentences or fewer in a paragraph.
+- Write one instruction in each sentence.
+- Use the active voice. Use only the present tense, the past tense and the future tense with "will".
+- Do not use semicolons. Write two sentences.
+- Do not use contractions.
+- Use only these modal verbs: "can", "cannot", "must" and "will".
+- Use one word for one meaning. For example, write "use", not "utilize". Write "make sure", not "ensure". Write "approximately" for a quantity.
+- Do not omit the subject. For example, the TSDoc sentence "Gives the value." is not complete. Write "The function gives the value."
+- Do not use Latin abbreviations. Write "for example", or write the sentence again.
+- Write API names, file names and commands in code format.
+
+## The linter
+
+`tools/ste-lint` is a copy of the STE linter of the `lag` project. It examines the Markdown and MDX pages, the TSDoc comments and the text of the TSX components. It finds these problems:
+
+- long sentences and long paragraphs
+- modal verbs that are not approved
+- semicolons and Latin abbreviations
+- words with a better alternative
+- gender pronouns
+- passive instructions
+- sentences without a subject
+
+Examine all files:
+
+```bash
+pnpm lint:ste
+```
+
+Examine the pages of the site only:
+
+```bash
+pnpm lint:ste "site/content/**/*.mdx"
+```
+
+The configuration is in `ste.config.json`. It has the glossary of the project: the technical nouns and verbs that the rules permit, for example "frame", "promise", "await" and "patch". Add a word to the glossary only if it is a real technical term of the project.
+
+## The same word for the same thing
+
+| Use | Do not use |
+| --- | --- |
+| context | scope, zone (except for zone.js) |
+| root context | empty context, no context |
+| frame | layer, node |
+| registration context | context of the listener |
+| patch | monkey-patch, hook (except for the hooks of Node.js) |
+| transform (verb) | compile, instrument |
+
+## Add a page
+
+1. Add an `.mdx` file in `site/content/docs`, `site/content/explore` or `site/content/testing`. The path of the file is the path of the page.
+2. Add the frontmatter: `title`, `description` and `order`. For a page that is not complete, add `status: draft`.
+3. Start the text at heading level 2 (`##`). The page shows the title as the heading of level 1.
+4. Use `pnpm lint:ste` to examine the page, and correct each finding.
+
+The table of contents shows the headings of level 2 and 3.
+
+## Frontmatter
+
+| Field | Type | What it does |
+| --- | --- | --- |
+| `title` | Text | The title of the page, in the sidebar and as the level 1 heading. |
+| `description` | Text | One sentence under the title. |
+| `order` | Number | The position in the section. Lower numbers come first. |
+| `status` | `draft` or `final` | Optional. A draft page shows a note that it is a draft. |
+
+## Components
+
+Each MDX page can use these components without an import.
+
+| Component | Use it for |
+| --- | --- |
+| `Callout` | A note, a caution or a warning. |
+| `Figure` | Content with a caption. |
+| `Tabs` and `Tab` | Content in tabs, for example one command for each tool. |
+| `Mermaid` | A diagram. A fenced code block with the language `mermaid` also shows as a diagram. |
+| `PlotFigure` | A chart. The page gives the Plot options and a text alternative. |
+| `ContextTimeline` | The context timeline of the Explore section. |
+| `FrameTree` | The frame tree of the Explore section. |
+| `TransformViewer` | The input and the output of the Babel preset. |
+| `EventRuleDemo` | The demonstration of rule C13. |
+| `ProbeTable`, `MutationChart`, `BrowserMatrix`, `BenchChart` | The test results in `site/public/data/`. |
+
+To add a component, add it to `site/src/mdx/component-map.tsx`.
+
+## Callouts
+
+<Callout type="note">
+  A note gives information that helps the reader.
+</Callout>
+
+<Callout type="caution">
+  A caution tells the reader about a risk to data, to performance or to other parts of the system.
+</Callout>
+
+<Callout type="warning">
+  A warning tells the reader about a risk of injury. This site has no warnings.
+</Callout>
+
+## Facts
+
+Do not write facts about the library that the code or the tests do not show. Write facts about browsers and other libraries only with a source.

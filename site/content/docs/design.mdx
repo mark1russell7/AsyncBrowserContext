@@ -1,0 +1,42 @@
+---
+title: Design
+description: The problems of the old design, the reasons for the new design, and a comparison with zone.js, the TC39 proposal and Node.js.
+order: 40
+---
+
+## The old design
+
+The first version of the library had one global variable for the current context. A Babel plugin set this variable after each `await` statement. A review of 2026-10-08 found five root causes of errors:
+
+| ID | Problem | Effect |
+| --- | --- | --- |
+| RC1 | The runtime set the context when an async function continued, but it did not set the previous context when the function stopped. | Code got the context of a different operation. |
+| RC2 | A `then` callback got the context of the promise creation, not the context of the `then` use. | Shared and cached promises gave incorrect values. |
+| RC3 | Each promise kept a strong reference to its parent promise. | Memory use increased with each `then` use in a chain. |
+| RC4 | The runtime replaced the global `Promise` constructor with a function. | `Promise` subclasses and identity checks did not operate correctly. |
+| RC5 | The Babel plugin changed each statement with `await` with custom code. | The plugin stopped the build, or it changed the result of correct code. |
+
+The old tests did not find these errors. A runtime with no async support passed 82 of the 217 old tests. The [results](/testing/results) page shows the probes and the mutants of the review.
+
+## The new design
+
+The new design has three principles:
+
+1. **A context is current only for one step.** The runtime sets a frame before a step that it controls, and sets the previous frame after the step. Between tasks, the root context is current. Thus, an error gives no value, not a wrong value.
+2. **Use the rules of the TC39 proposal.** A `then` callback gets the context of the `then` use. An async function and a generator keep their context.
+3. **Use the Babel transforms.** The preset composes the Babel plugins for async functions and async generators with a small runtime function. The library has no custom code for `await`.
+
+The runtime patches only `Promise.prototype.then` of the promise API. It does not replace the `Promise` constructor. Each frame holds its variable and its value in private fields, so only the variable can read its value.
+
+## Comparison
+
+| Topic | This library | zone.js | TC39 AsyncContext | Node.js `AsyncLocalStorage` |
+| --- | --- | --- | --- | --- |
+| Where it operates | Browsers, and Node.js with the native class | Browsers and Node.js | A proposal (Stage 2) | Node.js |
+| Native `await` | A build transform changes it into a generator | A build transform changes it, for example the Angular CLI | The engine keeps the context | The engine keeps the context |
+| `then` callbacks | Registration context | The zone of the `then` use | Registration context | Registration context |
+| Generators | Context of the creation (transformed code) | Zone of the caller | Context of the creation | Context of the caller |
+| Events | Dispatch context, else registration context | Zone of the registration | The host decides | The context of the `emit()` use |
+| API | `AsyncLocalStorage` and `AsyncContext` | `Zone` | `AsyncContext` | `AsyncLocalStorage` |
+
+When browsers ship the TC39 proposal, the transform and the patches will not be necessary. The API of this library is the API of the proposal, so code that uses `AsyncContext.Variable` can then use the native class.

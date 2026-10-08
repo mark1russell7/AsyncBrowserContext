@@ -1,0 +1,47 @@
+{
+  "generated": "2026-10-08T19:23:58.647Z",
+  "environment": {
+    "node": "v25.2.1",
+    "os": "Windows_NT 10.0.26200",
+    "cpu": "AMD Ryzen AI 7 PRO 350 w/ Radeon 860M",
+    "cores": 16
+  },
+  "rows": [
+    {
+      "benchmark": "await loop",
+      "plainMs": 0.3177508366871394,
+      "transformOnlyMs": 0.36232823671497383,
+      "libraryMs": 0.46442170278637546
+    },
+    {
+      "benchmark": "async calls",
+      "plainMs": 0.6958210111317241,
+      "transformOnlyMs": 1.142651637471442,
+      "libraryMs": 1.356851175406881
+    },
+    {
+      "benchmark": "then chain",
+      "plainMs": 0.22707082954889182,
+      "transformOnlyMs": 0.22953747513389194,
+      "libraryMs": 0.4040718017775341
+    },
+    {
+      "benchmark": "concurrent tasks",
+      "plainMs": 0.46569875814964123,
+      "transformOnlyMs": 0.592441113744076,
+      "libraryMs": 0.8612164084911276
+    },
+    {
+      "benchmark": "request handlers",
+      "plainMs": 0.3997021049826981,
+      "transformOnlyMs": 0.5321192976232705,
+      "libraryMs": 0.7360306182532093
+    },
+    {
+      "benchmark": "get in nested contexts",
+      "plainMs": 0.12795307915387993,
+      "transformOnlyMs": 0.12341685041962186,
+      "libraryMs": 0.4592202632384603
+    }
+  ]
+}

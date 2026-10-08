@@ -130,7 +130,7 @@ async function main() : Promise<void> {
     });
     const results = {
         date : new Date().toISOString(),
-        environment : { node : process.version, os : `${os.type()} ${os.release()}`, cpu : os.cpus()[0]?.model ?? "unknown", cores : os.cpus().length },
+        environment : { node : process.version, os : `${os.type()} ${os.release()}`, cpu : os.cpus()[0]?.model.trim() ?? "unknown", cores : os.cpus().length },
         cases : CASES.map(({ name, description }) => ({ name, description })),
         rows,
     };

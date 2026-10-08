@@ -1,0 +1,9 @@
+{
+  "generated": "2026-10-08T00:00:00.000Z",
+  "sample": true,
+  "rows": [
+    { "browser": "chromium", "version": "141", "passed": 48, "failed": 0, "skipped": 0 },
+    { "browser": "firefox", "version": "157", "passed": 48, "failed": 0, "skipped": 0 },
+    { "browser": "webkit", "version": "26", "passed": 48, "failed": 0, "skipped": 0 }
+  ]
+}

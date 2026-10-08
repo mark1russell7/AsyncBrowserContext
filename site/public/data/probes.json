@@ -1,0 +1,235 @@
+{
+  "generated": "2026-10-08T19:55:18.115Z",
+  "probes": [
+    {
+      "id": "P01",
+      "rule": "C1",
+      "scenario": "An unrelated task after request A ends",
+      "before": "request-A",
+      "after": "undefined",
+      "status": "fixed"
+    },
+    {
+      "id": "P02",
+      "rule": "C7",
+      "scenario": "A callback in a dependency that Babel does not transform, in request A",
+      "before": "B",
+      "after": "undefined",
+      "status": "safe"
+    },
+    {
+      "id": "P03a",
+      "rule": "C4",
+      "scenario": "then on a cached promise in request A",
+      "before": "A",
+      "after": "A",
+      "status": "correct"
+    },
+    {
+      "id": "P03b",
+      "rule": "C4",
+      "scenario": "then on the same cached promise in request B",
+      "before": "A",
+      "after": "B",
+      "status": "fixed"
+    },
+    {
+      "id": "P03c",
+      "rule": "C4",
+      "scenario": "then on a module-level promise in request C",
+      "before": "undefined",
+      "after": "C",
+      "status": "fixed"
+    },
+    {
+      "id": "P03d",
+      "rule": "C4",
+      "scenario": "then outside run() on the result of run()",
+      "before": "inner",
+      "after": "undefined",
+      "status": "fixed"
+    },
+    {
+      "id": "P03e",
+      "rule": "C4",
+      "scenario": "then on an async-function promise in request E",
+      "before": "E",
+      "after": "E",
+      "status": "correct"
+    },
+    {
+      "id": "P04",
+      "rule": "C11",
+      "scenario": "Promise subclass, identity and function names (9 checks)",
+      "before": "9 errors",
+      "after": "0 errors",
+      "status": "fixed"
+    },
+    {
+      "id": "P05",
+      "rule": "C3",
+      "scenario": "for await over an array",
+      "before": "TypeError",
+      "after": "1,2",
+      "status": "fixed"
+    },
+    {
+      "id": "P06",
+      "rule": "C3",
+      "scenario": "for await with destructuring",
+      "before": "SyntaxError",
+      "after": "1a,2b",
+      "status": "fixed"
+    },
+    {
+      "id": "P07",
+      "rule": "C3",
+      "scenario": "break in for await calls return()",
+      "before": "no",
+      "after": "yes",
+      "status": "fixed"
+    },
+    {
+      "id": "P08",
+      "rule": "C3",
+      "scenario": "Closures over the for await variable",
+      "before": "3,3,3",
+      "after": "1,2,3",
+      "status": "fixed"
+    },
+    {
+      "id": "P09",
+      "rule": "C3",
+      "scenario": "Labeled for await with continue",
+      "before": "SyntaxError",
+      "after": "11,21",
+      "status": "fixed"
+    },
+    {
+      "id": "P10",
+      "rule": "C3",
+      "scenario": "Top-level for await",
+      "before": "ReferenceError",
+      "after": "1,2",
+      "status": "fixed"
+    },
+    {
+      "id": "P11",
+      "rule": "C3",
+      "scenario": "One var declared two times with await",
+      "before": "SyntaxError",
+      "after": "2",
+      "status": "fixed"
+    },
+    {
+      "id": "P12",
+      "rule": "C3",
+      "scenario": "var in a block, read after the block",
+      "before": "ReferenceError",
+      "after": "42",
+      "status": "fixed"
+    },
+    {
+      "id": "P13",
+      "rule": "C3",
+      "scenario": "Object destructuring default after await",
+      "before": "build stops",
+      "after": "3",
+      "status": "fixed"
+    },
+    {
+      "id": "P14",
+      "rule": "C3",
+      "scenario": "Array destructuring default after await",
+      "before": "build stops",
+      "after": "3",
+      "status": "fixed"
+    },
+    {
+      "id": "P15",
+      "rule": "C3",
+      "scenario": "Two declarators, one with await",
+      "before": "ReferenceError",
+      "after": "3",
+      "status": "fixed"
+    },
+    {
+      "id": "P16",
+      "rule": "C3",
+      "scenario": "Read in the same expression after await (4 forms)",
+      "before": "B",
+      "after": "A",
+      "status": "fixed"
+    },
+    {
+      "id": "P17",
+      "rule": "C1",
+      "scenario": "An async handler that an unrelated event starts",
+      "before": "request-A",
+      "after": "undefined",
+      "status": "fixed"
+    },
+    {
+      "id": "P18",
+      "rule": "C5",
+      "scenario": "Async generator made in A, next() in B, then in C",
+      "before": "B, C",
+      "after": "created-in-A, created-in-A",
+      "status": "fixed"
+    },
+    {
+      "id": "P19",
+      "rule": "C10",
+      "scenario": "Two copies of the library",
+      "before": "undefined",
+      "after": "X",
+      "status": "fixed"
+    },
+    {
+      "id": "P20a",
+      "scenario": "README constructor new AsyncVariable(0)",
+      "before": "undefined",
+      "after": "undefined",
+      "status": "documentation"
+    },
+    {
+      "id": "P20b",
+      "scenario": "new AsyncVariable({ defaultValue: 0 })",
+      "before": "0",
+      "after": "0",
+      "status": "correct"
+    },
+    {
+      "id": "P21",
+      "rule": "C12",
+      "scenario": "First promise of a 200,000-step then chain is released",
+      "before": "no, 20.4 MB",
+      "after": "yes, 3.6 MB",
+      "status": "fixed"
+    },
+    {
+      "id": "P22a",
+      "rule": "C4",
+      "scenario": "Module-level Promise.resolve() promise, then in request C",
+      "before": "undefined",
+      "after": "C",
+      "status": "fixed"
+    },
+    {
+      "id": "P22b",
+      "rule": "C4",
+      "scenario": "Module-level async-function promise, then in request C",
+      "before": "C",
+      "after": "C",
+      "status": "correct"
+    },
+    {
+      "id": "P23",
+      "rule": "C5",
+      "scenario": "Sync generator made in A, next() in B, then at the root",
+      "before": "B, undefined",
+      "after": "created-in-A, created-in-A",
+      "status": "fixed"
+    }
+  ]
+}

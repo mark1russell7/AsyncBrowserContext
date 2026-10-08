@@ -1,0 +1,47 @@
+---
+title: Structured logging
+description: Add the fields of the current operation to each log record, without a logger parameter in each function.
+order: 31
+---
+
+## The goal
+
+Each log record of an operation must contain the same fields, for example the user ID and the page. With the library, the logger reads these fields from the context.
+
+## Keep the fields in a variable
+
+```ts
+// log.ts
+import { AsyncContext } from "async-browser-context";
+
+type Fields = Readonly<Record<string, string | number>>;
+
+const fields = new AsyncContext.Variable<Fields>({ name : "log fields", defaultValue : {} });
+
+/** Starts `fn` with more log fields. The fields of the outer context stay. */
+export function withFields<R>(more : Fields, fn : () => R) : R {
+    return fields.run({ ...fields.get(), ...more }, fn);
+}
+
+export function log(level : "info" | "warn" | "error", message : string, extra : Fields = {}) : void {
+    console[level](JSON.stringify({ time : new Date().toISOString(), level, message, ...fields.get(), ...extra }));
+}
+```
+
+## Add fields where the operation starts
+
+```ts
+await withFields({ userId : user.id, page : "checkout" }, async () => {
+    log("info", "The checkout starts.");
+    await withFields({ step : "payment" }, async () => {
+        await pay(order);
+        log("info", "The payment is complete."); // userId, page and step
+    });
+});
+```
+
+The inner `withFields()` adds a field. It does not remove the fields of the outer context. After the inner function, the outer fields are current again.
+
+## Send the records
+
+If you send the records to a server in batches, keep the fields in each record when you make it. The batch timer gets the context of the code that scheduled it, not the context of each record.

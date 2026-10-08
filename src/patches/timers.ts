@@ -3,7 +3,7 @@ import { claim, globalPrototype, replaceFunction } from "./patch.js";
 
 type Scheduler = (this : unknown, callback : unknown, ...rest : unknown[]) => unknown;
 
-/** The global functions that get a callback as their first argument and call it later. */
+/** The global functions that get a callback as their first argument and use it later. */
 const GLOBAL_SCHEDULERS = [
     "setTimeout",
     "setInterval",
@@ -13,7 +13,7 @@ const GLOBAL_SCHEDULERS = [
     "requestIdleCallback",
 ] as const;
 
-/** The prototype methods that get a callback as their first argument and call it later. */
+/** The prototype methods that get a callback as their first argument and use it later. */
 const PROTOTYPE_SCHEDULERS : readonly (readonly [string, string])[] = [
     ["Scheduler", "postTask"],
     ["HTMLVideoElement", "requestVideoFrameCallback"],
@@ -28,8 +28,8 @@ function wrapFirstArgument(original : Scheduler) : Scheduler {
 }
 
 /**
- * Patches the timers and the other schedulers. The callback runs in the
- * context of the call that scheduled it (rule C6). A string callback of
+ * This function patches the timers and the other schedulers. The callback
+ * operates in the context of the call that scheduled it (rule C6). A string callback of
  * `setTimeout` does not change.
  */
 export function installTimerPatches() : void {

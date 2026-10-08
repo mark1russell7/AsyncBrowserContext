@@ -1,0 +1,18 @@
+.footer {
+    margin-top: var(--space-10);
+    border-top: 1px solid var(--color-rule);
+}
+
+.inner {
+    width: 100%;
+    max-width: var(--page-width);
+    margin: 0 auto;
+    padding: var(--space-5) var(--gutter) var(--space-7);
+}
+
+.text {
+    max-width: var(--measure);
+    margin: 0 0 var(--space-2);
+    color: var(--color-ink-secondary);
+    font-size: var(--text-sm);
+}

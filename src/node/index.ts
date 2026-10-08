@@ -35,13 +35,13 @@ export class Variable<T> {
         return this.#name;
     }
 
-    /** Gives the value of this variable in the current context, or the default value. */
+    /** This method gives the value of this variable in the current context, or the default value. */
     get() : T | undefined {
         const box = this.#storage.getStore();
         return box === undefined ? this.#defaultValue : box.value;
     }
 
-    /** Runs `fn` with `args` in a new context in which `get()` gives `value`. */
+    /** This method starts `fn` with `args` in a new context in which `get()` gives `value`. */
     run<R, A extends unknown[]>(value : T, fn : (...args : A) => R, ...args : A) : R {
         return this.#storage.run({ value }, fn, ...args);
     }
@@ -51,12 +51,12 @@ export class Variable<T> {
 export class Snapshot {
     readonly #run : <R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) => R = NodeAsyncLocalStorage.snapshot();
 
-    /** Runs `fn` with `args` in the recorded context. */
+    /** This method starts `fn` with `args` in the recorded context. */
     run<R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) : R {
         return this.#run(fn, ...args);
     }
 
-    /** Records the current context and gives a wrapper of `fn` that runs in that context. */
+    /** This method records the current context. It gives a wrapper of `fn` that operates in that context. */
     static wrap<T, A extends unknown[], R>(fn : (this : T, ...args : A) => R) : (this : T, ...args : A) => R {
         if (typeof fn !== "function") {
             throw new TypeError("Snapshot.wrap: the argument is not a function");
@@ -71,7 +71,7 @@ export class Snapshot {
     }
 }
 
-/** Gives `true` if the native class supports the `defaultValue` option (Node.js 24 and later). */
+/** This function gives `true` if the native class supports the `defaultValue` option (Node.js 24 and later). */
 function supportsOptions() : boolean {
     const probe = new NodeAsyncLocalStorage<number>({ defaultValue : 1 } as never);
     return probe.getStore() === 1;

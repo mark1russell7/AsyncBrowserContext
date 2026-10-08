@@ -1,0 +1,20 @@
+---
+title: Event rule
+description: Examine rule C13 with your own clicks.
+order: 5
+---
+
+## The rule
+
+An event listener operates in the context of the code that dispatches the event, if that context is not the root context. Else, the listener operates in the context of the `addEventListener()` use, or of the assignment to the `on...` property.
+
+## Examine the rule
+
+1. Add a listener in context A.
+2. Set `onclick` in context B.
+3. Click the large button. The browser dispatches the event, so each handler gets its registration context.
+4. Dispatch a click from context C. Code in context C dispatches the event, so each handler gets C.
+
+<EventRuleDemo />
+
+A green line is a click in which the handler got the context of the rule. A red line is a click in which it did not.

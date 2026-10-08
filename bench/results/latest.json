@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-08T19:23:58.647Z",
+  "environment": {
+    "node": "v25.2.1",
+    "os": "Windows_NT 10.0.26200",
+    "cpu": "AMD Ryzen AI 7 PRO 350 w/ Radeon 860M",
+    "cores": 16
+  },
+  "cases": [
+    {
+      "name": "plain",
+      "description": "Plain JavaScript, no library"
+    },
+    {
+      "name": "transform only",
+      "description": "The Babel preset with the plain coroutine of the Node.js runtime, no patches"
+    },
+    {
+      "name": "library",
+      "description": "The Babel preset and the browser runtime"
+    }
+  ],
+  "rows": [
+    {
+      "benchmark": "await loop",
+      "plainMs": 0.3177508366871394,
+      "transformOnlyMs": 0.36232823671497383,
+      "libraryMs": 0.46442170278637546,
+      "libraryFactor": 1.461590810046079,
+      "rme": {
+        "plain": 0.6724891978586768,
+        "transformOnly": 0.6437525401965024,
+        "library": 0.715868841705769
+      }
+    },
+    {
+      "benchmark": "async calls",
+      "plainMs": 0.6958210111317241,
+      "transformOnlyMs": 1.142651637471442,
+      "libraryMs": 1.356851175406881,
+      "libraryFactor": 1.9500002927477265,
+      "rme": {
+        "plain": 0.6095738702024389,
+        "transformOnly": 0.854428611935997,
+        "library": 0.8304422550162209
+      }
+    },
+    {
+      "benchmark": "then chain",
+      "plainMs": 0.22707082954889182,
+      "transformOnlyMs": 0.22953747513389194,
+      "libraryMs": 0.4040718017775341,
+      "libraryFactor": 1.7794967437265263,
+      "rme": {
+        "plain": 0.6684855100945664,
+        "transformOnly": 0.6518834257820938,
+        "library": 1.3307781100172669
+      }
+    },
+    {
+      "benchmark": "concurrent tasks",
+      "plainMs": 0.46569875814964123,
+      "transformOnlyMs": 0.592441113744076,
+      "libraryMs": 0.8612164084911276,
+      "libraryFactor": 1.8492993451668087,
+      "rme": {
+        "plain": 0.9066594032830614,
+        "transformOnly": 1.0367802388659901,
+        "library": 1.3245941697428951
+      }
+    },
+    {
+      "benchmark": "request handlers",
+      "plainMs": 0.3997021049826981,
+      "transformOnlyMs": 0.5321192976232705,
+      "libraryMs": 0.7360306182532093,
+      "libraryFactor": 1.8414479410486713,
+      "rme": {
+        "plain": 1.026519270410097,
+        "transformOnly": 1.292963522861165,
+        "library": 1.311757792321451
+      }
+    },
+    {
+      "benchmark": "get in nested contexts",
+      "plainMs": 0.12795307915387993,
+      "transformOnlyMs": 0.12341685041962186,
+      "libraryMs": 0.4592202632384603,
+      "libraryFactor": 3.588973913524889,
+      "rme": {
+        "plain": 0.4436459079306009,
+        "transformOnly": 0.48799297489893156,
+        "library": 0.6672601498752183
+      }
+    }
+  ]
+}

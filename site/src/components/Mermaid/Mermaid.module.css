@@ -1,0 +1,48 @@
+.figure {
+    margin: 0 0 var(--space-6);
+    padding: var(--space-4);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.diagram {
+    display: flex;
+    justify-content: center;
+    overflow-x: auto;
+}
+
+.diagram :global(svg) {
+    height: auto;
+}
+
+.status {
+    margin: 0;
+    color: var(--color-ink-secondary);
+    font-size: var(--text-sm);
+}
+
+.source {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+}
+
+.source > summary {
+    width: fit-content;
+    color: var(--color-accent);
+    cursor: pointer;
+}
+
+.source pre {
+    margin: var(--space-2) 0 0;
+    padding: var(--space-3);
+    overflow-x: auto;
+    border-radius: var(--radius-small);
+    background: var(--color-surface-sunken);
+}
+
+.caption {
+    margin-top: var(--space-3);
+    color: var(--color-ink-secondary);
+    font-size: var(--text-sm);
+}

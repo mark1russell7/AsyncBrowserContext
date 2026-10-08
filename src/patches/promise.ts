@@ -4,14 +4,14 @@ import { claim, replaceFunction } from "./patch.js";
 type Then = typeof Promise.prototype.then;
 
 /**
- * Patches `Promise.prototype.then`. A `then` callback runs in the context of
- * the `then` call (rule C4). `catch`, `finally`, `Promise.all` and the other
- * combinators call `then`, so they get the same rule.
+ * This function patches `Promise.prototype.then`. A `then` callback operates in
+ * the context of the `then` call (rule C4). `catch`, `finally`, `Promise.all`
+ * and the other combinators use `then`, so they get the same rule.
  *
  * The patch does not replace the `Promise` constructor. Thus, `Promise`
  * subclasses and identity checks operate as without the library (rule C11).
  *
- * `await` in native code does not call `then`. The Babel preset changes each
+ * `await` in native code does not use `then`. The Babel preset changes each
  * `await` so that the coroutine sets the context (rule C3).
  */
 export function installPromisePatch() : void {

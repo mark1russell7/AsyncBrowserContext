@@ -1,0 +1,123 @@
+---
+title: Get started
+description: Install the library, then configure Vite, Babel, webpack or Node.js.
+order: 2
+---
+
+## Install the package
+
+```bash
+npm install async-browser-context
+```
+
+The package has these entries:
+
+| Entry | What it gives |
+| --- | --- |
+| `async-browser-context` | `AsyncLocalStorage`, `AsyncContext`, `Variable` and `Snapshot`. On Node.js, the `node` export condition selects the Node.js entry. |
+| `async-browser-context/browser` | The browser entry, also on Node.js. |
+| `async-browser-context/vite` | The Vite plugin `asyncContext()`. |
+| `async-browser-context/babel-preset` | The Babel preset. |
+| `async-browser-context/runtime` | The runtime functions of transformed code. Do not import them in your code. |
+
+## Configure Vite
+
+1. Import `asyncContext` from `async-browser-context/vite`.
+2. Add `asyncContext()` to the `plugins` list of `vite.config.ts`.
+
+```ts
+import { defineConfig } from "vite";
+import { asyncContext } from "async-browser-context/vite";
+
+export default defineConfig({
+    plugins : [asyncContext()],
+});
+```
+
+The plugin operates after the other plugins, so it gets JavaScript after Vite compiles TypeScript and JSX. By default, it transforms the modules of the application and the modules in `node_modules`. The [API reference](/docs/api#the-vite-plugin) gives the options.
+
+## Configure Babel
+
+1. Add `async-browser-context/babel-preset` to the `presets` list of your Babel configuration.
+2. Put the preset last in the list. Babel uses the presets in reverse order, so the last preset operates first.
+
+```js
+// babel.config.js
+export default {
+    presets : [
+        "@babel/preset-env",
+        "async-browser-context/babel-preset",
+    ],
+};
+```
+
+The preset operates with Babel 7.22 and later, and with Babel 8.
+
+<Callout type="caution" title="Dependencies">
+  Make sure that Babel also transforms your dependencies. After a native `await`, code that Babel does not transform gets the root context. The [limits](/docs/concepts/limits) page tells more.
+</Callout>
+
+## Configure webpack
+
+1. Use `babel-loader` for all JavaScript and TypeScript files.
+2. Do not exclude `node_modules`, so that the loader also transforms the dependencies.
+3. Put the preset of the library last in the `presets` list.
+
+```js
+// webpack.config.js
+export default {
+    module : {
+        rules : [{
+            test : /\.[cm]?[jt]sx?$/,
+            use : {
+                loader : "babel-loader",
+                options : {
+                    presets : ["@babel/preset-env", "async-browser-context/babel-preset"],
+                },
+            },
+        }],
+    },
+};
+```
+
+## Use Node.js
+
+Import the package as usual. On Node.js, the `node` export condition selects the Node.js entry. That entry uses the native `AsyncLocalStorage` of `node:async_hooks`, and it installs no patch. A transform is not necessary on Node.js.
+
+The Node.js entry and the browser entry have the same API. Thus, code that uses the library can operate in the browser and on the server.
+
+<Callout type="note">
+  The package needs Node.js 22.18 or later, or Node.js 24.11 or later. These versions are the versions of Babel 8.
+</Callout>
+
+## Use the API
+
+`AsyncLocalStorage` is the API of Node.js:
+
+```ts
+import { AsyncLocalStorage } from "async-browser-context";
+
+const storage = new AsyncLocalStorage<{ requestId : string }>();
+
+await storage.run({ requestId : "r-1" }, async () => {
+    await fetch("/api/data");
+    console.log(storage.getStore()?.requestId); // "r-1"
+});
+```
+
+`AsyncContext.Variable` is the API of the TC39 proposal:
+
+```ts
+import { AsyncContext } from "async-browser-context";
+
+const requestId = new AsyncContext.Variable<string>({ name : "requestId" });
+
+await requestId.run("r-1", async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    console.log(requestId.get()); // "r-1"
+});
+```
+
+## Use TypeScript
+
+The package contains its type declarations. The two entries have the same types. `get()` and `getStore()` give `T | undefined`. Code outside a context gets the default value, and without a `defaultValue` option, the default value is `undefined`.
