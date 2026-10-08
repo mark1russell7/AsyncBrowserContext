@@ -52,11 +52,23 @@ async function resultsOf(url : string) : Promise<Record<string, unknown>> {
         const errors : string[] = [];
         page.on("pageerror", (error) => errors.push(error.message));
         await page.goto(url);
-        await page.waitForFunction(() => (window as unknown as { __results? : unknown }).__results !== undefined, undefined, { timeout : 30_000 });
-        if (errors.length > 0) {
-            throw new Error(`Page errors: ${errors.join("; ")}`);
+        // The dev server can reload the page one time, after it pre-bundles new dependencies
+        for (let attempt = 1; ; attempt++) {
+            try {
+                await page.waitForFunction(() => (window as unknown as { __results? : unknown }).__results !== undefined, undefined, { timeout : 30_000 });
+                const results = await page.evaluate(() => (window as unknown as { __results : Record<string, unknown> }).__results);
+                if (errors.length > 0) {
+                    throw new Error(`Page errors: ${errors.join("; ")}`);
+                }
+                return results;
+            } catch (error) {
+                const destroyed = error instanceof Error && error.message.includes("Execution context was destroyed");
+                if (!destroyed || attempt === 3) {
+                    throw error;
+                }
+                await page.waitForLoadState("load");
+            }
         }
-        return await page.evaluate(() => (window as unknown as { __results : Record<string, unknown> }).__results);
     } finally {
         await browser.close();
     }
