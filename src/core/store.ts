@@ -2,9 +2,9 @@
  * The context store. It holds the current frame, the original functions of
  * the patches, and the native functions that the runtime uses.
  *
- * A frame identifies one context. A frame does not contain values. Each
- * `Variable` keeps its values in its own private `WeakMap`, with the frame as
- * the key. Thus, code that gets a frame cannot read the values of a variable.
+ * A frame identifies one context. Each `run()` call makes a frame that sets
+ * one variable. The frame keeps the variable and the value in private fields,
+ * so code that gets a frame cannot read the value.
  *
  * The store is a property of `globalThis` with a `Symbol.for` key. When a page
  * contains two copies of the library, the two copies use the same store, and
@@ -77,9 +77,68 @@ export function enter(frame : Frame) : Frame {
     return previous;
 }
 
-/** Makes a new frame that has `parent` as its parent. */
-export function createFrame(parent : Frame) : Frame {
-    return Object.freeze({ parent });
+/** The result of `findValue` when no frame sets the variable. */
+export const NOT_FOUND : unique symbol = Symbol("not found");
+
+/**
+ * A frame that sets the value of one variable. The variable and the value are
+ * private fields, so only this module can read them. A frame of another copy
+ * of the library is an instance of another class, so `#variable in frame` is
+ * `false` for it, and the search goes on to its parent.
+ */
+class ValueFrame implements Frame {
+    readonly parent : Frame;
+    readonly #variable : object;
+    readonly #value : unknown;
+    /**
+     * The result of the last search for another variable from this frame. A
+     * frame does not change, so the result stays correct. The cached value
+     * comes from a parent frame, so the cache keeps no other object in memory.
+     */
+    #cachedVariable : object | undefined = undefined;
+    #cachedValue : unknown = undefined;
+
+    constructor(parent : Frame, variable : object, value : unknown) {
+        this.parent = parent;
+        this.#variable = variable;
+        this.#value = value;
+    }
+
+    /** Gives the value that the nearest frame sets for `variable`, or `NOT_FOUND`. */
+    static find(start : Frame, variable : object) : unknown {
+        if (!(#variable in start)) {
+            return ValueFrame.#search(start, variable);
+        }
+        if (start.#variable === variable) {
+            return start.#value;
+        }
+        if (start.#cachedVariable === variable) {
+            return start.#cachedValue;
+        }
+        const value = ValueFrame.#search(start.parent, variable);
+        start.#cachedVariable = variable;
+        start.#cachedValue = value;
+        return value;
+    }
+
+    static #search(start : Frame | null, variable : object) : unknown {
+        for (let frame = start; frame !== null; frame = frame.parent) {
+            if (#variable in frame && frame.#variable === variable) {
+                return frame.#value;
+            }
+        }
+        return NOT_FOUND;
+    }
+}
+
+/** Makes a new frame that has `parent` as its parent and sets `variable` to `value`. */
+export function createFrame(parent : Frame, variable : object, value : unknown) : Frame {
+    return new ValueFrame(parent, variable, value);
+}
+
+/** Gives the value of `variable` in `frame`, or `NOT_FOUND` if no frame sets it. */
+export function findValue(frame : Frame, variable : object) : unknown {
+    return ValueFrame.find(frame, variable);
 }
 
 /**

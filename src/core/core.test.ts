@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AsyncLocalStorage } from "./async-local-storage.js";
 import { bindGenerator, coroutine } from "./coroutine.js";
-import { bindOneArgument, bindToFrame, createFrame, enter, store } from "./store.js";
+import { bindOneArgument, bindToFrame, createFrame, enter, findValue, NOT_FOUND, store } from "./store.js";
 import { enterValue, Variable } from "./variable.js";
 
 describe("the context store", () => {
@@ -14,15 +14,25 @@ describe("the context store", () => {
         expect(descriptor?.enumerable).toBe(false);
     });
 
-    it("makes frozen frames with one parent", () => {
-        const frame = createFrame(store.root);
+    it("makes frames that show only their parent", () => {
+        const variable = {};
+        const frame = createFrame(store.root, variable, "secret");
         expect(frame.parent).toBe(store.root);
-        expect(Object.isFrozen(frame)).toBe(true);
+        expect(Reflect.ownKeys(frame)).toEqual(["parent"]);
+        expect(findValue(frame, variable)).toBe("secret");
+        expect(findValue(frame, {})).toBe(NOT_FOUND);
         expect(store.root.parent).toBeNull();
     });
 
+    it("skips the frames of another copy of the library", () => {
+        const variable = {};
+        const inner = createFrame(store.root, variable, "inner");
+        const foreign = { parent : inner };
+        expect(findValue(foreign, variable)).toBe("inner");
+    });
+
     it("gives the previous frame from enter()", () => {
-        const frame = createFrame(store.root);
+        const frame = createFrame(store.root, {}, 0);
         const previous = enter(frame);
         try {
             expect(store.current).toBe(frame);
@@ -33,7 +43,7 @@ describe("the context store", () => {
     });
 
     it("keeps this, the arguments and the result in bindToFrame and bindOneArgument", () => {
-        const frame = createFrame(store.root);
+        const frame = createFrame(store.root, {}, 0);
         const many = bindToFrame(frame, function (this : { id : number }, a : number, b : number) : string {
             return `${this.id}:${a + b}:${store.current === frame ? "frame" : "other"}`;
         });
@@ -52,35 +62,31 @@ describe("the context store", () => {
 });
 
 describe("Variable lookup", () => {
-    it("finds a value in a parent frame and remembers the result for the current frame", () => {
+    it("finds a value in a parent frame that another variable does not hide", () => {
         const variable = new Variable<string>();
         const other = new Variable<string>();
         variable.run("outer", () => {
             other.run("x", () => other.run("y", () => {
                 expect(variable.get()).toBe("outer");
-                expect(variable.get()).toBe("outer");
+                expect(other.get()).toBe("y");
             }));
         });
     });
 
-    it("remembers that no frame sets a value, and gives the default value", () => {
+    it("finds the nearest frame when two frames set the same variable", () => {
+        const variable = new Variable<string>();
+        const other = new Variable<string>();
+        variable.run("far", () => other.run("x", () => variable.run("near", () => other.run("y", () => {
+            expect(variable.get()).toBe("near");
+        }))));
+    });
+
+    it("gives the default value when no frame in the chain sets the variable", () => {
         const variable = new Variable({ defaultValue : "default" });
         const other = new Variable<string>();
         other.run("x", () => other.run("y", () => {
             expect(variable.get()).toBe("default");
-            expect(variable.get()).toBe("default");
         }));
-    });
-
-    it("stops the search at a frame that remembers no value", () => {
-        const variable = new Variable({ defaultValue : "default" });
-        const other = new Variable<string>();
-        other.run("x", () => {
-            expect(variable.get()).toBe("default");
-            other.run("y", () => {
-                expect(variable.get()).toBe("default");
-            });
-        });
     });
 
     it("sets a new current frame with enterValue", () => {

@@ -59,7 +59,7 @@ describe("the patch helpers", () => {
     });
 
     it("wraps only the function arguments, with the current frame", () => {
-        const frame = createFrame(store.root);
+        const frame = createFrame(store.root, {}, 0);
         const previous = enter(frame);
         let args : unknown[];
         try {

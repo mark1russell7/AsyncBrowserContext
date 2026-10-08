@@ -75,7 +75,7 @@
     "test:browser": "vitest run --project \"browser (chromium)\" --project \"browser (firefox)\" --project \"browser (webkit)\"",
     "coverage": "vitest run --coverage --project unit --project \"rules (browser runtime, Node.js)\" --project \"rules (node runtime)\"",
     "mutation": "stryker run",
-    "bench": "tsx bench/run.ts",
+    "bench": "pnpm build && tsx bench/run.ts",
     "smoke": "tsx test/smoke/run.ts",
     "lint:ste": "tsx tools/ste-lint/src/cli.ts",
     "site:dev": "pnpm --filter ./site dev",
