@@ -91,14 +91,21 @@ describe("the patch helpers", () => {
             return undefined;
         }
         (withNull as { prototype : unknown }).prototype = null;
+        function withNumber() : void {
+            return undefined;
+        }
+        (withNumber as { prototype : unknown }).prototype = 5;
         holder["__testArrow"] = () : void => undefined;
         holder["__testNullPrototype"] = withNull;
+        holder["__testNumberPrototype"] = withNumber;
         try {
             expect(globalPrototype("__testArrow")).toBeUndefined();
             expect(globalPrototype("__testNullPrototype")).toBeUndefined();
+            expect(globalPrototype("__testNumberPrototype")).toBeUndefined();
         } finally {
             delete holder["__testArrow"];
             delete holder["__testNullPrototype"];
+            delete holder["__testNumberPrototype"];
         }
     });
 });

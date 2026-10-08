@@ -19,12 +19,9 @@ type FunctionPath = NodePath<types.Function>;
 
 /** This function gives `true` if `path` is the generator that Babel gives to its async generator helper. */
 function isAsyncGeneratorHelperArgument(path : FunctionPath) : boolean {
-    const parent = path.parentPath;
-    if (parent === null || !parent.isCallExpression()) {
-        return false;
-    }
-    const callee = parent.node.callee;
-    return types.isIdentifier(callee) && ASYNC_GENERATOR_HELPER.test(callee.name);
+    const parent = path.parent;
+    // Stryker disable next-line LogicalOperator: without the call check, the name test also fails, because a member callee has no name
+    return types.isCallExpression(parent) && types.isIdentifier(parent.callee) && ASYNC_GENERATOR_HELPER.test(parent.callee.name);
 }
 
 /**
@@ -34,23 +31,21 @@ function isAsyncGeneratorHelperArgument(path : FunctionPath) : boolean {
  */
 function isBindGeneratorCallee(callee : types.Node, path : NodePath, runtime : string) : boolean {
     if (types.isIdentifier(callee)) {
+        // Stryker disable next-line StringLiteral: referencesImport with an empty name accepts each import of the runtime, which gives the same result here
         return BIND_GENERATOR_NAME.test(callee.name) || path.referencesImport(runtime, "bindGenerator");
     }
+    // Stryker disable next-line UnaryOperator: the sequence (0, _runtime.bindGenerator) has two expressions, so at(1) gives the same expression
     const member = types.isSequenceExpression(callee) ? callee.expressions.at(-1) : callee;
     return types.isMemberExpression(member) && types.isIdentifier(member.property, { name : "bindGenerator" });
 }
 
 /** This function gives `true` if this plugin already changed the generator: `bindGenerator((function* () {...})())`. */
 function isAlreadyBound(path : FunctionPath, runtime : string) : boolean {
-    const call = path.parentPath;
-    if (call === null || !call.isCallExpression() || call.node.callee !== path.node) {
-        return false;
-    }
-    const outer = call.parentPath;
-    if (outer === null || !outer.isCallExpression()) {
-        return false;
-    }
-    return isBindGeneratorCallee(outer.node.callee, outer.get("callee"), runtime);
+    // A function and a call always have a parent path: at least the program
+    const call = path.parentPath as NodePath;
+    const outer = call.parentPath as NodePath;
+    return call.isCallExpression() && call.node.callee === path.node
+        && outer.isCallExpression() && isBindGeneratorCallee(outer.node.callee, outer.get("callee"), runtime);
 }
 
 /**

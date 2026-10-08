@@ -116,6 +116,35 @@ describe("the Babel preset", () => {
         expect(countBindCalls(output.code)).toBe(5);
     });
 
+    it("does not bind a generator again that the CommonJS output of another tool binds", async () => {
+        const input = [
+            "const _runtime = require('async-browser-context/runtime');",
+            "exports.a = function a() { return (0, _runtime.bindGenerator)((function* () { yield 1; })()); };",
+            "exports.b = function b() { return _runtime.bindGenerator((function* () { yield 2; })()); };",
+        ].join("\n");
+        const output = await transform(input, { sourceType : "script" });
+        expect(output.code.match(/\.bindGenerator\)?\(/g)?.length).toBe(2);
+        expect(output.code).not.toMatch(/_bindGenerator\d*\(/);
+    });
+
+    it("binds a generator that is an argument, not the callee, inside a bindGenerator call", async () => {
+        const input = "import { bindGenerator as bind } from 'async-browser-context/runtime'; export const it = bind(use(function* () { yield 1; }));";
+        const output = await transform(input);
+        expect(output.code).toMatch(/_bindGenerator\(/);
+    });
+
+    it("binds generators that functions with other names close to the helper names get", async () => {
+        const input = "_wrapAsyncGeneratorLike(function* () { yield 1; }); x_wrapAsyncGenerator(function* () { yield 2; }); x_bindGenerator((function* () { yield 3; })());";
+        const output = await transform(input);
+        expect(output.code.match(/\b_bindGenerator\(/g)?.length).toBe(3);
+    });
+
+    it("binds generators that member calls get, also as an immediate call", async () => {
+        const input = "service.register(function* () { yield 1; }); service.other((function* () { yield 2; })()); service.bindGeneratorLike((function* () { yield 3; })());";
+        const output = await transform(input);
+        expect(output.code.match(/\b_bindGenerator\(/g)?.length).toBe(3);
+    });
+
     it("binds a generator that an immediate call makes", async () => {
         const output = await transform("use((function* () { yield 1; })());");
         expect(countBindCalls(output.code)).toBe(1);
