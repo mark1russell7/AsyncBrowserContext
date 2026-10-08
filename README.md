@@ -1,5 +1,11 @@
 # async-browser-context
 
+[![npm version](https://img.shields.io/npm/v/async-browser-context)](https://www.npmjs.com/package/async-browser-context)
+[![CI](https://github.com/mark1russell7/AsyncBrowserContext/actions/workflows/ci.yml/badge.svg)](https://github.com/mark1russell7/AsyncBrowserContext/actions/workflows/ci.yml)
+[![Mutation score: 98%](https://img.shields.io/badge/mutation%20score-98%25-brightgreen)](docs/testing.md)
+[![Types: included](https://img.shields.io/badge/types-included-blue)](https://www.npmjs.com/package/async-browser-context)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 `async-browser-context` gives the `AsyncLocalStorage` class of Node.js and the TC39 `AsyncContext` API to browsers. A value that you set for one operation stays available in all the asynchronous code of that operation. This includes the code after `await`, `then` callbacks, timers, event listeners and generators.
 
 ```ts
@@ -27,6 +33,17 @@ Browsers do not have `AsyncLocalStorage`. A native `await` does not use code tha
 2. **A Babel preset and a Vite plugin.** They change each async function into a generator that the runtime operates. Before each step of the function, the runtime sets the context of the function. After the step, the runtime sets the previous context again.
 
 On Node.js, the package uses the native `AsyncLocalStorage` of `node:async_hooks`. No transform and no patch is necessary on Node.js.
+
+## Compared with other tools
+
+| Tool | Where it operates | Context after a native `await` | API |
+| --- | --- | --- | --- |
+| `AsyncLocalStorage` of Node.js | Node.js and other server runtimes | Yes | `AsyncLocalStorage` |
+| TC39 `AsyncContext` proposal | No browser has it at this time (Stage 2) | Yes, when browsers have it | `AsyncContext.Variable`, `AsyncContext.Snapshot` |
+| zone.js | Browsers | No. A compiler must change async functions before zone.js can see them. | `Zone` |
+| `async-browser-context` | Browsers and Node.js | Yes, through the Babel preset or the Vite plugin | `AsyncLocalStorage` and `AsyncContext` |
+
+Thus, code that uses `AsyncLocalStorage` on the server can use the same API in the browser. The `AsyncContext` API of the library is the API of the proposal. When browsers have `AsyncContext`, a change to the native API is small: change the import.
 
 ## Install
 
