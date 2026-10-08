@@ -114,6 +114,17 @@ snapshot.run(() => userId.get()); // "u-1"
 
 The package also exports `Variable`, `Snapshot`, and the other names `AsyncVariable` and `AsyncSnapshot`.
 
+## Entry points
+
+| Import | Function |
+| --- | --- |
+| `async-browser-context` | The API. The `node` export condition selects the Node.js entry. Other environments get the browser entry. |
+| `async-browser-context/browser` | The browser entry, also on Node.js. |
+| `async-browser-context/runtime` | The runtime functions that the transformed code imports. |
+| `async-browser-context/browser/runtime` | The browser runtime functions, also on Node.js. Use it as the `runtime` option together with `async-browser-context/browser`. |
+| `async-browser-context/vite` | The Vite plugin. |
+| `async-browser-context/babel-preset` | The Babel preset. |
+
 ## Context rules
 
 The tests examine each rule on the browser runtime, on the Node.js runtime and in Chromium, Firefox and WebKit.

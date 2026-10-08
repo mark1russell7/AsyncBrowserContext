@@ -37,7 +37,23 @@ export default defineConfig({
 });
 ```
 
-To examine the behavior of the browser runtime, use browser mode.
+## The browser runtime in the Node.js environment
+
+Browser mode is the best test of the browser runtime. For fast tests without a browser, you can also use the browser runtime in Node.js:
+
+1. Map the package to its browser entry with an alias.
+2. Set the `runtime` option of the plugin to the browser runtime.
+3. Set the `ssr` option of the plugin to `true`.
+
+```ts
+export default defineConfig({
+    plugins : [asyncContext({ ssr : true, runtime : "async-browser-context/browser/runtime" })],
+    resolve : { alias : [{ find : /^async-browser-context$/, replacement : "async-browser-context/browser" }] },
+    test : { environment : "node" },
+});
+```
+
+This repository uses this configuration in its `rules (browser runtime, Node.js)` test project.
 
 ## Write a test that can find a leak
 
