@@ -1,6 +1,6 @@
 # Builds the documentation website (site/) and publishes it to GitHub Pages.
-# To use this workflow, set the Pages source of the repository to
-# "GitHub Actions" (Settings > Pages).
+# To publish, set the Pages source of the repository to "GitHub Actions"
+# (Settings > Pages). Until then, the workflow only builds the site.
 name: Pages
 
 on:
@@ -46,6 +46,8 @@ jobs:
 
   deploy:
     needs: build
+    # Only when the repository has Pages. The build job above still examines the site.
+    if: ${{ github.event.repository.has_pages }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
