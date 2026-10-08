@@ -1,3 +1,0 @@
-{
-  "plugins": ["./babel-plugin/index.js"]
-}

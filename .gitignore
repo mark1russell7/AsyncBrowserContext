@@ -1,4 +1,11 @@
-**/node_modules/**/*
-**/dist/**/*
-.DS_STORE
-
+node_modules/
+dist/
+coverage/
+reports/
+.stryker-tmp/
+.vitest-attachments/
+__screenshots__/
+.playwright-mcp/
+test-results/
+*.tsbuildinfo
+.DS_Store

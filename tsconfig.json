@@ -1,54 +1,41 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    /* Language and Environment */
-    "target": "ESNext",
-    "lib": ["ESNext"],
-
-    /* Modules */
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "resolveJsonModule": true,
-
-    /* Emit */
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "removeComments": false,
-    "importHelpers": false,
-    "downlevelIteration": true,
-
-    /* Interop Constraints */
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true,
-
-    /* Type Checking */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "allowUnusedLabels": false,
-    "allowUnreachableCode": false,
-    "noPropertyAccessFromIndexSignature": true,
-
-    /* Completeness */
-    "skipLibCheck": true,
-
-    /* Composite Projects */
-    "composite": true,
-    "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
-
-    /* Styling */
-    "pretty": true
+    "noEmit": true,
+    "isolatedDeclarations": false,
+    "types": [
+      "node",
+      "vitest/globals",
+      "@vitest/browser-playwright"
+    ],
+    "paths": {
+      "async-browser-context": [
+        "./src/index.ts"
+      ],
+      "async-browser-context/runtime": [
+        "./src/runtime.ts"
+      ],
+      "async-browser-context/browser": [
+        "./src/index.ts"
+      ],
+      "async-browser-context/vite": [
+        "./src/vite/plugin.ts"
+      ],
+      "async-browser-context/babel-preset": [
+        "./src/babel/preset.ts"
+      ]
+    }
   },
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts", "src/context-v2.ts"],
-  "include": ["src/context.ts", "src/context-final.ts"]
+  "include": [
+    "src/**/*",
+    "test/**/*.ts",
+    "bench/**/*.ts",
+    "vitest.config.ts",
+    "stryker.config.mjs"
+  ],
+  "exclude": [
+    "test/legacy/**",
+    "test/smoke/fixture/**"
+  ]
 }
