@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T19:23:58.647Z",
+  "generated": "2026-10-08T22:10:14.368Z",
   "environment": {
     "node": "v25.2.1",
     "os": "Windows_NT 10.0.26200",
@@ -9,39 +9,39 @@
   "rows": [
     {
       "benchmark": "await loop",
-      "plainMs": 0.3177508366871394,
-      "transformOnlyMs": 0.36232823671497383,
-      "libraryMs": 0.46442170278637546
+      "plainMs": 0.2586055507671119,
+      "transformOnlyMs": 0.31457185992871084,
+      "libraryMs": 0.4042805712745804
     },
     {
       "benchmark": "async calls",
-      "plainMs": 0.6958210111317241,
-      "transformOnlyMs": 1.142651637471442,
-      "libraryMs": 1.356851175406881
+      "plainMs": 0.6127965277777689,
+      "transformOnlyMs": 0.9854152987524731,
+      "libraryMs": 1.2180028409090955
     },
     {
       "benchmark": "then chain",
-      "plainMs": 0.22707082954889182,
-      "transformOnlyMs": 0.22953747513389194,
-      "libraryMs": 0.4040718017775341
+      "plainMs": 0.1868709106764607,
+      "transformOnlyMs": 0.19416395288635202,
+      "libraryMs": 0.33023801452785195
     },
     {
       "benchmark": "concurrent tasks",
-      "plainMs": 0.46569875814964123,
-      "transformOnlyMs": 0.592441113744076,
-      "libraryMs": 0.8612164084911276
+      "plainMs": 0.3904402915148295,
+      "transformOnlyMs": 0.4850407048173252,
+      "libraryMs": 0.6820290454545609
     },
     {
       "benchmark": "request handlers",
-      "plainMs": 0.3997021049826981,
-      "transformOnlyMs": 0.5321192976232705,
-      "libraryMs": 0.7360306182532093
+      "plainMs": 0.31403659200334166,
+      "transformOnlyMs": 0.4067905097613829,
+      "libraryMs": 0.5964501391650051
     },
     {
       "benchmark": "get in nested contexts",
-      "plainMs": 0.12795307915387993,
-      "transformOnlyMs": 0.12341685041962186,
-      "libraryMs": 0.4592202632384603
+      "plainMs": 0.10493040710687637,
+      "transformOnlyMs": 0.10541386507378657,
+      "libraryMs": 0.39214660219548836
     }
   ]
 }

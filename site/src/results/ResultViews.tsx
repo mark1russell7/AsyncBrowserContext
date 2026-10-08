@@ -171,7 +171,7 @@ const BENCH_CASES : readonly (readonly [keyof Pick<BenchRow, "plainMs" | "transf
     ["libraryMs", "Library"],
 ];
 
-/** The chart of the benchmarks: the mean time of each case, next to plain JavaScript. */
+/** The chart of the benchmarks: the mean time of each case (the median of the rounds), next to plain JavaScript. */
 export function BenchChart() {
     return (
         <DataState name="bench">

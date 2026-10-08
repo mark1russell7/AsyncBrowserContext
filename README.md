@@ -170,18 +170,18 @@ The patches keep the names, the lengths and the source text of the native functi
 
 ## Performance
 
-These results are from `pnpm bench`: the mean time of each scenario, on Node.js 25.2.1 and Windows 11. Each case operates in its own process.
+These results are from `pnpm bench`: the mean time of each scenario, on Node.js 25.2.1 and Windows 11. Each case operates in its own process. The values are the median of 5 rounds.
 
 | Scenario | Plain JavaScript | Library | Factor |
 | --- | --- | --- | --- |
-| 10,000 awaits in one async function | 0.32 ms | 0.46 ms | 1.46 |
-| 10,000 calls of an async function | 0.70 ms | 1.36 ms | 1.95 |
-| A chain of 10,000 `then` calls | 0.23 ms | 0.40 ms | 1.78 |
-| 1,000 tasks with 10 awaits each | 0.47 ms | 0.86 ms | 1.85 |
-| 1,000 request handlers in 1,000 contexts | 0.40 ms | 0.74 ms | 1.84 |
-| 100,000 reads with `get()`, 5 contexts deep | 0.13 ms | 0.46 ms | 3.59 |
+| 10,000 awaits in one async function | 0.26 ms | 0.40 ms | 1.56 |
+| 10,000 calls of an async function | 0.61 ms | 1.22 ms | 1.99 |
+| A chain of 10,000 `then` calls | 0.19 ms | 0.33 ms | 1.77 |
+| 1,000 tasks with 10 awaits each | 0.39 ms | 0.68 ms | 1.75 |
+| 1,000 request handlers in 1,000 contexts | 0.31 ms | 0.60 ms | 1.90 |
+| 100,000 reads with `get()`, 5 contexts deep | 0.105 ms | 0.39 ms | 3.74 |
 
-One read with `get()` takes approximately 5 ns. The documentation website shows the full results.
+One read with `get()` takes approximately 4 ns. The [documentation website](https://mark1russell7.github.io/AsyncBrowserContext/) shows the full results.
 
 ## Tests
 

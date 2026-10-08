@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T19:55:18.115Z",
+  "generated": "2026-10-08T22:11:18.007Z",
   "rows": [
     {
       "mutant": "real",
@@ -59,12 +59,12 @@
     }
   ],
   "stryker": {
-    "score": 2.4179620034542313,
-    "killed": 14,
-    "survived": 530,
-    "timeout": 0,
-    "noCoverage": 35,
-    "total": 579,
+    "score": 98.0295566502463,
+    "killed": 389,
+    "survived": 8,
+    "timeout": 9,
+    "noCoverage": 0,
+    "total": 431,
     "scope": [
       "src/babel/bind-generators.ts",
       "src/babel/preset.ts",
@@ -73,8 +73,6 @@
       "src/core/snapshot.ts",
       "src/core/store.ts",
       "src/core/variable.ts",
-      "src/node/index.ts",
-      "src/node/runtime.ts",
       "src/patches/patch.ts",
       "src/patches/promise.ts",
       "src/patches/timers.ts",

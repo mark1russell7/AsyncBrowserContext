@@ -82,7 +82,7 @@ The maintainer must make these decisions. Each decision has options, a proposed 
 
 | ID | Question | Options | Proposed option | Blocks |
 |---|---|---|---|---|
-| D7 | The workspace instructions in `C:\Users\markt\git\CLAUDE.md` say: use `cue-config` for package configuration, and do not edit `tsconfig.json` or `package.json` manually. This repository does not use `cue-config`, and it is not in the ecosystem manifest. How do we change the configuration? | A: Keep the repository standalone. Edit `package.json` and `tsconfig.json` directly. Make new files and folders under `src/` directly. B: First add the repository to the ecosystem (`cue-config`, `pnpm`, and the manifest). | A. It is the smallest change. Option B is a separate task. Option B can also change the TypeScript settings that a browser library needs. This option is not the workspace rule, so your explicit approval is necessary. | Phase 0 |
+| D7 | The workspace instructions in `~/git/CLAUDE.md` say: use `cue-config` for package configuration, and do not edit `tsconfig.json` or `package.json` manually. This repository does not use `cue-config`, and it is not in the ecosystem manifest. How do we change the configuration? | A: Keep the repository standalone. Edit `package.json` and `tsconfig.json` directly. Make new files and folders under `src/` directly. B: First add the repository to the ecosystem (`cue-config`, `pnpm`, and the manifest). | A. It is the smallest change. Option B is a separate task. Option B can also change the TypeScript settings that a browser library needs. This option is not the workspace rule, so your explicit approval is necessary. | Phase 0 |
 | D11 | How do we use git? | A: Make the branch `fix/remediation` from `main`. Commit at the end of each phase. Push and open a pull request only when the maintainer says so. B: One commit at the end. C: Other. | A | Phase 0 |
 | D12 | Where must work stop for a review? | A: After Phase 1, after Phase 3, after Phase 7, and before Phase 8. B: After each phase. C: Only before Phase 8. | A | Phase 0 |
 | D6 | Which test tools do we use? | A: Vitest for Node.js, and Vitest browser mode with Playwright for Chromium, Firefox, and WebKit. Remove the custom runner (`tests/framework/`, `tests/runner.html`). B: Option A, but keep the custom runner as a visual demonstration. C: Keep only the custom runner. | A. The custom runner has no exit code and no CI support. It also has errors in its timeouts and assertions (Appendix A.3). | Phase 1 |
@@ -757,7 +757,7 @@ module.exports = function ({ types: t }) {
 ### E.3 Babel configuration (`babel.spike.config.cjs`)
 
 ```js
-const nm = 'C:/Users/markt/git/AsyncBrowserContext/node_modules/';
+const nm = require("node:path").join(__dirname, "node_modules") + "/";
 module.exports = {
   babelrc: false,
   plugins: [
@@ -868,3 +868,16 @@ The results are in these documents:
 - `docs/performance.md`: the benchmark results.
 - `docs/legacy-test-triage.md`: the result for each legacy test.
 
+
+### 11.1 Acceptance criteria
+
+| Criterion of section 7 | Result |
+|---|---|
+| 1. The rule tests pass on Node.js, Chromium, Firefox and WebKit. | Pass. CI runs them on Node.js 22 and 24, and in the three browsers. Rule C13 also passes in the three browsers. |
+| 2. The probe results agree with the exit criteria of Phase 3. | Pass. `test/regression/probes.test.ts` examines each probe. |
+| 3. The mutation score of the runtime is 85% or more. | Pass: 98.03%. Stryker made 431 mutants. The tests found 389, 9 timed out, and 8 survived. The 8 survivors and 25 more mutants have no effect on a result: comments in the source or `docs/testing.md` give the reason for each. |
+| 4. 20 test runs in a sequence pass. | Open. In 20 runs on Windows, no test failed. But run 6 did only 1,500 of the 1,523 tests and did not show an error. The script of the check did not keep the full output, thus the cause is not known. A second check keeps the full output of each run. |
+| 5. A test or a measurement supports each claim in the documentation. | Pass. The README gives the rules, the patched APIs and the benchmark results. The tests and `pnpm bench` give the evidence. |
+| 6. The documentation passes the STE checklist. | Pass. `pnpm lint:ste` finds no problems in 120 files. |
+| 7. The smoke test passes with the packed package. | Pass, on Windows and in CI. |
+| 8. The memory tests pass. | Pass. |

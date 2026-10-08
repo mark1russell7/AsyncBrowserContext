@@ -1,11 +1,12 @@
 {
-  "date": "2026-10-08T19:23:58.647Z",
+  "date": "2026-10-08T22:10:14.368Z",
   "environment": {
     "node": "v25.2.1",
     "os": "Windows_NT 10.0.26200",
     "cpu": "AMD Ryzen AI 7 PRO 350 w/ Radeon 860M",
     "cores": 16
   },
+  "rounds": 5,
   "cases": [
     {
       "name": "plain",
@@ -23,75 +24,69 @@
   "rows": [
     {
       "benchmark": "await loop",
-      "plainMs": 0.3177508366871394,
-      "transformOnlyMs": 0.36232823671497383,
-      "libraryMs": 0.46442170278637546,
-      "libraryFactor": 1.461590810046079,
-      "rme": {
-        "plain": 0.6724891978586768,
-        "transformOnly": 0.6437525401965024,
-        "library": 0.715868841705769
-      }
+      "plainMs": 0.2586055507671119,
+      "transformOnlyMs": 0.31457185992871084,
+      "libraryMs": 0.4042805712745804,
+      "libraryFactor": 1.563309720442376,
+      "factorRange": [
+        1.1138041822373124,
+        1.7071171271204943
+      ]
     },
     {
       "benchmark": "async calls",
-      "plainMs": 0.6958210111317241,
-      "transformOnlyMs": 1.142651637471442,
-      "libraryMs": 1.356851175406881,
-      "libraryFactor": 1.9500002927477265,
-      "rme": {
-        "plain": 0.6095738702024389,
-        "transformOnly": 0.854428611935997,
-        "library": 0.8304422550162209
-      }
+      "plainMs": 0.6127965277777689,
+      "transformOnlyMs": 0.9854152987524731,
+      "libraryMs": 1.2180028409090955,
+      "libraryFactor": 1.9876138093112776,
+      "factorRange": [
+        1.8392051316240015,
+        2.801768358702395
+      ]
     },
     {
       "benchmark": "then chain",
-      "plainMs": 0.22707082954889182,
-      "transformOnlyMs": 0.22953747513389194,
-      "libraryMs": 0.4040718017775341,
-      "libraryFactor": 1.7794967437265263,
-      "rme": {
-        "plain": 0.6684855100945664,
-        "transformOnly": 0.6518834257820938,
-        "library": 1.3307781100172669
-      }
+      "plainMs": 0.1868709106764607,
+      "transformOnlyMs": 0.19416395288635202,
+      "libraryMs": 0.33023801452785195,
+      "libraryFactor": 1.7671986149819228,
+      "factorRange": [
+        1.6597329647473158,
+        2.0744931423845654
+      ]
     },
     {
       "benchmark": "concurrent tasks",
-      "plainMs": 0.46569875814964123,
-      "transformOnlyMs": 0.592441113744076,
-      "libraryMs": 0.8612164084911276,
-      "libraryFactor": 1.8492993451668087,
-      "rme": {
-        "plain": 0.9066594032830614,
-        "transformOnly": 1.0367802388659901,
-        "library": 1.3245941697428951
-      }
+      "plainMs": 0.3904402915148295,
+      "transformOnlyMs": 0.4850407048173252,
+      "libraryMs": 0.6820290454545609,
+      "libraryFactor": 1.7468203468664207,
+      "factorRange": [
+        1.691775067644657,
+        1.9240805656202495
+      ]
     },
     {
       "benchmark": "request handlers",
-      "plainMs": 0.3997021049826981,
-      "transformOnlyMs": 0.5321192976232705,
-      "libraryMs": 0.7360306182532093,
-      "libraryFactor": 1.8414479410486713,
-      "rme": {
-        "plain": 1.026519270410097,
-        "transformOnly": 1.292963522861165,
-        "library": 1.311757792321451
-      }
+      "plainMs": 0.31403659200334166,
+      "transformOnlyMs": 0.4067905097613829,
+      "libraryMs": 0.5964501391650051,
+      "libraryFactor": 1.8993014010248153,
+      "factorRange": [
+        1.830991440630716,
+        1.9937073533150111
+      ]
     },
     {
       "benchmark": "get in nested contexts",
-      "plainMs": 0.12795307915387993,
-      "transformOnlyMs": 0.12341685041962186,
-      "libraryMs": 0.4592202632384603,
-      "libraryFactor": 3.588973913524889,
-      "rme": {
-        "plain": 0.4436459079306009,
-        "transformOnly": 0.48799297489893156,
-        "library": 0.6672601498752183
-      }
+      "plainMs": 0.10493040710687637,
+      "transformOnlyMs": 0.10541386507378657,
+      "libraryMs": 0.39214660219548836,
+      "libraryFactor": 3.737206525807808,
+      "factorRange": [
+        3.6588835115234213,
+        3.7562804046655405
+      ]
     }
   ]
 }

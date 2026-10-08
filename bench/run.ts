@@ -7,6 +7,12 @@
  * another case. Each process measures the scenarios with tinybench and writes
  * its results as JSON. The runner writes `bench/results/latest.json` and
  * shows a table.
+ *
+ * The load of the machine can change while the runner operates. Thus the
+ * runner does more than one round. Each round starts one process for each
+ * case, and each round has a different order of the cases. The result of a
+ * case is the median of its rounds. The range shows the lowest and the
+ * highest factor "library / plain" of one round.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -21,6 +27,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const outDir = path.join(here, ".out");
 const dist = (file : string) : string => pathToFileURL(path.join(root, "dist", file)).href;
+
+/** The number of rounds. Set `BENCH_ROUNDS` to change it. */
+const ROUNDS = Math.max(1, Number(process.env["BENCH_ROUNDS"] ?? 5));
 
 interface Case {
     readonly name : string;
@@ -103,34 +112,55 @@ function run(child : string) : TaskResult[] {
     return JSON.parse(output) as TaskResult[];
 }
 
+function median(values : readonly number[]) : number {
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 1 ? sorted[middle] as number : ((sorted[middle - 1] as number) + (sorted[middle] as number)) / 2;
+}
+
 async function main() : Promise<void> {
     fs.rmSync(outDir, { recursive : true, force : true });
     // Link node_modules, so that the children find tinybench
     fs.mkdirSync(outDir, { recursive : true });
     fs.symlinkSync(path.join(root, "node_modules"), path.join(outDir, "node_modules"), "junction");
-    const byCase = new Map<string, TaskResult[]>();
+    const children = new Map<string, string>();
+    const rounds = new Map<string, TaskResult[][]>();
     for (const benchCase of CASES) {
-        const child = await prepare(benchCase);
-        process.stdout.write(`${benchCase.name}: `);
-        byCase.set(benchCase.name, run(child));
-        process.stdout.write("done\n");
+        children.set(benchCase.name, await prepare(benchCase));
+        rounds.set(benchCase.name, []);
     }
-    const plain = byCase.get("plain") ?? [];
-    const rows = plain.map((task) => {
-        const transformOnly = byCase.get("transform only")?.find((other) => other.name === task.name);
-        const library = byCase.get("library")?.find((other) => other.name === task.name);
+    for (let round = 0; round < ROUNDS; round++) {
+        // Turn the order, so that each case also runs first and last in a round
+        const order = CASES.map((_, index) => CASES[(index + round) % CASES.length] as Case);
+        process.stdout.write(`round ${round + 1} of ${ROUNDS}:`);
+        for (const benchCase of order) {
+            rounds.get(benchCase.name)?.push(run(children.get(benchCase.name) as string));
+            process.stdout.write(` ${benchCase.name};`);
+        }
+        process.stdout.write("\n");
+    }
+    /** The mean times of one scenario in one case, one value for each round. */
+    const meansOf = (caseName : string, scenario : string) : number[] =>
+        (rounds.get(caseName) ?? []).flatMap((tasks) => tasks.filter((task) => task.name === scenario).map((task) => task.meanMs));
+    const scenarios = (rounds.get("plain")?.[0] ?? []).map((task) => task.name);
+    const rows = scenarios.map((scenario) => {
+        const plain = meansOf("plain", scenario);
+        const transformOnly = meansOf("transform only", scenario);
+        const library = meansOf("library", scenario);
+        const roundFactors = library.map((ms, round) => ms / (plain[round] as number));
         return {
-            benchmark : task.name,
-            plainMs : task.meanMs,
-            transformOnlyMs : transformOnly?.meanMs ?? null,
-            libraryMs : library?.meanMs ?? null,
-            libraryFactor : library === undefined ? null : library.meanMs / task.meanMs,
-            rme : { plain : task.rme, transformOnly : transformOnly?.rme ?? null, library : library?.rme ?? null },
+            benchmark : scenario,
+            plainMs : median(plain),
+            transformOnlyMs : transformOnly.length === 0 ? null : median(transformOnly),
+            libraryMs : library.length === 0 ? null : median(library),
+            libraryFactor : library.length === 0 ? null : median(library) / median(plain),
+            factorRange : roundFactors.length === 0 ? null : [Math.min(...roundFactors), Math.max(...roundFactors)],
         };
     });
     const results = {
         date : new Date().toISOString(),
         environment : { node : process.version, os : `${os.type()} ${os.release()}`, cpu : os.cpus()[0]?.model.trim() ?? "unknown", cores : os.cpus().length },
+        rounds : ROUNDS,
         cases : CASES.map(({ name, description }) => ({ name, description })),
         rows,
     };
@@ -142,6 +172,7 @@ async function main() : Promise<void> {
         "transform only (ms)" : row.transformOnlyMs?.toFixed(3),
         "library (ms)" : row.libraryMs?.toFixed(3),
         "library / plain" : row.libraryFactor?.toFixed(2),
+        "range of rounds" : row.factorRange?.map((factor) => factor.toFixed(2)).join(" to "),
     })));
 }
 

@@ -6,7 +6,7 @@ order: 3
 
 ## The benchmarks
 
-The command `pnpm bench` starts each case in a separate Node.js process. Each process measures each benchmark with tinybench. A value is the mean time of one operation of the benchmark.
+The command `pnpm bench` starts each case in a separate Node.js process. Each process measures each benchmark with tinybench. A value is the mean time of one operation of the benchmark. The command does 5 rounds, with a different order of the cases in each round, and a value is the median of the rounds. The rounds decrease the effect of other work on the machine.
 
 | Benchmark | What it does |
 | --- | --- |
@@ -31,7 +31,7 @@ The command `pnpm bench` starts each case in a separate Node.js process. Each pr
 
 - **The transform.** Each async function of transformed code is a generator that the coroutine operates. This costs more than a native async function. The number of microtask steps of each `await` does not change.
 - **The context.** Each `then` callback and each step of the coroutine sets the context and sets it again after the step. Each `then` call makes two small wrappers.
-- **`get()`.** One read takes approximately 5 ns. The plain case reads one field, so the factor is large, but the time is small.
+- **`get()`.** One read takes approximately 4 ns. The plain case reads one field, so the factor is large, but the time is small.
 
 <Callout type="note">
   The values are microbenchmarks. The benchmarks do no other work, so the factors are the largest possible factors. Measure your own application before and after you add the library.
