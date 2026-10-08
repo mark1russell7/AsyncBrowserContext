@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { asyncContext, type AsyncContextPluginOptions } from "./plugin.js";
 
@@ -37,7 +40,9 @@ describe("the Vite plugin", () => {
 
     it("does not transform virtual modules, other file types and its own runtime", async () => {
         const handler = handlerOf();
-        expect(await handler(ASYNC_CODE, "\0virtual:module")).toBeNull();
+        expect(await handler(ASYNC_CODE, "\0virtual:module.js")).toBeNull();
+        expect(await handler(ASYNC_CODE, "/app/src/data.json")).toBeNull();
+        expect(await handler(ASYNC_CODE, "/app/src/load.ts.map")).toBeNull();
         expect(await handler(ASYNC_CODE, "/app/src/style.css")).toBeNull();
         expect(await handler(ASYNC_CODE, "/app/node_modules/async-browser-context/dist/runtime.js")).toBeNull();
     });
@@ -61,5 +66,30 @@ describe("the Vite plugin", () => {
     it("imports the runtime of the options", async () => {
         const result = await handlerOf({ runtime : "/custom/runtime.js" })(ASYNC_CODE, "/app/src/load.ts");
         expect(result?.code).toContain("/custom/runtime.js");
+    });
+
+    it("transforms .mjs, .cjs, .jsx and .tsx modules", async () => {
+        const handler = handlerOf();
+        for (const id of ["/app/a.mjs", "/app/b.cjs", "/app/c.jsx", "/app/d.tsx", "/app/e.mts"]) {
+            expect(await handler(ASYNC_CODE, id)).not.toBeNull();
+        }
+    });
+
+    it("finds a generator with a space between function and the star", async () => {
+        const plugin = asyncContext();
+        const filter = (plugin.transform as { filter : { code : RegExp } }).filter.code;
+        expect(filter.test("const g = function * () { };")).toBe(true);
+        expect(await handlerOf()("export const g = function * () { };", "/app/src/g.js")).not.toBeNull();
+    });
+
+    it("ignores the Babel configuration files of the project", async () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-babel-"));
+        fs.writeFileSync(path.join(directory, "babel.config.json"), JSON.stringify({ plugins : ["a-plugin-that-does-not-exist"] }));
+        fs.writeFileSync(path.join(directory, ".babelrc"), JSON.stringify({ plugins : ["another-plugin-that-does-not-exist"] }));
+        try {
+            expect(await handlerOf()(ASYNC_CODE, path.join(directory, "load.js"))).not.toBeNull();
+        } finally {
+            fs.rmSync(directory, { recursive : true, force : true });
+        }
     });
 });

@@ -73,4 +73,32 @@ describe("the patch helpers", () => {
         const unchanged = [1, 2];
         expect(wrapFunctionArguments(unchanged)).toBe(unchanged);
     });
+
+    it("keeps the own prototype object of the replacement", () => {
+        function original() : void {
+            return undefined;
+        }
+        const owner = { method : original };
+        replaceFunction<() => void>(owner, "method", () => function replacement() : void {
+            return undefined;
+        });
+        expect(owner.method.prototype).not.toBe(original.prototype);
+    });
+
+    it("gives no prototype for a global function without a prototype object", () => {
+        const holder = globalThis as unknown as Record<string, unknown>;
+        function withNull() : void {
+            return undefined;
+        }
+        (withNull as { prototype : unknown }).prototype = null;
+        holder["__testArrow"] = () : void => undefined;
+        holder["__testNullPrototype"] = withNull;
+        try {
+            expect(globalPrototype("__testArrow")).toBeUndefined();
+            expect(globalPrototype("__testNullPrototype")).toBeUndefined();
+        } finally {
+            delete holder["__testArrow"];
+            delete holder["__testNullPrototype"];
+        }
+    });
 });

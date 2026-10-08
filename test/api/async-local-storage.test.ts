@@ -43,14 +43,13 @@ describe(`AsyncLocalStorage (${runtime} runtime)`, () => {
         expect(seen).toBe("mine");
     });
 
-    it("gives undefined in exit(), also with a default value", () => {
+    it("gives undefined in exit(), also with a default value, and gives the result of the callback", () => {
         const storage = new AsyncLocalStorage({ defaultValue : "default" });
-        storage.run("store", () => {
-            storage.exit(() => {
-                expect(storage.getStore()).toBeUndefined();
-            });
-            expect(storage.getStore()).toBe("store");
+        const seen = storage.run("store", () => {
+            const inExit = storage.exit((a : number) => ({ store : storage.getStore(), a }), 7);
+            return { inExit, after : storage.getStore() };
         });
+        expect(seen).toEqual({ inExit : { store : undefined, a : 7 }, after : "store" });
     });
 
     it("keeps the store of enterWith() after await in the same async function", async () => {

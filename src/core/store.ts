@@ -106,12 +106,14 @@ class ValueFrame implements Frame {
 
     /** This method gives the value that the nearest frame sets for `variable`, or `NOT_FOUND`. */
     static find(start : Frame, variable : object) : unknown {
+        // Stryker disable next-line ConditionalExpression: a search without the cache gives the same result, only slower
         if (!(#variable in start)) {
             return ValueFrame.#search(start, variable);
         }
         if (start.#variable === variable) {
             return start.#value;
         }
+        // Stryker disable next-line ConditionalExpression,BlockStatement: a search without the cache gives the same result, only slower
         if (start.#cachedVariable === variable) {
             return start.#cachedValue;
         }

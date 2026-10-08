@@ -11,8 +11,6 @@ import { store, type Frame } from "./store.js";
  * also in the same expression, and no other code gets this context.
  */
 
-type StepMethod = "next" | "throw";
-
 /**
  * This function gives an async function that operates `generatorFunction`. The preset gives
  * this function to `@babel/plugin-transform-async-to-generator` as its
@@ -25,13 +23,13 @@ export function coroutine<T, A extends unknown[], R>(generatorFunction : (this :
         let frame : Frame = store.current;
         const generator = generatorFunction.apply(this, args);
         return new NativePromise<R>((resolve, reject) => {
-            const step = (method : StepMethod, argument : unknown) : void => {
+            const step = (resume : (argument : unknown) => IteratorResult<unknown, R>, argument : unknown) : void => {
                 const previous = store.current;
                 store.current = frame;
                 let result : IteratorResult<unknown, R>;
                 let awaited : Promise<unknown>;
                 try {
-                    result = method === "next" ? generator.next(argument) : generator.throw(argument);
+                    result = resume(argument);
                     if (result.done) {
                         frame = store.current;
                         store.current = previous;
@@ -49,9 +47,11 @@ export function coroutine<T, A extends unknown[], R>(generatorFunction : (this :
                 store.current = previous;
                 promiseThen.call(awaited, onFulfilled, onRejected);
             };
-            const onFulfilled = (value : unknown) : void => step("next", value);
-            const onRejected = (error : unknown) : void => step("throw", error);
-            step("next", undefined);
+            const next = (value : unknown) : IteratorResult<unknown, R> => generator.next(value);
+            const throwInto = (error : unknown) : IteratorResult<unknown, R> => generator.throw(error);
+            const onFulfilled = (value : unknown) : void => step(next, value);
+            const onRejected = (error : unknown) : void => step(throwInto, error);
+            step(next, undefined);
         });
     };
 }

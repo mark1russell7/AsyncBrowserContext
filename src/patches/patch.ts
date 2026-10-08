@@ -21,13 +21,11 @@ export function rememberOriginal(replacement : object, original : object) : void
 /** This function copies the name, the length and the other own properties of `original` to `replacement`. */
 function copyFunctionProperties(replacement : object, original : object) : void {
     for (const key of Reflect.ownKeys(original)) {
-        if (key === "prototype" || key === "arguments" || key === "caller") {
+        // The replacement keeps its own prototype object
+        if (key === "prototype") {
             continue;
         }
-        const descriptor = Object.getOwnPropertyDescriptor(original, key);
-        if (descriptor === undefined) {
-            continue;
-        }
+        const descriptor = Object.getOwnPropertyDescriptor(original, key) as PropertyDescriptor;
         try {
             Object.defineProperty(replacement, key, descriptor);
         } catch {
@@ -77,8 +75,7 @@ export function globalPrototype(name : string) : object | undefined {
 export function wrapFunctionArguments(args : unknown[]) : unknown[] {
     const frame = store.current;
     let changed : unknown[] | undefined;
-    for (let index = 0; index < args.length; index++) {
-        const argument = args[index];
+    for (const [index, argument] of args.entries()) {
         if (typeof argument === "function") {
             changed ??= [...args];
             changed[index] = bindToFrame(frame, argument as (...values : unknown[]) => unknown);

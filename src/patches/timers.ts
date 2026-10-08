@@ -13,12 +13,17 @@ const GLOBAL_SCHEDULERS = [
     "requestIdleCallback",
 ] as const;
 
-/** The prototype methods that get a callback as their first argument and use it later. */
+/**
+ * The prototype methods that get a callback as their first argument and use it
+ * later. Only browsers have these classes. The browser tests examine them.
+ */
+// Stryker disable all: browser-only entries, which the browser tests examine
 const PROTOTYPE_SCHEDULERS : readonly (readonly [string, string])[] = [
     ["Scheduler", "postTask"],
     ["HTMLVideoElement", "requestVideoFrameCallback"],
     ["XRSession", "requestAnimationFrame"],
 ];
+// Stryker restore all
 
 function wrapFirstArgument(original : Scheduler) : Scheduler {
     return function (this : unknown, callback : unknown, ...rest : unknown[]) : unknown {
@@ -39,10 +44,12 @@ export function installTimerPatches() : void {
     for (const name of GLOBAL_SCHEDULERS) {
         replaceFunction<Scheduler>(globalThis, name, wrapFirstArgument);
     }
+    // Stryker disable all: Node.js has none of these classes. The browser tests examine them.
     for (const [constructorName, method] of PROTOTYPE_SCHEDULERS) {
         const prototype = globalPrototype(constructorName);
         if (prototype !== undefined) {
             replaceFunction<Scheduler>(prototype, method, wrapFirstArgument);
         }
     }
+    // Stryker restore all
 }

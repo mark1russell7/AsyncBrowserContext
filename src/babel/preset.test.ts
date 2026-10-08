@@ -21,9 +21,9 @@ async function transform(code : string, options : { runtime? : string; sourceTyp
     };
 }
 
-/** Counts the occurrences of `word` in `text`. */
-function count(text : string, word : string) : number {
-    return text.split(word).length - 1;
+/** Counts the calls of the runtime function `bindGenerator`, also with a local name such as `_bindGenerator2`. */
+function countBindCalls(text : string) : number {
+    return text.match(/(?:\b_bindGenerator\d*|\.bindGenerator\))\(/g)?.length ?? 0;
 }
 
 /** The inputs of the output snapshots. Each input shows one form of async function or generator. */
@@ -70,14 +70,64 @@ describe("the Babel preset", () => {
     });
 
     it("tells that it changed nothing in a file without async functions, generators or for await", async () => {
-        const output = await transform("const asyncLabel = 'async'; function plain() { return 1; }");
+        const output = await transform("const asyncLabel = 'async'; function plain() { for (const x of [1]) use(x); }");
         expect(output.changed).toBe(false);
+    });
+
+    it("writes the change into the metadata key asyncBrowserContext", async () => {
+        const result = await transformAsync("async function f() { await null; }", {
+            filename : "input.js",
+            babelrc : false,
+            configFile : false,
+            presets : [preset],
+        });
+        expect(result?.metadata).toHaveProperty("asyncBrowserContext", true);
+        expect(METADATA_KEY).toBe("asyncBrowserContext");
+    });
+
+    it("tells that it changed a file with only a top-level for await", async () => {
+        const output = await transform("for await (const value of source()) use(value);");
+        expect(output.changed).toBe(true);
     });
 
     it("binds a generator one time when it transforms its own output again", async () => {
         const first = await transform("function* g() { yield 1; } async function* h() { yield 2; }");
         const second = await transform(first.code);
-        expect(count(second.code, "bindGenerator(")).toBe(count(first.code, "bindGenerator("));
+        expect(countBindCalls(first.code)).toBe(2);
+        expect(countBindCalls(second.code)).toBe(2);
+    });
+
+    it("binds a generator one time when it transforms its own CommonJS output again", async () => {
+        const first = await transform("module.exports = function* g() { yield 1; };", { sourceType : "script" });
+        const second = await transform(first.code, { sourceType : "script" });
+        expect(countBindCalls(first.code)).toBe(1);
+        expect(countBindCalls(second.code)).toBe(1);
+    });
+
+    it("does not bind a generator again that an import of bindGenerator with another name binds", async () => {
+        const input = "import { bindGenerator as bind } from 'async-browser-context/runtime'; export const it = bind((function* () { yield 1; })());";
+        const output = await transform(input);
+        expect(countBindCalls(output.code)).toBe(0);
+    });
+
+    it("binds generators that functions with names like the helpers get", async () => {
+        const input = "my_wrapAsyncGenerator(function* () { yield 1; }); wrapAsyncGeneratorLike(function* () { yield 2; }); wrapAsyncGenerator(function* () { yield 3; }); notbindGenerator((function* () { yield 4; })()); _bindGeneratorLike((function* () { yield 5; })());";
+        const output = await transform(input);
+        expect(countBindCalls(output.code)).toBe(5);
+    });
+
+    it("binds a generator that an immediate call makes", async () => {
+        const output = await transform("use((function* () { yield 1; })());");
+        expect(countBindCalls(output.code)).toBe(1);
+    });
+
+    it("asks Babel for version 7.22 or 8, and names its plugin", () => {
+        const ranges : string[] = [];
+        const config = preset({ assertVersion : (range : string) => { ranges.push(range); } } as never);
+        expect(ranges).toEqual(["^7.22.0 || ^8.0.0"]);
+        const [first] = config.plugins ?? [];
+        const [plugin, options] = first as [(api : unknown, options : object) => { name : string }, object];
+        expect(plugin({}, options).name).toBe("async-browser-context/bind-generators");
     });
 
     it("keeps the hoisting of a generator declaration", async () => {

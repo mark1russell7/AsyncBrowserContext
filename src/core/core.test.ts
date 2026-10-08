@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AsyncLocalStorage } from "./async-local-storage.js";
 import { bindGenerator, coroutine } from "./coroutine.js";
+import { Snapshot } from "./snapshot.js";
 import { bindOneArgument, bindToFrame, createFrame, enter, findValue, NOT_FOUND, store } from "./store.js";
 import { enterValue, Variable } from "./variable.js";
 
@@ -215,8 +216,28 @@ describe("bindGenerator", () => {
         expect(Object.getPrototypeOf(bound) === Object.getPrototypeOf(inner)).toBe(true);
         expect(Object.prototype.toString.call(bound)).toBe("[object Generator]");
         expect(bound[Symbol.iterator]() === bound).toBe(true);
+        for (const method of ["next", "throw", "return"] as const) {
+            const descriptor = Object.getOwnPropertyDescriptor(bound, method);
+            expect(descriptor?.writable).toBe(true);
+            expect(descriptor?.configurable).toBe(true);
+            expect(descriptor?.enumerable).toBe(false);
+        }
         expect(bound.next.name).toBe("next");
         expect(bound.throw.name).toBe("throw");
         expect(bound.return.name).toBe("return");
+    });
+});
+
+describe("Snapshot.wrap", () => {
+    it("throws a TypeError with a message for a value that is not a function", () => {
+        expect(() => Snapshot.wrap(1 as unknown as () => void)).toThrow(new TypeError("Snapshot.wrap: the argument is not a function"));
+    });
+
+    it("gives a wrapper with a configurable name and length", () => {
+        const wrapped = Snapshot.wrap(function sum(a : number, b : number) : number {
+            return a + b;
+        });
+        expect(Object.getOwnPropertyDescriptor(wrapped, "name")).toMatchObject({ value : "sum", configurable : true });
+        expect(Object.getOwnPropertyDescriptor(wrapped, "length")).toMatchObject({ value : 2, configurable : true });
     });
 });

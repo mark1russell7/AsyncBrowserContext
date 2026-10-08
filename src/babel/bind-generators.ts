@@ -10,10 +10,10 @@ export interface BindGeneratorsOptions {
 /** The key of the file metadata that tells if the preset changed the file. */
 export const METADATA_KEY = "asyncBrowserContext";
 
-/** The names of the helper of `@babel/plugin-transform-async-generator-functions`. */
-const ASYNC_GENERATOR_HELPER = /^_?wrapAsyncGenerator\d*$/;
+/** The names of the helper of `@babel/plugin-transform-async-generator-functions`. Babel gives them an underscore. */
+const ASYNC_GENERATOR_HELPER = /^_wrapAsyncGenerator\d*$/;
 /** The local names that `addNamed` gives to `bindGenerator`. */
-const BIND_GENERATOR_NAME = /^_?bindGenerator\d*$/;
+const BIND_GENERATOR_NAME = /^_bindGenerator\d*$/;
 
 type FunctionPath = NodePath<types.Function>;
 
@@ -27,11 +27,17 @@ function isAsyncGeneratorHelperArgument(path : FunctionPath) : boolean {
     return types.isIdentifier(callee) && ASYNC_GENERATOR_HELPER.test(callee.name);
 }
 
+/**
+ * This function gives `true` if `callee` is the `bindGenerator` function of
+ * the runtime: an import, or `_runtime.bindGenerator` in CommonJS output,
+ * also in the form `(0, _runtime.bindGenerator)`.
+ */
 function isBindGeneratorCallee(callee : types.Node, path : NodePath, runtime : string) : boolean {
     if (types.isIdentifier(callee)) {
         return BIND_GENERATOR_NAME.test(callee.name) || path.referencesImport(runtime, "bindGenerator");
     }
-    return types.isMemberExpression(callee) && types.isIdentifier(callee.property) && callee.property.name === "bindGenerator";
+    const member = types.isSequenceExpression(callee) ? callee.expressions.at(-1) : callee;
+    return types.isMemberExpression(member) && types.isIdentifier(member.property, { name : "bindGenerator" });
 }
 
 /** This function gives `true` if this plugin already changed the generator: `bindGenerator((function* () {...})())`. */
@@ -64,13 +70,12 @@ function isAlreadyBound(path : FunctionPath, runtime : string) : boolean {
  */
 function bindGeneratorFunction(path : FunctionPath, bindGenerator : types.Expression) : void {
     const node = path.node;
-    if (!types.isBlockStatement(node.body)) {
-        return;
-    }
-    const inner = types.functionExpression(null, [], types.blockStatement(node.body.body), true, node.async);
+    // A generator function always has a block body: an arrow function cannot be a generator
+    const body = node.body as types.BlockStatement;
+    const inner = types.functionExpression(null, [], types.blockStatement(body.body), true, node.async);
     node.body = types.blockStatement(
         [types.returnStatement(types.callExpression(bindGenerator, [types.callExpression(inner, [])]))],
-        node.body.directives,
+        body.directives,
     );
     node.generator = false;
     node.async = false;
