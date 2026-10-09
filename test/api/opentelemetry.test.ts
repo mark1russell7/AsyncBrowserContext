@@ -67,6 +67,8 @@ describe(`AsyncContextManager (${runtime} runtime)`, () => {
             return `${this.tag}${suffix} ${String(valueOf())}`;
         });
         expect(bound.length).toBe(1);
+        // The length of a native function is configurable, but not writable or enumerable.
+        expect(Object.getOwnPropertyDescriptor(bound, "length")).toEqual({ value : 1, writable : false, enumerable : false, configurable : true });
         expect(bound.call({ tag : "x" }, "!")).toBe("x! r-3");
         expect(context.bind(ROOT_CONTEXT, 42)).toBe(42);
     });

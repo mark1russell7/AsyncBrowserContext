@@ -19,6 +19,7 @@ export default {
         "src/patches/to-string.ts",
         "src/babel/**/*.ts",
         "src/vite/**/*.ts",
+        "src/opentelemetry/**/*.ts",
         "!src/**/*.test.ts",
     ],
     reporters : ["clear-text", "progress", "json", "html"],

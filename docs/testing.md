@@ -96,7 +96,7 @@ The check does not examine a run that stopped early, for example with `--bail` o
 
 ## Mutation testing
 
-Stryker examines the code that the tests can examine in Node.js. This code is the core, the patches of promises and timers, the patch helpers, the Babel preset and the Vite plugin. The browser-only patches (events, observers, streams and callback APIs) are not in the scope of Stryker, because Stryker operates Vitest in Node.js only. The browser tests examine these patches. The Node.js runtime is also not in the scope, because the native `AsyncLocalStorage` does its work.
+Stryker examines the code that the tests can examine in Node.js. This code is the core, the patches of promises and timers, the patch helpers, the Babel preset, the Vite plugin and the OpenTelemetry context manager. The browser-only patches (events, observers, streams and callback APIs) are not in the scope of Stryker, because Stryker operates Vitest in Node.js only. The browser tests examine these patches. The Node.js runtime is also not in the scope, because the native `AsyncLocalStorage` does its work.
 
 Stryker uses its command runner. For each mutant, it starts `vitest run` with the configuration `vitest.stryker.config.ts`. This configuration has no projects: it starts the unit tests and the shared tests on the browser runtime in Node.js. The Vitest runner of Stryker started almost no tests with Vitest 5, so each mutant seemed to survive.
 
