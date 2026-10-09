@@ -45,3 +45,20 @@ declare module "virtual:debugger-scenarios" {
     const scenarios : readonly DebuggerScenario[];
     export default scenarios;
 }
+
+/**
+ * The type of `virtual:search-index` (refer to `build/search-plugin.ts`).
+ */
+declare module "virtual:search-index" {
+    export type SearchHeading = { text : string; id : string };
+    export type SearchEntry = {
+        path : string;
+        section : string;
+        title : string;
+        description : string;
+        headings : SearchHeading[];
+        text : string;
+    };
+    const entries : SearchEntry[];
+    export default entries;
+}

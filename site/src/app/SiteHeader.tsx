@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { cx } from "../lib/cx";
+import { SearchButton } from "../search/Search";
 import { ThemeToggle } from "../theme/ThemeToggle";
 import { BrandMark } from "./BrandMark";
 import { useSections } from "./SectionsContext";
@@ -44,6 +45,7 @@ export function SiteHeader() {
                     </ul>
                 </nav>
                 <div className={styles.tools}>
+                    <SearchButton />
                     <ThemeToggle />
                 </div>
             </div>
