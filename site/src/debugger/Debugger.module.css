@@ -263,14 +263,12 @@
     padding-right: 0.4em;
     color: var(--color-ink-muted);
     text-align: right;
-    opacity: 0.75;
     user-select: none;
 }
 
 .line[data-active] .gutter {
     color: var(--color-ink);
     font-weight: 700;
-    opacity: 1;
 }
 
 .marks {

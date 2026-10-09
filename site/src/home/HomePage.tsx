@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Link } from "react-router";
-import examples from "virtual:transform-examples";
+import examples from "virtual:transform-examples?only=async-function";
 import { useSections } from "../app/SectionsContext";
 import { REPOSITORY_URL, SITE_NAME } from "../app/site";
 import { HighlightedCode } from "../components/Code/HighlightedCode";

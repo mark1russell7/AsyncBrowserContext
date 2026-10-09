@@ -2,6 +2,13 @@
  * The type of `virtual:transform-examples` (refer to
  * `build/transform-examples-plugin.ts`).
  */
+/** One example of `virtual:transform-examples`, for the home page. */
+declare module "virtual:transform-examples?only=async-function" {
+    import type { TransformExample } from "virtual:transform-examples";
+    const examples : TransformExample[];
+    export default examples;
+}
+
 declare module "virtual:transform-examples" {
     export type TransformExample = {
         id : string;

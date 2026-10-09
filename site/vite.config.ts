@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { asyncContext } from "../src/vite/plugin.ts";
 import { debuggerPlugin } from "./build/debugger-plugin.ts";
+import { fontPreloadPlugin } from "./build/font-preload-plugin.ts";
 import { normalizeBase } from "./build/base.ts";
 import { mdxFrontmatterPlugin } from "./build/frontmatter-plugin.ts";
 import { mdxPlugin } from "./build/mdx-plugin.ts";
@@ -37,6 +38,7 @@ export default defineConfig({
         react({ include : /\.(mdx|js|jsx|ts|tsx)$/ }),
         transformExamplesPlugin(),
         debuggerPlugin(),
+        fontPreloadPlugin(),
         // The site uses the library on itself: the demos run the real runtime in the page.
         asyncContext({ include : isSiteModule }),
         spaFallbackPlugin(),
