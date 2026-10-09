@@ -43,7 +43,7 @@ describe("the scenarios of the context debugger", () => {
         expect(await texts("snapshot")).toEqual(["now: r-2", "in the snapshot: r-1"]);
     });
 
-    it("give the root frame to code without the transform after a native await (rule C7)", async () => {
-        expect(await texts("untransformed")).toEqual(["in the dependency: undefined", "after the await: r-1"]);
+    it("give the root frame to code without the transform after a native await (rule C7), and the context to a bound callback", async () => {
+        expect(await texts("untransformed")).toEqual(["without bind(): undefined", "with bind(): r-1", "after the await: r-1"]);
     });
 });

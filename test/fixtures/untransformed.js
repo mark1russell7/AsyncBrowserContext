@@ -14,3 +14,21 @@ export async function* libraryGenerator(callback) {
     await null;
     yield callback();
 }
+
+/** Calls `callback` from a timer that it starts before its first `await`. */
+export function libraryTimer(callback) {
+    return new Promise((resolve) => setTimeout(() => resolve(callback()), 0));
+}
+
+/** A list of callbacks, as a library keeps them: `emit()` calls each callback. */
+export function createEmitter() {
+    const listeners = [];
+    return {
+        on(listener) {
+            listeners.push(listener);
+        },
+        emit() {
+            return listeners.map((listener) => listener());
+        },
+    };
+}

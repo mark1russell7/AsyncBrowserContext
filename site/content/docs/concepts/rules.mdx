@@ -63,12 +63,12 @@ requestId.run("r-2", () => iterator.next().value); // "r-1"
 
 A callback of `setTimeout`, `setInterval`, `queueMicrotask`, `requestAnimationFrame` or `requestIdleCallback` gets the context of the code that scheduled it. The [patched APIs](/docs/concepts/patched-apis) page gives the other schedulers.
 
-## C7: untransformed code gets the root context
+## C7: code without the transform cannot get a wrong context
 
-After an `await`, code that the transform does not change gets the root context. Callbacks from APIs that the library does not patch also get the root context. They do not get the context of a different operation.
+After its own native `await`, code that the transform does not change gets the root context. Callbacks from APIs that the library does not patch also get the root context. Such code cannot get the context of a different operation. After your transformed code awaits that code, your code gets its context again.
 
-<Callout type="caution" title="A missing value, not a wrong value">
-  The library cannot know the context after a native `await`. It gives the root context, so the code sees no value. It does not give the value of a different request. Configure the Vite plugin or Babel to transform the dependencies.
+<Callout type="note" title="A missing value at a boundary, not a wrong value">
+  The library cannot know the context after a native `await`, so it gives no value there. It does not give the value of a different request at any time. Where your code gives a callback to such code, `AsyncLocalStorage.bind(callback)` keeps the context. The [boundaries](/docs/concepts/boundaries) page gives each case.
 </Callout>
 
 ## C8: a snapshot keeps a context

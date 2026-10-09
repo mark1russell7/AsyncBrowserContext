@@ -1,0 +1,94 @@
+---
+title: Boundaries
+description: The guarantee of the library, and the tools that keep the context where your code meets code without the transform.
+order: 14
+---
+
+## The guarantee
+
+In code that the Vite plugin or the Babel preset transforms, each step gets the context of its own operation. Code without the transform cannot get the context of a different operation (rule C7). At most, that code gets no context after its own native `await`.
+
+Thus, a value cannot go from one request to another request. Where your code meets code without the transform, you decide the context with one function of the library.
+
+## Where your code meets other code
+
+| The other code | What happens | What to do |
+| --- | --- | --- |
+| Gives a promise, and your code awaits it | After the `await`, your code gets its context again. | Nothing |
+| Starts your callback before its first `await` | The callback gets the context of your code. | Nothing |
+| Starts your callback from a timer, an observer or a promise that it registers before its first `await` | The patched API gives the callback the context of the registration. | Nothing |
+| Adds your callback as an event listener | The listener gets the context of the dispatch, or the context of the registration for a dispatch from the root context (rule C13). | Nothing |
+| Starts your callback after its own native `await` | The callback gets the root context. | Bind the callback |
+| Keeps your callback in a list, and starts it from other code later | The callback gets the context of the code that starts the list. | Bind the callback |
+| Reads the context itself after its own native `await`, for example a logger | These reads get no value. | Give the values as arguments, or transform the code |
+
+The tests in `test/rules/c07-boundaries.test.ts` examine each row on Node.js and in the browsers.
+
+## Bind a callback
+
+`AsyncLocalStorage.bind()` gives a function that always starts in the context of the `bind()` use. Bind the callback where you give it to the other code:
+
+```ts
+import { AsyncLocalStorage } from "async-browser-context";
+
+untransformedLibrary.onDone(AsyncLocalStorage.bind((result) => {
+    log(requestId.getStore(), result); // the context of the bind() use
+}));
+```
+
+`AsyncContext.Snapshot.wrap(callback)` does the same with the API of the TC39 proposal.
+
+## Keep a snapshot for more callbacks
+
+`AsyncLocalStorage.snapshot()` keeps the current context. The function that it gives starts a function in that context, also later and from a different context:
+
+```ts
+const inContext = AsyncLocalStorage.snapshot();
+
+widget.on("change", (value) => inContext(() => save(value)));
+widget.on("close", () => inContext(() => log("closed")));
+```
+
+## Give values to code that reads the context
+
+Code without the transform cannot read the context after its own `await`. Read the values in your code, and give them as arguments:
+
+```ts
+cdnLogger.log("saved", { requestId : requestId.getStore() });
+```
+
+## Transform as much code as possible
+
+The Vite plugin transforms your code and the dependencies in `node_modules` by default. With Babel, configure the loader so that it does not exclude `node_modules` (refer to [The transform](/docs/concepts/transform)). The build cannot transform this code. Use the tools above at its boundary:
+
+- Scripts from other servers, for example a script from a content delivery network.
+- Code of browser extensions.
+- Code that `eval()` and `new Function()` compile at runtime.
+
+The [context debugger](/explore/debugger) shows a callback in a dependency without the transform, and the same callback with `bind()`.
+
+## Workers, iframes and other realms
+
+Each realm has its own global object and its own store. Send the values in the message, and start `run()` on the other side:
+
+```ts
+// The page
+worker.postMessage({ requestId : requestId.getStore(), job });
+
+// The worker
+self.onmessage = ({ data }) => {
+    requestId.run(data.requestId, () => handle(data.job));
+};
+```
+
+## zone.js is not a boundary
+
+zone.js also patches `Promise.prototype.then`, with different rules. Do not use the library and zone.js in the same page. For OpenTelemetry, use [`AsyncContextManager`](/docs/guides/opentelemetry) in place of the `ZoneContextManager`.
+
+<Callout type="caution" title="zone.js">
+  Do not use this library and zone.js in the same page. The two libraries patch the same functions with different rules.
+</Callout>
+
+## Node.js
+
+On Node.js, the native `AsyncLocalStorage` keeps the context in all code, also in code that Babel does not transform. Thus, a callback after a native `await` gets the correct context, and `bind()` is not necessary. The tools give the same results on Node.js. Only native generators are different (rule C5).

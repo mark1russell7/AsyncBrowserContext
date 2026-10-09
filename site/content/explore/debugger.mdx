@@ -26,7 +26,7 @@ Select a scenario. The page starts the code of the scenario with the real librar
 | Timers and events | The timer and the microtask get frame F1, the frame of their registration. The dispatch in r-2 gives r-2 to the listener. The dispatch from the root frame gives F1, the frame of the registration (rule C13). |
 | Generators | Each `next()` call operates the generator in frame F1, also when the caller is in frame F2 or in the root frame. |
 | Snapshots | `snapshot.run()` makes frame F1 current again in the frame of request r-2. |
-| Code without the transform | The callback in the dependency gets the root frame, because a native `await` comes before it (rule C7). The scenario code gets frame F1 again after its own `await`. |
+| Code without the transform | The first callback in the dependency gets the root frame, because a native `await` comes before it (rule C7). It cannot get the frame of a different request. The second callback has `AsyncLocalStorage.bind()`, so it gets frame F1 at the boundary (refer to [Boundaries](/docs/concepts/boundaries)). The scenario code gets frame F1 again after its own `await`. |
 
 ## How the page records the steps
 

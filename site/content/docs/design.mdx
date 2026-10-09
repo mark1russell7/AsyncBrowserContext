@@ -22,7 +22,7 @@ The old tests did not find these errors. A runtime with no async support passed 
 
 The new design has three principles:
 
-1. **A context is current only for one step.** The runtime sets a frame before a step that it controls, and sets the previous frame after the step. Between tasks, the root context is current. Thus, an error gives no value, not a wrong value.
+1. **A context is current only for one step.** The runtime sets a frame before a step that it controls, and sets the previous frame after the step. Between tasks, the root context is current. Thus, an error gives no value, not a wrong value. At a boundary with code that the runtime does not control, `AsyncLocalStorage.bind()` keeps the context (refer to [Boundaries](/docs/concepts/boundaries)).
 2. **Use the rules of the TC39 proposal.** A `then` callback gets the context of the `then` use. An async function and a generator keep their context.
 3. **Use the Babel transforms.** The preset composes the Babel plugins for async functions and async generators with a small runtime function. The library has no custom code for `await`.
 

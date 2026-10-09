@@ -52,5 +52,5 @@ saveButton.addEventListener("click", () => traced("save", async () => {
 Each `api()` use in the action reads the same trace ID: after `await`, in `then` callbacks and in timers. Two actions at the same time keep different IDs.
 
 <Callout type="note">
-  A request that a dependency sends after a native `await` gets the root context. Use the Vite plugin, or configure Babel to transform the dependencies. The [limits](/docs/concepts/limits) page tells more.
+  A dependency without the transform does not read the trace after its own native `await`. Use the Vite plugin, which transforms the dependencies, or bind the callbacks that you give to the dependency. The [boundaries](/docs/concepts/boundaries) page tells how.
 </Callout>

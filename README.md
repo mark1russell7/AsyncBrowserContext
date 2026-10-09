@@ -171,7 +171,7 @@ The tests examine each rule on the browser runtime, on the Node.js runtime and i
 | C4 | A `then`, `catch` or `finally` callback gets the context of the `then`, `catch` or `finally` call. |
 | C5 | A generator body gets the context of the call that made the generator. After each step, the context of the caller is current again. |
 | C6 | A timer callback gets the context of the call that scheduled it. |
-| C7 | Code that the transform does not change does not get the context of a different operation at any time. |
+| C7 | Code that the transform does not change cannot get the context of a different operation. At most, it gets no context after its own native `await`. |
 | C8 | `snapshot.run()` and `Snapshot.wrap()` start functions in the recorded context. |
 | C9 | Only code that has a `Variable` can read its values. The library puts no values on `globalThis`. |
 | C10 | Two copies of the library on one page use one context store. |
@@ -194,13 +194,33 @@ The tests examine each rule on the browser runtime, on the Node.js runtime and i
 
 The patches keep the names, the lengths and the source text of the native functions. `Function.prototype.toString` gives the source text of the original function.
 
-## Limits
+## Boundaries
 
-- **Code that the transform does not change.** On the browser runtime, this code gets the root context after `await` (rule C7). Use the Vite plugin, which transforms the dependencies, or use `Snapshot.wrap()` for a callback.
-- **Other patches of `Promise.prototype.then`.** Do not use the library together with zone.js or with another library that patches `then`.
-- **Transformed generator functions.** A transformed generator function is an ordinary function that gives a generator. `fn.prototype` and `instanceof fn` do not operate as for a native generator function. The generator objects operate as native generator objects.
+In transformed code, each step gets the context of its own operation. Code without the transform cannot get the context of a different operation (rule C7). At most, that code gets no context after its own native `await`. Where your code meets that code, one function of the library keeps the context:
+
+| The other code | What to do |
+| --- | --- |
+| Gives a promise, and your code awaits it | Nothing. After the `await`, your code gets its context again. |
+| Starts your callback synchronously, or from a timer, an observer or a promise that it registers before its first `await` | Nothing. The patched APIs keep the context. Event listeners follow rule C13. |
+| Starts your callback after its own native `await` | `AsyncLocalStorage.bind(callback)` or `AsyncContext.Snapshot.wrap(callback)` |
+| Keeps your callback in a list and starts it later from other code | `AsyncLocalStorage.bind(callback)` when you give the callback |
+| Reads the context itself after its own native `await` | Give the values as arguments, or transform the code. |
+| Operates in a worker or an iframe | Send the values in the message, and use `run()` on the other side. |
+
+```ts
+untransformedLibrary.onDone(AsyncLocalStorage.bind((result) => {
+    log(requestId.getStore(), result); // the context of the bind() use
+}));
+```
+
+The Vite plugin transforms the dependencies in `node_modules` by default. Thus, these boundaries are usually only scripts from other servers, browser extensions and code from `eval()` or `new Function()`. The tests in `test/rules/c07-boundaries.test.ts` examine each row. The [boundaries page](https://mark1russell7.github.io/AsyncBrowserContext/docs/concepts/boundaries) of the website gives the details.
+
+Do not use the library together with zone.js or with another library that patches `Promise.prototype.then`. The two libraries patch the same functions with different rules. For OpenTelemetry, use `AsyncContextManager` in place of the `ZoneContextManager`.
+
+### Other differences of transformed code
+
+- **Generator functions.** A transformed generator function is an ordinary function that gives a generator. `fn.prototype` and `instanceof fn` do not operate as for a native generator function. The generator objects operate as native generator objects.
 - **Stack traces.** In transformed code, a stack trace shows the generator and the `coroutine` function of the runtime.
-- **Other realms.** The context does not go to web workers, iframes or code in `eval()` and `new Function()`.
 
 ## Performance
 

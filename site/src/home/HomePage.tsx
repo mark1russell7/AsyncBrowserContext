@@ -22,6 +22,15 @@ const PATCHES : readonly { group : string; apis : readonly string[] }[] = [
     { group : "Other callbacks", apis : ["navigator.locks", "toBlob", "geolocation", "startViewTransition", "Array.fromAsync"] },
 ];
 
+/** The boundaries with code without the transform, and what to do at each (refer to the page Boundaries). */
+const BOUNDARIES : readonly { other : string; action : string; tool? : string }[] = [
+    { other : "Gives a promise that your code awaits", action : "Nothing to do" },
+    { other : "Starts your callback from a patched API", action : "Nothing to do" },
+    { other : "Starts your callback after its own await", action : "Bind the callback", tool : "AsyncLocalStorage.bind(callback)" },
+    { other : "Keeps your callback in a list for later", action : "Bind the callback", tool : "AsyncLocalStorage.bind(callback)" },
+    { other : "Operates in a worker or an iframe", action : "Send the values, then", tool : "run(value, fn)" },
+];
+
 /** The tools that have a guide. */
 const WORKS_WITH : readonly { label : string; to : string }[] = [
     { label : "Vite", to : "/docs/getting-started" },
@@ -150,6 +159,28 @@ export function HomePage() {
                                 <li key={group.group}>
                                     <span className={styles.patchGroup}>{group.group}</span>
                                     <span className={styles.patchList}>{group.apis.map(api => <code key={api}>{api}</code>)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </li>
+                    <li className={styles.step}>
+                        <div className={styles.stepText}>
+                            <span className={styles.stepNumber}>4</span>
+                            <h3>The boundaries</h3>
+                            <p>
+                                Code without the transform cannot get the context of a different operation. At most, it gets no context after its own native{" "}
+                                <code>await</code>. Where your code gives a callback to that code, one function keeps the context.
+                            </p>
+                            <p><Link to="/docs/concepts/boundaries">Read about the boundaries</Link></p>
+                        </div>
+                        <ul className={`${styles.patches} ${styles.boundaries}`} aria-label="What to do at each boundary">
+                            {BOUNDARIES.map(item => (
+                                <li key={item.other}>
+                                    <span className={styles.patchGroup}>{item.other}</span>
+                                    <span className={styles.patchList}>
+                                        <span className={styles.boundaryAction}>{item.action}</span>
+                                        {item.tool === undefined ? null : <code>{item.tool}</code>}
+                                    </span>
                                 </li>
                             ))}
                         </ul>

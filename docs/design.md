@@ -41,7 +41,7 @@ The runtime sets a frame only for one step of code that it controls. After the s
 - One step of a transformed generator, from one `yield` to the next.
 - The function of `run()` or `snapshot.run()`.
 
-Thus, between tasks, the current frame is the root frame. Code that the library does not control gets the root context, not the context of a different operation.
+Thus, between tasks, the current frame is the root frame. Code that the library does not control gets the root context, not the context of a different operation. Where application code gives a callback to such code, `AsyncLocalStorage.bind()` or a snapshot keeps the context (refer to the page "Boundaries" of the website).
 
 ### The transform
 

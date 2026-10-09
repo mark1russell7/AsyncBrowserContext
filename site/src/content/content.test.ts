@@ -13,7 +13,7 @@ const REQUIRED : Readonly<Record<string, readonly string[]>> = {
         "concepts/rules",
         "concepts/transform",
         "concepts/patched-apis",
-        "concepts/limits",
+        "concepts/boundaries",
         "api",
         "guides/request-tracing",
         "guides/logging",

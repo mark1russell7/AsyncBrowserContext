@@ -50,4 +50,4 @@ The plugin changes each generator function so that it gives `bindGenerator(gener
 
 ## Transform the dependencies
 
-The Vite plugin transforms the dependencies by default. With Babel, configure the loader so that it does not exclude `node_modules`. The [limits](/docs/concepts/limits) page tells what occurs in code that the build does not transform.
+The Vite plugin transforms the dependencies by default. With Babel, configure the loader so that it does not exclude `node_modules`. Code that the build cannot transform cannot get the context of a different operation. The [boundaries](/docs/concepts/boundaries) page gives the tools that keep the context where your code meets that code.
