@@ -1,5 +1,6 @@
 import { transformAsync } from "@babel/core";
 import preset from "../../src/babel/preset.ts";
+import { highlightLines, type CodeToken } from "./highlight.ts";
 
 /** One example of the transform viewer: the source code that the preset gets. */
 export type TransformInput = {
@@ -13,10 +14,24 @@ export type TransformInput = {
 /** One example with the code that the preset gives. */
 export type TransformExample = TransformInput & {
     output : string;
+    /** The highlighted lines of the input and the output. */
+    inputLines : CodeToken[][];
+    outputLines : CodeToken[][];
 };
 
 /** The examples of the transform viewer. Each example shows one part of the preset. */
 export const TRANSFORM_INPUTS : readonly TransformInput[] = [
+    {
+        id : "async-function",
+        title : "Async function",
+        note : "The function becomes a generator that coroutine operates. Each await becomes a yield, so the runtime can set the context before the function continues.",
+        input : [
+            "async function handle(id) {",
+            "    const user = await load(id);",
+            "    log(requestId.getStore(), user);",
+            "}",
+        ].join("\n"),
+    },
     {
         id : "await-in-expression",
         title : "await in an expression",
@@ -95,7 +110,8 @@ export async function transformExamples(inputs : readonly TransformInput[] = TRA
             sourceType : "module",
             presets : [[preset, { runtime : "async-browser-context/runtime" }]],
         });
-        examples.push({ ...input, output : result?.code ?? "" });
+        const output = result?.code ?? "";
+        examples.push({ ...input, output, inputLines : await highlightLines(input.input), outputLines : await highlightLines(output) });
     }
     return examples;
 }

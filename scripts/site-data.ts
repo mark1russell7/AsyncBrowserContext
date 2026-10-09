@@ -9,15 +9,19 @@
  *   this run when you give the option `--browsers`.
  * - `probes.json` has the results of the review. The regression tests examine
  *   them. The script sets only its time.
+ * - `size.json` has the size of the browser runtime: the classes and the
+ *   runtime of the transform, in one minified bundle. The script builds `dist/` first.
  *
  * The script does not change a file when its source does not exist.
  */
 import { execSync } from "node:child_process";
+import { brotliCompressSync, gzipSync } from "node:zlib";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, firefox, webkit, type BrowserType } from "playwright";
+import { build } from "vite";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(root, "site", "public", "data");
@@ -146,9 +150,41 @@ function writeProbes() : void {
     writeData("probes", { ...probes, generated });
 }
 
+/** The size of the code that a browser application gets: the classes, the patches and the runtime of the transform. */
+async function writeSize() : Promise<void> {
+    execSync("npx tsc -p tsconfig.build.json", { cwd : root, stdio : "ignore" });
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "abc-size-"));
+    const entry = path.join(directory, "entry.js");
+    const dist = (file : string) : string => JSON.stringify(path.join(root, "dist", file).replace(/\\/g, "/"));
+    fs.writeFileSync(entry, [
+        `export { AsyncLocalStorage, AsyncContext } from ${dist("index.js")};`,
+        `export { coroutine, bindGenerator } from ${dist("runtime.js")};`,
+    ].join("\n"));
+    try {
+        const result = await build({
+            configFile : false,
+            logLevel : "silent",
+            root : directory,
+            build : { write : false, minify : true, lib : { entry, formats : ["es"], fileName : "bundle" } },
+        });
+        const outputs = (Array.isArray(result) ? result : [result]) as { output : { type : string; code? : string }[] }[];
+        const code = outputs.flatMap(item => item.output).map(chunk => chunk.code ?? "").join("\n");
+        writeData("size", {
+            generated,
+            entries : ["async-browser-context", "async-browser-context/runtime"],
+            minifiedBytes : Buffer.byteLength(code),
+            gzipBytes : gzipSync(code, { level : 9 }).length,
+            brotliBytes : brotliCompressSync(code).length,
+        });
+    } finally {
+        fs.rmSync(directory, { recursive : true, force : true });
+    }
+}
+
 writeBench();
 writeMutation();
 writeProbes();
+await writeSize();
 if (process.argv.includes("--browsers")) {
     await writeBrowsers();
 }

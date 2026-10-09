@@ -13,3 +13,4 @@ bench/.out/
 *.log
 bench/results/*
 !bench/results/latest.json
+.claude/

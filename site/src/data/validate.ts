@@ -39,6 +39,11 @@ export function validateDataFile<K extends SiteDataName>(name : K, value : unkno
         case "browsers":
             requireFields(rowsOf(value, "rows", name), { browser : "string", version : "string", passed : "number", failed : "number", skipped : "number" }, name);
             break;
+        case "size":
+            for (const field of ["minifiedBytes", "gzipBytes", "brotliBytes"]) {
+                if (typeof value[field] !== "number") throw new Error(`The file data/${name}.json has no number "${field}".`);
+            }
+            break;
         case "bench": {
             if (!isRecord(value["environment"])) throw new Error(`The file data/${name}.json has no "environment".`);
             requireFields(rowsOf(value, "rows", name), { benchmark : "string", plainMs : "number", transformOnlyMs : "number", libraryMs : "number" }, name);

@@ -1,10 +1,12 @@
 import mdx from "@mdx-js/rollup";
+import rehypeShiki from "@shikijs/rehype";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypeSlug from "rehype-slug";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import type { Plugin } from "vite";
+import { CODE_LANGUAGES, CODE_THEMES } from "./highlight.ts";
 import { isFrontmatterRequest } from "./frontmatter.ts";
 import { rehypeExportToc } from "./rehype-export-toc.ts";
 import { remarkMermaid } from "./remark-mermaid.ts";
@@ -27,6 +29,8 @@ export function mdxPlugin() : Plugin {
             remarkMermaid,
         ],
         rehypePlugins : [
+            // Each code block gets the colors of the light and the dark theme as CSS variables.
+            [rehypeShiki, { themes : CODE_THEMES, defaultColor : false, langs : CODE_LANGUAGES, fallbackLanguage : "text" }],
             rehypeSlug,
             rehypeExportToc,
             [rehypeAutolinkHeadings, { behavior : "wrap", properties : { className : ["heading-anchor"] } }],

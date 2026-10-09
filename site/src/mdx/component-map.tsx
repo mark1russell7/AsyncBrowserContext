@@ -25,7 +25,7 @@ function lazyComponent<P extends object>(
 }
 
 const ContextTimeline = lazyComponent(() => import("../explore/ContextTimeline"), "The context timeline loads.");
-const FrameTree = lazyComponent(() => import("../explore/FrameTree"), "The frame tree loads.");
+const ContextDebugger = lazyComponent(() => import("../debugger/ContextDebugger"), "The context debugger loads.");
 const TransformViewer = lazyComponent(() => import("../explore/TransformViewer"), "The transform viewer loads.");
 const EventRuleDemo = lazyComponent(() => import("../explore/EventRuleDemo"), "The event demonstration loads.");
 const ProbeTable = lazyComponent<object>(async () => ({ default : (await import("../results/ResultViews")).ProbeTable }), "The probe table loads.");
@@ -46,10 +46,10 @@ export const mdxComponents = {
     BenchChart,
     BrowserMatrix,
     Callout,
+    ContextDebugger,
     ContextTimeline,
     EventRuleDemo,
     Figure,
-    FrameTree,
     Mermaid,
     MutationChart,
     PlotFigure,

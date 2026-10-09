@@ -166,6 +166,15 @@ table {
     max-width: var(--measure);
 }
 
+/* On a wide page, the text keeps its measure, and the components get the full width. */
+[data-layout="wide"] .prose {
+    max-width: none;
+}
+
+[data-layout="wide"] .prose > :where(p, ul, ol, dl, blockquote, h2, h3, h4) {
+    max-width: var(--measure);
+}
+
 .prose > :first-child {
     margin-top: 0;
 }
@@ -189,6 +198,21 @@ table {
 .prose ul,
 .prose ol,
 .prose dl,
+/* Code blocks that Shiki highlighted. Each token has a light and a dark color. */
+.shiki span {
+    color: var(--shiki-light);
+}
+
+:root[data-theme="dark"] .shiki span {
+    color: var(--shiki-dark);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .shiki span {
+        color: var(--shiki-dark);
+    }
+}
+
 .prose blockquote {
     margin: 0 0 var(--space-4);
 }

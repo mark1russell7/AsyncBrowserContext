@@ -1,5 +1,6 @@
 import examples from "virtual:transform-examples";
 import { useState } from "react";
+import { HighlightedCode } from "../components/Code/HighlightedCode";
 import styles from "./Explore.module.css";
 
 export type TransformViewerProps = {
@@ -32,11 +33,11 @@ export function TransformViewer({ example : initialExample } : TransformViewerPr
                 <div className={styles.split}>
                     <div>
                         <p className={styles.label}>Input</p>
-                        <pre className={styles.code}><code>{selected.input}</code></pre>
+                        <HighlightedCode lines={selected.inputLines} label="The input of the preset" />
                     </div>
                     <div>
                         <p className={styles.label}>Output of the preset</p>
-                        <pre className={styles.code}><code>{selected.output}</code></pre>
+                        <HighlightedCode lines={selected.outputLines} label="The output of the preset" />
                     </div>
                 </div>
             </div>

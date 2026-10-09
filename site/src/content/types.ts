@@ -14,6 +14,8 @@ export type PageMeta = {
      */
     order : number;
     status? : PageStatus;
+    /** "wide": the article uses the width of the table of contents too, for large interactive components. */
+    layout? : "wide";
 };
 
 /** One heading in the table of contents. `build/rehype-export-toc.ts` exports this shape as `toc`. */

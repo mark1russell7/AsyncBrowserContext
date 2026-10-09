@@ -95,12 +95,22 @@ export type BenchFile = DataFileBase & {
     rows : BenchRow[];
 };
 
+/** The size of the browser runtime in one minified bundle, in bytes. */
+export type SizeFile = DataFileBase & {
+    /** The modules in the bundle. */
+    entries : string[];
+    minifiedBytes : number;
+    gzipBytes : number;
+    brotliBytes : number;
+};
+
 /** The data file of each name. */
 export type SiteDataMap = {
     probes : ProbesFile;
     mutation : MutationFile;
     browsers : BrowsersFile;
     bench : BenchFile;
+    size : SizeFile;
 };
 
 export type SiteDataName = keyof SiteDataMap;

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { asyncContext } from "../src/vite/plugin.ts";
+import { debuggerPlugin } from "./build/debugger-plugin.ts";
 import { normalizeBase } from "./build/base.ts";
 import { mdxFrontmatterPlugin } from "./build/frontmatter-plugin.ts";
 import { mdxPlugin } from "./build/mdx-plugin.ts";
@@ -29,6 +30,7 @@ export default defineConfig({
         mdxPlugin(),
         react({ include : /\.(mdx|js|jsx|ts|tsx)$/ }),
         transformExamplesPlugin(),
+        debuggerPlugin(),
         // The site uses the library on itself: the demos run the real runtime in the page.
         asyncContext({ include : isSiteModule }),
         spaFallbackPlugin(),
@@ -49,7 +51,6 @@ export default defineConfig({
             "react-router",
             "react-router/dom",
             "@observablehq/plot",
-            "@xyflow/react",
             "mermaid",
         ],
     },

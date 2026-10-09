@@ -20,6 +20,13 @@ describe("parsePageMeta", () => {
         expect(result.errors).toHaveLength(4);
     });
 
+    it("accepts the wide layout and rejects other layouts", () => {
+        expect(parsePageMeta({ title : "A", description : "", order : 0, layout : "wide" }, "F").meta.layout).toBe("wide");
+        const invalid = parsePageMeta({ title : "A", description : "", order : 0, layout : "narrow" }, "F");
+        expect(invalid.errors).toEqual(["Set `layout` to \"wide\", or remove it."]);
+        expect(invalid.meta.layout).toBeUndefined();
+    });
+
     it("reports a missing frontmatter", () => {
         const result = parsePageMeta(undefined, "Page");
         expect(result.errors[0]).toBe("The page has no frontmatter.");

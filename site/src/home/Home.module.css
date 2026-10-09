@@ -2,40 +2,100 @@
     width: 100%;
     max-width: var(--page-width);
     margin: 0 auto;
-    padding: var(--space-8) var(--gutter) var(--space-6);
+    padding: var(--space-8) var(--gutter) var(--space-10);
 }
+
+/* Hero */
 
 .hero {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-7);
-    align-items: start;
+    align-items: center;
 }
 
-@media (min-width: 60rem) {
+@media (min-width: 64rem) {
     .hero {
-        grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 1fr);
-        gap: var(--space-10);
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+        gap: var(--space-8);
+        align-items: end;
     }
 }
 
 .heroText {
-    max-width: 40rem;
+    max-width: 38rem;
+}
+
+.eyebrow {
+    margin: 0 0 var(--space-3);
+    color: var(--color-accent);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .title {
     margin: 0 0 var(--space-5);
-    font-size: clamp(2.1rem, 1.4rem + 3vw, var(--text-3xl));
+    font-size: clamp(2.4rem, 1.5rem + 3.2vw, 3.6rem);
     font-weight: 800;
-    line-height: 1.08;
-    letter-spacing: -0.025em;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
 }
 
 .lead {
-    margin: 0 0 var(--space-6);
+    margin: 0 0 var(--space-3);
     color: var(--color-ink-secondary);
     font-size: var(--text-lg);
     line-height: 1.5;
+}
+
+.subLead {
+    margin: 0 0 var(--space-5);
+    color: var(--color-ink-muted);
+}
+
+.install {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    max-width: 30rem;
+    margin: 0 0 var(--space-5);
+    padding: 0.5rem 0.55rem 0.5rem 0.9rem;
+    border: 1px solid var(--color-rule-strong);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+}
+
+.install code {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.prompt {
+    color: var(--color-ink-muted);
+    user-select: none;
+}
+
+.copy {
+    padding: 0.2rem 0.65rem;
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-small);
+    background: var(--color-surface-sunken);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.copy:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent-strong);
 }
 
 .actions {
@@ -49,60 +109,345 @@
     text-decoration: none;
 }
 
-.indicator {
+.githubButton {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.demo {
+    min-width: 0;
+    margin-top: var(--space-8);
+}
+
+.heroLoading,
+.compareLoading,
+.snapshotLoading {
     display: grid;
-    gap: var(--space-3);
-    padding: var(--space-5);
-    border: 1px solid var(--color-rule-strong);
+    place-items: center;
+    border: 1px dashed var(--color-rule-strong);
     border-radius: var(--radius);
+    color: var(--color-ink-muted);
 }
 
-.indicator figure {
-    margin: 0;
+.heroLoading {
+    min-height: 34rem;
 }
 
-.indicator .button,
-.indicator button {
-    justify-self: start;
+.compareLoading {
+    min-height: 15rem;
 }
 
-.indicatorTitle {
-    margin: 0;
-    color: var(--color-ink-secondary);
-    font-weight: 700;
+.snapshotLoading {
+    min-height: 18rem;
 }
 
-.reading {
+/* Measurements */
+
+.stats {
     display: grid;
-    gap: var(--space-1);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 1px;
     margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-rule);
+    list-style: none;
 }
 
-.readingValue {
-    font-size: var(--text-3xl);
+.stat {
+    background: var(--color-surface);
+}
+
+.stat a {
+    display: grid;
+    gap: var(--space-2);
+    height: 100%;
+    padding: var(--space-5);
+    color: inherit;
+    text-decoration: none;
+}
+
+.stat a:hover .statValue {
+    color: var(--color-accent);
+}
+
+.statValue {
+    font-size: clamp(1.9rem, 1.3rem + 1.6vw, 2.6rem);
     font-weight: 800;
+    font-variant-numeric: tabular-nums;
     line-height: 1;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
 }
 
-.readingLabel {
+.statLabel {
     color: var(--color-ink-secondary);
     font-size: var(--text-sm);
 }
 
-.indicatorText {
-    margin: 0;
-    color: var(--color-ink-secondary);
-    font-size: var(--text-sm);
-}
+/* The problem */
 
-.sections {
+.band {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+    align-items: start;
     margin-top: var(--space-10);
 }
 
-.sectionsTitle {
+@media (min-width: 64rem) {
+    .band {
+        grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+        gap: var(--space-8);
+    }
+}
+
+.bandTitle,
+.sectionTitle {
     margin: 0 0 var(--space-4);
+    font-size: var(--text-2xl);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+}
+
+.bandText p {
+    margin: 0 0 var(--space-3);
+    color: var(--color-ink-secondary);
+}
+
+.bandText .bandNote {
+    color: var(--color-ink-muted);
+    font-size: var(--text-sm);
+}
+
+.compareGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+    gap: var(--space-3);
+}
+
+.consoleCard {
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.consoleCard[data-kind="global"] {
+    border-top: 3px solid var(--status-critical);
+}
+
+.consoleCard[data-kind="library"] {
+    border-top: 3px solid var(--status-good);
+}
+
+.consoleCard figcaption {
+    display: grid;
+    gap: 2px;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--color-rule);
+    background: var(--color-surface-sunken);
+}
+
+.consoleTitle {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 700;
+}
+
+.consoleNote {
+    font-size: var(--text-xs);
+}
+
+.consoleNote[data-status="wrong"] {
+    color: var(--status-critical-ink);
+}
+
+.consoleNote[data-status="correct"] {
+    color: var(--status-good-ink);
+}
+
+.consoleCard ol {
+    margin: 0;
+    padding: 0.5rem 0;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    list-style: none;
+}
+
+.consoleCard li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 0.2rem 0.9rem;
+}
+
+.consoleCard li[data-status="wrong"] {
+    background: color-mix(in srgb, var(--status-critical) 9%, transparent);
+    color: var(--status-critical-ink);
+}
+
+.consoleIcon {
+    flex: none;
+    font-weight: 800;
+}
+
+.consoleCard li[data-status="correct"] .consoleIcon {
+    color: var(--status-good-ink);
+}
+
+.consoleCard li code i {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: var(--lane);
+    vertical-align: middle;
+}
+
+/* How the library operates */
+
+.how {
+    margin-top: var(--space-10);
+}
+
+.steps {
+    display: grid;
+    gap: var(--space-6);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.step {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+    align-items: center;
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--color-rule);
+}
+
+@media (min-width: 64rem) {
+    .step {
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+        gap: var(--space-8);
+    }
+}
+
+.stepText h3 {
+    margin: var(--space-3) 0 var(--space-3);
     font-size: var(--text-xl);
+}
+
+.stepText p {
+    max-width: var(--measure);
+    margin: 0 0 var(--space-3);
+    color: var(--color-ink-secondary);
+}
+
+.stepNumber {
+    display: inline-grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border: 1.5px solid var(--color-ink);
+    border-radius: 50%;
+    font-size: var(--text-sm);
+    font-weight: 800;
+}
+
+.transform {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.arrow {
+    padding-left: var(--space-3);
+    color: var(--color-ink-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.snapshot {
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.snapshotGraph {
+    display: grid;
+    place-items: center;
+    padding: var(--space-5);
+    background-color: var(--color-surface);
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 16px 16px;
+    background-position: -1px -1px;
+}
+
+.snapshot figcaption {
+    padding: 0.6rem 0.9rem;
+    border-top: 1px solid var(--color-rule);
+    color: var(--color-ink-secondary);
+    font-size: var(--text-sm);
+}
+
+.patches {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    list-style: none;
+}
+
+.patches li {
+    display: grid;
+    grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: baseline;
+    padding: 0.7rem 0.9rem;
+}
+
+.patches li + li {
+    border-top: 1px solid var(--color-rule);
+}
+
+.patchGroup {
+    font-size: var(--text-sm);
+    font-weight: 700;
+}
+
+.patchList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.patchList code {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--color-rule);
+    border-radius: 999px;
+    background: var(--color-surface-sunken);
+    font-size: 0.78rem;
+}
+
+/* Sections of the site */
+
+.sections {
+    margin-top: var(--space-10);
 }
 
 .cards {
@@ -166,16 +511,4 @@
     margin: 0;
     padding-left: 1.1em;
     font-size: var(--text-sm);
-}
-
-.example {
-    margin: 0;
-    padding: var(--space-3);
-    overflow-x: auto;
-    border-radius: var(--radius-small);
-    background: var(--color-surface);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    line-height: 1.55;
-    white-space: pre;
 }

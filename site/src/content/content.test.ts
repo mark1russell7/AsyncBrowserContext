@@ -23,7 +23,7 @@ const REQUIRED : Readonly<Record<string, readonly string[]>> = {
         "design",
         "contributing/writing-style",
     ],
-    explore : ["", "timeline", "frames", "transform", "events", "diagrams"],
+    explore : ["", "debugger", "timeline", "transform", "events", "diagrams"],
     testing : ["", "results", "performance"],
 };
 

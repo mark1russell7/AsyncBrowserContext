@@ -1,0 +1,39 @@
+---
+title: Context debugger
+description: Real code with the library, step by step. See the line that runs, the frame tree, the search of each read and the console.
+order: 2
+layout: wide
+---
+
+## How to use the debugger
+
+Select a scenario. The page starts the code of the scenario with the real library in your browser, and records each step. A step is a statement, or the end of an `await`.
+
+- **Move through the steps.** Use the play button, the step buttons, or the left and right arrow keys. Click a lane to go to a step.
+- **Code.** The line of the step has the color of its context. The dots at the left of a line show each context of the line until this step.
+- **Frames.** Each box is one frame, and each arrow goes to the parent frame. The current frame has a ring in the color of its context. When the code reads a variable, a line goes up from the current frame to the frame that sets the value.
+- **Lanes.** Each row is one context. A filled dot is a statement. A ring is the end of an `await`.
+- **Console.** The output of `log()`. Select a global variable in "Compare with" to show its output next to the output of the library.
+
+<ContextDebugger />
+
+## What to look for
+
+| Scenario | What to look for |
+| --- | --- |
+| Two requests at the same time | The two requests continue in turns, and each step gets the frame of its own request. Compare with a global variable that `run()` does not set back: request r-1 writes `[r-2] hello, Ada`. |
+| Nested contexts | In frame F2, `get()` of `requestId` searches F2 and then finds the value in F1. The inner `run()` hides the value of F1 until it ends. |
+| Timers and events | The timer and the microtask get frame F1, the frame of their registration. The dispatch in r-2 gives r-2 to the listener. The dispatch from the root frame gives F1, the frame of the registration (rule C13). |
+| Generators | Each `next()` call operates the generator in frame F1, also when the caller is in frame F2 or in the root frame. |
+| Snapshots | `snapshot.run()` makes frame F1 current again in the frame of request r-2. |
+| Code without the transform | The callback in the dependency gets the root frame, because a native `await` comes before it (rule C7). The scenario code gets frame F1 again after its own `await`. |
+
+## How the page records the steps
+
+The build of this site changes each scenario file before the Vite plugin of the library transforms it:
+
+1. Before each statement, the build adds a call that records the line and the current frame.
+2. After each `await`, the build adds a call that records the end of the `await`.
+3. The build changes the import of the library to a module that wraps the real classes. The wrapper records the frame of each `run()` and the search of each read.
+
+The page reads the current frame from the store of the runtime, and the values come from the real library. The calls of the build add no `await`, thus the order of the steps does not change. The code in the panel is the code that runs, without these calls. The scenario files are in `site/src/debugger/scenarios/`.

@@ -74,7 +74,7 @@ export type ContentPageViewProps = {
 export function ContentPageView({ page, sectionLabel } : ContentPageViewProps) {
     const registry = useContentRegistry();
     return (
-        <div className={styles.layout}>
+        <div className={styles.layout} data-layout={page.meta.layout}>
             <title>{`${page.meta.title} – ${SITE_NAME}`}</title>
             {page.meta.description ? <meta name="description" content={page.meta.description} /> : null}
             <SectionSidebar

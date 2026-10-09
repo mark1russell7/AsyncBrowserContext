@@ -91,13 +91,12 @@ describe("site routes", () => {
         expect(problems).toEqual([]);
     });
 
-    it("draws the frames of the frame tree and moves to the next step", async () => {
-        await renderPath("/explore/frames");
+    it("runs a scenario in the context debugger and moves to the next step", async () => {
+        await renderPath("/explore/debugger");
         await vi.waitFor(() => {
-            if (container.querySelectorAll(".react-flow__node").length === 0) throw new Error("No nodes yet");
+            if (container.querySelectorAll("svg[role='img'] text").length === 0) throw new Error("No frames yet");
         }, { timeout : 15_000 });
-        const next = [...container.querySelectorAll("button")].find(button => button.textContent === "Next step");
-        next?.click();
+        container.querySelector<HTMLButtonElement>("button[aria-label='Next step']")?.click();
         await vi.waitFor(() => {
             if (!container.textContent?.includes("Step 2 of")) throw new Error("Not at step 2");
         });

@@ -1,0 +1,959 @@
+/*
+ * The context debugger. Each element with a context has the custom property
+ * --lane: the color of its lane (refer to laneColor in layout.ts).
+ */
+
+.debugger {
+    --lane: var(--status-neutral);
+    container-type: inline-size;
+    margin: var(--space-5) 0 var(--space-6);
+    padding: var(--space-4);
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.debugger[data-variant="hero"] {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border-color: var(--color-rule-strong);
+}
+
+/* Scenario tabs */
+
+.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+    padding: 0;
+    list-style: none;
+}
+
+.tabs button {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--color-control-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.tabs button:hover {
+    border-color: var(--color-accent);
+}
+
+.tabs button[aria-pressed="true"] {
+    border-color: var(--color-accent);
+    background: var(--color-accent-wash);
+    color: var(--color-accent-strong);
+    font-weight: 700;
+}
+
+.summary {
+    max-width: var(--measure);
+    margin: 0 0 var(--space-4);
+    color: var(--color-ink-secondary);
+}
+
+/* The window bar of the hero */
+
+.windowBar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 0.55rem var(--space-3);
+    border-bottom: 1px solid var(--color-rule);
+    background: var(--color-surface-sunken);
+}
+
+.windowDots {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.windowDots i {
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--color-rule-strong);
+    border-radius: 50%;
+    background: var(--color-surface);
+}
+
+.windowTitle {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-ink-muted);
+}
+
+.live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--status-good-ink);
+}
+
+.live i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--status-good);
+    animation: breathe 1.8s ease-in-out infinite;
+}
+
+/* Stage: code, frames and (in the hero) console */
+
+.stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: var(--space-3);
+    border-radius: var(--radius);
+}
+
+.stage:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
+}
+
+.debugger[data-variant="hero"] .stage {
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+    grid-template-areas:
+        "code frames"
+        "code console";
+    padding: var(--space-3);
+}
+
+.debugger[data-variant="hero"] .codePanel {
+    grid-area: code;
+}
+
+.debugger[data-variant="hero"] .framePanel {
+    grid-area: frames;
+}
+
+.debugger[data-variant="hero"] .consolePanel {
+    grid-area: console;
+}
+
+/* A wide hero shows the code, the frames and the console in three columns. */
+@container (min-width: 62rem) {
+    .debugger[data-variant="hero"] .stage {
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.85fr);
+        grid-template-areas: "code frames console";
+    }
+}
+
+@container (max-width: 44rem) {
+    .stage,
+    .debugger[data-variant="hero"] .stage {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: none;
+    }
+
+    .debugger[data-variant="hero"] .codePanel,
+    .debugger[data-variant="hero"] .framePanel,
+    .debugger[data-variant="hero"] .consolePanel {
+        grid-area: auto;
+    }
+    .code {
+        font-size: 0.74rem;
+    }
+}
+
+/* Panels */
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.panelHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 2rem;
+    padding: 0.3rem 0.7rem;
+    border-bottom: 1px solid var(--color-rule);
+    background: var(--color-surface-sunken);
+    font-size: var(--text-xs);
+    color: var(--color-ink-muted);
+}
+
+.panelTitle {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.panelAside {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.panelBody {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+}
+
+.where {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    color: var(--color-ink-secondary);
+}
+
+.where i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lane);
+    transition: background-color 200ms ease;
+}
+
+/* Code */
+
+.code {
+    height: 100%;
+    margin: 0;
+    padding: 0.6rem 0;
+    overflow-x: auto;
+    background: var(--color-surface);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    line-height: 1.7;
+}
+
+.code > code {
+    display: block;
+    min-width: max-content;
+}
+
+.line {
+    display: flex;
+    align-items: baseline;
+    padding-right: 1rem;
+    border-left: 3px solid transparent;
+    transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.line[data-active] {
+    border-left-color: var(--lane);
+    background: color-mix(in srgb, var(--lane) 14%, transparent);
+}
+
+.gutter {
+    flex: none;
+    width: 2.4em;
+    padding-right: 0.4em;
+    color: var(--color-ink-muted);
+    text-align: right;
+    opacity: 0.75;
+    user-select: none;
+}
+
+.line[data-active] .gutter {
+    color: var(--color-ink);
+    font-weight: 700;
+    opacity: 1;
+}
+
+.marks {
+    display: inline-flex;
+    flex: none;
+    align-self: center;
+    gap: 2px;
+    width: 1.5rem;
+    padding-left: 0.2rem;
+}
+
+.marks i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--lane);
+}
+
+.text {
+    white-space: pre;
+}
+
+.token {
+    color: var(--l);
+}
+
+:global(:root[data-theme="dark"]) .token {
+    color: var(--d);
+}
+
+@media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .token {
+        color: var(--d);
+    }
+}
+
+.token[data-italic] {
+    font-style: italic;
+}
+
+.resumed {
+    align-self: center;
+    margin-left: 1.1rem;
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1.5;
+    white-space: nowrap;
+    animation: appear 260ms ease-out;
+}
+
+.resumed {
+    padding: 0 0.45rem;
+    border: 1px solid var(--lane);
+    border-radius: 999px;
+    color: var(--color-ink-secondary);
+}
+
+.codePanel .panelBody {
+    display: flex;
+    flex-direction: column;
+}
+
+.codePanel .code {
+    flex: 1;
+}
+
+.reads {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 1rem;
+    min-height: 2.2rem;
+    padding: 0.35rem 0.75rem;
+    border-top: 1px solid var(--color-rule);
+    background: var(--color-surface-sunken);
+    font-size: var(--text-xs);
+}
+
+.readsLabel {
+    color: var(--color-ink-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.readsNone {
+    color: var(--color-ink-muted);
+    font-style: italic;
+}
+
+.read {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    animation: appear 260ms ease-out;
+}
+
+.read strong {
+    color: color-mix(in srgb, var(--lane) 70%, var(--color-ink));
+}
+
+.readFrom {
+    color: var(--color-ink-muted);
+    font-family: var(--font-sans);
+}
+
+/* Frames */
+
+.framePanel .panelBody {
+    display: grid;
+    place-items: center;
+    padding: var(--space-3);
+    background-color: var(--color-surface);
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 16px 16px;
+    background-position: -1px -1px;
+}
+
+.graph {
+    display: block;
+    width: 100%;
+    max-width: 34rem;
+    height: auto;
+    max-height: 22rem;
+    overflow: visible;
+    font-family: var(--font-mono);
+}
+
+.debugger[data-variant="hero"] .graph {
+    max-height: 15rem;
+}
+
+.edge {
+    fill: none;
+    stroke: var(--color-rule-strong);
+    stroke-width: 1.5;
+    transition: opacity 320ms ease;
+}
+
+.edge[data-state="hidden"] {
+    opacity: 0;
+}
+
+.edge[data-state="ended"] {
+    opacity: 0.55;
+    stroke-dasharray: 4 4;
+}
+
+.arrowHead {
+    fill: var(--color-rule-strong);
+}
+
+.trail {
+    fill: none;
+    stroke: var(--lane);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw 260ms ease-out forwards;
+}
+
+.node {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: opacity 320ms ease, transform 320ms ease;
+}
+
+.node[data-state="hidden"] {
+    opacity: 0;
+    transform: scale(0.88);
+}
+
+.node[data-state="ended"] {
+    opacity: 0.5;
+}
+
+.box {
+    fill: var(--color-surface);
+    stroke: var(--color-rule-strong);
+    stroke-width: 1.2;
+    transition: stroke 200ms ease, fill 200ms ease;
+}
+
+.node[data-root] .box {
+    fill: var(--color-surface-sunken);
+    stroke-dasharray: 5 4;
+}
+
+.node[data-state="ended"] .box {
+    stroke-dasharray: 3 3;
+}
+
+.node[data-current] .box {
+    fill: color-mix(in srgb, var(--lane) 9%, var(--color-surface));
+    stroke: var(--lane);
+    stroke-width: 2.2;
+}
+
+.halo {
+    fill: none;
+    stroke: var(--lane);
+    stroke-width: 2;
+    animation: breathe 1.8s ease-in-out infinite;
+}
+
+.stripe {
+    fill: var(--lane);
+}
+
+.nodeId {
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    fill: var(--color-ink-muted);
+}
+
+.nodeNote {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-style: italic;
+    fill: var(--color-ink-muted);
+}
+
+.nodeValue {
+    font-size: 12.5px;
+    fill: var(--color-ink);
+}
+
+.nodeVar {
+    fill: var(--color-ink-secondary);
+}
+
+.nodeVal {
+    font-weight: 700;
+    fill: color-mix(in srgb, var(--lane) 70%, var(--color-ink));
+}
+
+.nodeEmpty {
+    font-style: italic;
+    fill: var(--color-ink-muted);
+}
+
+.chip rect,
+.found g rect {
+    fill: var(--lane);
+}
+
+.chip text,
+.found text {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    fill: var(--color-surface);
+}
+
+.found {
+    animation: appear 220ms ease-out both;
+}
+
+.found[data-found="false"] g rect {
+    fill: var(--status-warning);
+}
+
+.found[data-found="false"] text {
+    fill: #1f1600;
+}
+
+.foundRing {
+    fill: none;
+    stroke: var(--lane);
+    stroke-width: 2.5;
+}
+
+.found[data-found="false"] .foundRing {
+    stroke: var(--status-warning);
+}
+
+/* Timeline and controls */
+
+.timelinePanel {
+    margin-top: var(--space-3);
+    padding: 0.7rem 0.85rem 0.6rem;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+.debugger[data-variant="hero"] .timelinePanel {
+    margin: 0 var(--space-3) var(--space-3);
+}
+
+.timeline {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 9rem) minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: 1px;
+}
+
+.laneLabel {
+    display: flex;
+    grid-column: 1;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--color-ink-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.laneLabel i {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--lane);
+}
+
+.laneTrack {
+    position: relative;
+    grid-column: 2;
+    height: 20px;
+    margin: 0 6px;
+}
+
+.laneTrack::before {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    border-top: 1px dashed var(--color-rule);
+    content: "";
+}
+
+.laneLife {
+    position: absolute;
+    top: 50%;
+    height: 3px;
+    margin-top: -1.5px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--lane) 32%, transparent);
+}
+
+.dot {
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%;
+    background: var(--lane);
+    opacity: 0.25;
+    transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.dot[data-kind="resume"] {
+    border: 2px solid var(--lane);
+    background: var(--color-surface);
+}
+
+.dot[data-past] {
+    opacity: 1;
+}
+
+.dot[data-current] {
+    transform: scale(1.55);
+    outline: 3px solid color-mix(in srgb, var(--lane) 28%, transparent);
+}
+
+.scrub {
+    position: relative;
+    z-index: 1;
+    grid-column: 2;
+    align-self: stretch;
+    margin: 0 6px;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.playhead {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--color-ink);
+    opacity: 0.5;
+    transition: left 180ms ease;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--color-rule);
+}
+
+.buttons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.iconButton,
+.playButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2rem;
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    cursor: pointer;
+}
+
+.iconButton {
+    width: 2rem;
+}
+
+.iconButton:hover:not(:disabled) {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.iconButton:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.playButton {
+    gap: 6px;
+    min-width: 5.5rem;
+    padding: 0 0.9rem;
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-surface);
+    font-weight: 700;
+}
+
+.playButton:hover {
+    border-color: var(--color-accent-strong);
+    background: var(--color-accent-strong);
+}
+
+.counter {
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-ink-muted);
+}
+
+.counter strong {
+    color: var(--color-ink);
+}
+
+.speed,
+.compareSelect {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-xs);
+    color: var(--color-ink-muted);
+}
+
+.speed {
+    margin-left: auto;
+}
+
+.speed select,
+.compareSelect select {
+    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-small);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font: inherit;
+}
+
+/* Step and console */
+
+.lower {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+@container (max-width: 44rem) {
+    .lower {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.stepText {
+    padding: 0.7rem 0.9rem;
+}
+
+.stepTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 0.4rem;
+    font-weight: 700;
+}
+
+.stepTitle i {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--lane);
+}
+
+.stepText ul {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: var(--text-sm);
+    color: var(--color-ink-secondary);
+}
+
+.stepWarning {
+    font-weight: 700;
+    color: var(--status-critical-ink);
+}
+
+.console {
+    max-height: 15rem;
+    margin: 0;
+    padding: 0.45rem 0;
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    list-style: none;
+}
+
+.debugger[data-variant="hero"] .console {
+    max-height: 9rem;
+}
+
+.console li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 0.12rem 0.8rem;
+}
+
+.console li i,
+.compareCell i {
+    flex: none;
+    align-self: center;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lane);
+}
+
+.console li[data-new],
+.compareCell[data-new] {
+    animation: flash 1s ease-out;
+}
+
+.consoleEmpty {
+    padding: 0.12rem 0.8rem;
+    font-style: italic;
+    color: var(--color-ink-muted);
+}
+
+.compare {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: 0.45rem 0;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+}
+
+.compareHead {
+    padding: 0 0.8rem 0.35rem;
+    border-bottom: 1px solid var(--color-rule);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    color: var(--color-ink-muted);
+}
+
+.compareCell {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    padding: 0.12rem 0.8rem;
+    overflow-wrap: anywhere;
+}
+
+.compareCell[data-status="different"] {
+    background: color-mix(in srgb, var(--status-critical) 9%, transparent);
+    color: var(--status-critical-ink);
+}
+
+.compareIcon {
+    flex: none;
+    font-weight: 700;
+}
+
+.compareCell[data-status="same"] .compareIcon {
+    color: var(--status-good-ink);
+}
+
+.heroFoot {
+    margin: 0;
+    padding: 0 var(--space-3) var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--color-ink-muted);
+}
+
+.loading {
+    display: grid;
+    min-height: 14rem;
+    margin: 0;
+    place-items: center;
+    color: var(--color-ink-muted);
+}
+
+.error {
+    margin: var(--space-3) 0 0;
+    color: var(--status-critical-ink);
+}
+
+@keyframes draw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes appear {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes breathe {
+    0%,
+    100% {
+        opacity: 0.2;
+    }
+
+    50% {
+        opacity: 0.65;
+    }
+}
+
+@keyframes flash {
+    from {
+        background: color-mix(in srgb, var(--lane) 24%, transparent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .debugger *,
+    .debugger *::before {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .trail {
+        stroke-dashoffset: 0;
+    }
+}

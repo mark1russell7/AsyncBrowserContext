@@ -1,0 +1,30 @@
+.code {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    overflow-x: auto;
+    border: 1px solid var(--color-rule);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.65;
+    white-space: pre;
+}
+
+.token {
+    color: var(--l);
+}
+
+:global(:root[data-theme="dark"]) .token {
+    color: var(--d);
+}
+
+@media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .token {
+        color: var(--d);
+    }
+}
+
+.token[data-italic] {
+    font-style: italic;
+}

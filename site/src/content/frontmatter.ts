@@ -38,11 +38,16 @@ export function parsePageMeta(data : unknown, fallbackTitle : string) : Frontmat
     const validStatus = status === undefined || STATUSES.includes(status as PageStatus);
     if (!validStatus) errors.push("Set `status` to \"draft\" or \"final\", or remove it.");
 
+    const layout = record["layout"];
+    const validLayout = layout === undefined || layout === "wide";
+    if (!validLayout) errors.push("Set `layout` to \"wide\", or remove it.");
+
     const meta : PageMeta = {
         title : validTitle ? title.trim() : fallbackTitle,
         description : validDescription ? description : "",
         order : validOrder ? order : Number.MAX_SAFE_INTEGER,
     };
+    if (layout === "wide") meta.layout = "wide";
     if (errors.length > 0) meta.status = "draft";
     else if (status !== undefined) meta.status = status as PageStatus;
 

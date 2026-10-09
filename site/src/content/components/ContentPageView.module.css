@@ -30,6 +30,19 @@
         grid-template-areas: "sidebar article toc";
         column-gap: var(--space-8);
     }
+
+    /* A wide page keeps the table of contents above the article, so the article gets its width. */
+    .layout[data-layout="wide"] {
+        grid-template-columns: 15rem minmax(0, 1fr);
+        grid-template-areas:
+            "sidebar toc"
+            "sidebar article";
+        column-gap: var(--space-7);
+    }
+
+    .layout[data-layout="wide"] .toc {
+        position: static;
+    }
 }
 
 .sidebar {
