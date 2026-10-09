@@ -34,11 +34,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # The build renders each page and each Open Graph image in Chromium (site/build/prerender.ts)
+      - name: Install Chromium and its system dependencies
+        run: pnpm --filter ./site exec playwright install --with-deps chromium
+
       # The site uses the source of the library, so a separate build of the library is not necessary
       - name: Build the site
         run: pnpm --filter ./site build
         env:
           SITE_BASE: ${{ github.event.repository.name }}
+          # The absolute URL of the site, for the canonical links, Open Graph and the sitemap
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -116,7 +116,7 @@ export function Mermaid({ chart, title, caption } : MermaidProps) {
 
     const label = title ?? "Diagram";
     return (
-        <figure className={styles.figure} aria-busy={state.status === "loading" ? true : undefined}>
+        <figure className={styles.figure} aria-busy={state.status === "loading" ? true : undefined} data-loading={state.status === "loading" ? "" : undefined}>
             {state.status === "ready" ? (
                 <div className={styles.diagram} role="img" aria-label={label} dangerouslySetInnerHTML={{ __html : state.svg }} />
             ) : null}

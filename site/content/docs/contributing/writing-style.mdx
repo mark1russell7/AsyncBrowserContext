@@ -66,6 +66,8 @@ The configuration is in `ste.config.json`. It has the glossary of the project: t
 
 The table of contents shows the headings of level 2 and 3.
 
+The build makes two files for each page: an HTML file with the full text of the page, and an image for link previews. Search engines read the HTML file. A new `.mdx` file gets these files with no other change.
+
 ## Frontmatter
 
 | Field | Type | What it does |
@@ -93,6 +95,8 @@ Each MDX page can use these components without an import.
 | `ProbeTable`, `MutationChart`, `BrowserMatrix`, `BenchChart` | The test results in `site/public/data/`. |
 
 To add a component, add it to `site/src/mdx/component-map.tsx`.
+
+A component that loads code or data shows a placeholder until its content is ready. Give the placeholder the attribute `data-loading`. The build waits until no element has this attribute, and then it saves the HTML of the page. The app waits for the same condition before it replaces the saved HTML. Refer to `site/src/lib/readiness.ts`.
 
 ## Callouts
 

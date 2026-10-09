@@ -11,7 +11,7 @@ import { formatDateTime } from "../lib/format";
  */
 export function DataState<K extends SiteDataName>({ name, children } : { name : K; children : (data : SiteDataMap[K]) => ReactNode }) {
     const state = useSiteData(name);
-    if (state.status === "loading") return <p aria-busy="true">The data loads.</p>;
+    if (state.status === "loading") return <p aria-busy="true" data-loading="">The data loads.</p>;
     if (state.status === "error") {
         return (
             <Callout type="caution" title="The data did not load">

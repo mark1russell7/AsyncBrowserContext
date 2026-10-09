@@ -16,7 +16,7 @@ function lazyComponent<P extends object>(
     const Lazy = lazy(load);
     function LazyComponent(props : P) {
         return (
-            <Suspense fallback={<p aria-busy="true">{loadingText}</p>}>
+            <Suspense fallback={<p aria-busy="true" data-loading="">{loadingText}</p>}>
                 {createElement(Lazy, props)}
             </Suspense>
         );
