@@ -1,0 +1,45 @@
+name: Release
+
+# Publishes the package to npm when a version tag (for example v0.2.0) is pushed.
+# npm trusted publishing uses the OIDC token of GitHub Actions, so the
+# workflow needs no npm token, and the package gets a provenance statement.
+# docs/release.md tells how to set up the trusted publisher one time.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Test and publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+      - name: The tag agrees with the version of package.json
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: pnpm install --frozen-lockfile
+      - name: Install the browsers and their system dependencies
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm lint:ste
+      # Trusted publishing needs npm 11.5.1 or later
+      - run: npm install --global npm@latest
+      # The steps above did the work of prepublishOnly
+      - run: npm publish --provenance --access public --ignore-scripts
