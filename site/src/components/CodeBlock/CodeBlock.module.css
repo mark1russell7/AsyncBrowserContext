@@ -1,0 +1,35 @@
+.block {
+    position: relative;
+}
+
+.copy {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-small);
+    background: var(--color-surface);
+    color: var(--color-ink-secondary);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.copy:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent-strong);
+}
+
+/* With a mouse, the button shows when the pointer is on the block or the button has the focus. */
+@media (hover: hover) {
+    .copy {
+        opacity: 0;
+        transition: opacity 120ms ease;
+    }
+
+    .block:hover .copy,
+    .copy:focus-visible {
+        opacity: 1;
+    }
+}

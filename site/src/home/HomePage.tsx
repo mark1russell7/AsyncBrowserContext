@@ -22,6 +22,16 @@ const PATCHES : readonly { group : string; apis : readonly string[] }[] = [
     { group : "Other callbacks", apis : ["navigator.locks", "toBlob", "geolocation", "startViewTransition", "Array.fromAsync"] },
 ];
 
+/** The tools that have a guide. */
+const WORKS_WITH : readonly { label : string; to : string }[] = [
+    { label : "Vite", to : "/docs/getting-started" },
+    { label : "Babel", to : "/docs/getting-started" },
+    { label : "React", to : "/docs/guides/react" },
+    { label : "Vitest", to : "/docs/guides/testing-with-vitest" },
+    { label : "OpenTelemetry", to : "/docs/guides/opentelemetry" },
+    { label : "Node.js", to : "/docs/api" },
+];
+
 function Loading({ text, className } : { text : string; className : string | undefined }) {
     return <div className={className} data-loading="true" aria-busy="true">{text}</div>;
 }
@@ -58,6 +68,10 @@ export function HomePage() {
                         <Link className="button" data-variant="primary" to="/docs/getting-started">Read the guide</Link>
                         <Link className="button" to="/explore/debugger">Open the debugger</Link>
                         <a className={`button ${styles.githubButton}`} href={REPOSITORY_URL}><GitHubMark />GitHub</a>
+                    </p>
+                    <p className={styles.worksWith}>
+                        <span>Works with</span>
+                        {WORKS_WITH.map(item => <Link key={item.label} to={item.to}>{item.label}</Link>)}
                     </p>
                 </div>
                 <HomeStats />

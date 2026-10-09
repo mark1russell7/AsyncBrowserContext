@@ -91,6 +91,9 @@ importers:
       '@mdx-js/rollup':
         specifier: ^3.1.1
         version: 3.1.1(rollup@4.64.3)
+      '@opentelemetry/api':
+        specifier: ^1.9.1
+        version: 1.9.1
       '@shikijs/rehype':
         specifier: ^4.5.0
         version: 4.5.0

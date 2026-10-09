@@ -1,6 +1,7 @@
 import type { MDXComponents } from "mdx/types";
 import { createElement, lazy, Suspense, type ComponentType } from "react";
 import { Callout } from "../components/Callout/Callout";
+import { CodeBlock } from "../components/CodeBlock/CodeBlock";
 import { Figure } from "../components/Figure/Figure";
 import { MdxLink } from "../components/MdxLink/MdxLink";
 import { Mermaid } from "../components/Mermaid/Mermaid";
@@ -41,6 +42,7 @@ const BenchChart = lazyComponent<object>(async () => ({ default : (await import(
 export const mdxComponents = {
     // Overrides of Markdown elements
     a : MdxLink,
+    pre : CodeBlock,
     table : MarkdownTable,
 
     // Components, in alphabetical order
