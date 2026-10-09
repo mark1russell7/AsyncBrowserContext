@@ -19,6 +19,7 @@ This version replaces all of the first design. `docs/remediation-plan.md` gives 
 - The Vite plugin `async-browser-context/vite`. It also transforms the dependencies.
 - The Node.js entry, with the native `AsyncLocalStorage`.
 - Patches of event listeners, `on...` properties, observers, streams and other callback APIs.
+- The OpenTelemetry context manager `async-browser-context/opentelemetry`. It replaces the `ZoneContextManager`, which uses zone.js.
 
 ### Corrections
 

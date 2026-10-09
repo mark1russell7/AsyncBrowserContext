@@ -26,6 +26,7 @@ export function aliases(runtime : Runtime) : { find : RegExp; replacement : stri
     return [
         { find : /^async-browser-context\/runtime$/, replacement : source(`${prefix}runtime.ts`) },
         { find : /^async-browser-context\/browser\/runtime$/, replacement : source("runtime.ts") },
+        { find : /^async-browser-context\/opentelemetry$/, replacement : source(`${prefix}opentelemetry.ts`) },
         { find : /^async-browser-context\/browser$/, replacement : source("index.ts") },
         { find : /^async-browser-context$/, replacement : source(`${prefix}index.ts`) },
     ];

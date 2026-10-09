@@ -92,6 +92,16 @@ The class of `node:async_hooks`, for browsers. On Node.js, the package gives the
   Use `run()` if possible. `enterWith()` also changes the store of the code that started the current function, until the end of the current step.
 </Callout>
 
+## AsyncContextManager
+
+```ts
+import { AsyncContextManager } from "async-browser-context/opentelemetry";
+
+provider.register({ contextManager : new AsyncContextManager() });
+```
+
+The OpenTelemetry `ContextManager` of the library. It keeps the active context with `AsyncLocalStorage`, also after `await` in transformed code. It needs the package `@opentelemetry/api`. The guide [OpenTelemetry without zone.js](/docs/guides/opentelemetry) tells more.
+
 ## The Vite plugin
 
 ```ts

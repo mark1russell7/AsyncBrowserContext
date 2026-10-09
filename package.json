@@ -73,6 +73,11 @@
       "node": "./dist/node/runtime.js",
       "default": "./dist/runtime.js"
     },
+    "./opentelemetry": {
+      "types": "./dist/opentelemetry.d.ts",
+      "node": "./dist/node/opentelemetry.js",
+      "default": "./dist/opentelemetry.js"
+    },
     "./babel-preset": {
       "types": "./dist/babel/preset.d.ts",
       "default": "./dist/babel/preset.js"
@@ -121,14 +126,19 @@
     "@babel/plugin-transform-async-to-generator": "^8.0.1"
   },
   "peerDependencies": {
+    "@opentelemetry/api": "^1.0.0",
     "vite": ">=7"
   },
   "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@stryker-mutator/core": "^10.0.0",
     "@types/node": "^25.3.0",
     "@vitest/browser": "^5.0.3",

@@ -141,8 +141,23 @@ The package also exports `Variable`, `Snapshot`, and the other names `AsyncVaria
 | `async-browser-context/browser` | The browser entry, also on Node.js. |
 | `async-browser-context/runtime` | The runtime functions that the transformed code imports. |
 | `async-browser-context/browser/runtime` | The browser runtime functions, also on Node.js. Use it as the `runtime` option together with `async-browser-context/browser`. |
+| `async-browser-context/opentelemetry` | The OpenTelemetry context manager `AsyncContextManager`. It needs `@opentelemetry/api`. |
 | `async-browser-context/vite` | The Vite plugin. |
 | `async-browser-context/babel-preset` | The Babel preset. |
+
+## OpenTelemetry
+
+The web tracing of OpenTelemetry keeps the active span with a context manager. The `ZoneContextManager` of OpenTelemetry uses zone.js, and zone.js does not see a native `await`. `AsyncContextManager` uses `AsyncLocalStorage` of this library, so the active span stays correct after each `await` in transformed code.
+
+```ts
+import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
+import { AsyncContextManager } from "async-browser-context/opentelemetry";
+
+const provider = new WebTracerProvider();
+provider.register({ contextManager : new AsyncContextManager() });
+```
+
+On Node.js, `AsyncContextManager` uses the native `AsyncLocalStorage`. Do not use it together with zone.js.
 
 ## Context rules
 

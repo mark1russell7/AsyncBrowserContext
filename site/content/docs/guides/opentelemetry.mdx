@@ -1,0 +1,70 @@
+---
+title: OpenTelemetry without zone.js
+description: Keep the active span of OpenTelemetry through await in the browser, with the context manager of the library.
+order: 35
+---
+
+## The problem
+
+OpenTelemetry keeps the active span in a context. In the browser, the `ZoneContextManager` of OpenTelemetry keeps the context with zone.js. zone.js patches the callback APIs, but it does not see a native `await`. After an `await`, a span can get the wrong parent, or no parent.
+
+`AsyncContextManager` keeps the context with the `AsyncLocalStorage` class of this library. In code that the Vite plugin or the Babel preset transforms, the active span stays correct after each `await`.
+
+## Install
+
+```sh
+npm install async-browser-context @opentelemetry/api @opentelemetry/sdk-trace-web
+```
+
+Set up the transform. The [first guide](/docs/getting-started) tells you how.
+
+## Register the context manager
+
+```ts
+// tracing.ts
+import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
+import { AsyncContextManager } from "async-browser-context/opentelemetry";
+
+const provider = new WebTracerProvider();
+provider.register({ contextManager : new AsyncContextManager() });
+```
+
+Import `async-browser-context` before all other modules in the entry file of the application. The library patches the global functions when it loads (refer to [Patched APIs](/docs/concepts/patched-apis)).
+
+## Make spans
+
+```ts
+import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("shop");
+
+async function checkout(cart : Cart) : Promise<void> {
+    await tracer.startActiveSpan("checkout", async (span) => {
+        const prices = await loadPrices(cart);
+        // The span of loadPrices() and of save() have the parent "checkout".
+        await save(cart, prices);
+        span.end();
+    });
+}
+```
+
+Without the library, the code after the first `await` can get the root context. Then the spans of `save()` start a new trace.
+
+## What the context manager does
+
+| Method | What it does |
+| --- | --- |
+| `active()` | Gives the active context, or the root context outside `with()`. |
+| `with(context, fn, thisArg, ...args)` | Starts `fn` with the context as the active context. The context stays after each `await` in transformed code, and in the callbacks of the patched APIs. |
+| `bind(context, target)` | Gives a function that starts `target` in the context. The function keeps the `this` value, the arguments and the length. Other values stay as they are. |
+| `disable()` | `active()` gives the root context until the next `with()`. |
+
+On Node.js, the `node` export condition selects an entry with the native `AsyncLocalStorage`. Thus, code that runs on the server and in the browser can use one import.
+
+<Callout type="caution" title="zone.js">
+  Do not use the library together with zone.js or with the `ZoneContextManager`. The two libraries patch the same functions with different rules.
+</Callout>
+
+## Tests
+
+The tests in `test/api/opentelemetry.test.ts` use the context manager through the API of OpenTelemetry. They examine `await`, timers, `then` callbacks, two operations at the same time, `bind()` and the active span. The tests operate on Node.js and in Chromium, Firefox and WebKit.
