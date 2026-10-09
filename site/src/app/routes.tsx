@@ -5,7 +5,7 @@ import { RouteError } from "./RouteError";
 import type { SiteSection } from "./section-types";
 
 function HydrateFallback() {
-    return <p aria-busy="true" style={{ padding : "2rem" }}>The page loads.</p>;
+    return <p aria-busy="true" data-loading="" style={{ padding : "2rem" }}>The page loads.</p>;
 }
 
 /** The route tree: the layout, the routes of each section, and a not-found page. */

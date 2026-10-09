@@ -129,7 +129,7 @@ export function PlotFigure(props : PlotFigureProps) {
 
     const loading = !module && !loadError;
     return (
-        <figure className={styles.figure} aria-labelledby={titleId} aria-busy={loading ? true : undefined}>
+        <figure className={styles.figure} aria-labelledby={titleId} aria-busy={loading ? true : undefined} data-loading={loading ? "" : undefined}>
             <p id={titleId} className={hideTitle ? "visually-hidden" : styles.title}>{title}</p>
             {loading ? <p className={styles.status}>The chart loads.</p> : null}
             {loadError ? <p className={styles.status}>The chart did not load: {loadError}</p> : null}

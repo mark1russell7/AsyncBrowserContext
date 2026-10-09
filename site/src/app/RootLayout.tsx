@@ -30,7 +30,7 @@ export function RootLayout() {
             <a className={styles.skip} href="#main">Skip to the content</a>
             <SiteHeader />
             <main id="main" className={styles.main} tabIndex={-1}>
-                <Suspense fallback={<p className={styles.loading} aria-busy="true">Loading the page.</p>}>
+                <Suspense fallback={<p className={styles.loading} aria-busy="true" data-loading="">Loading the page.</p>}>
                     <Outlet />
                 </Suspense>
             </main>

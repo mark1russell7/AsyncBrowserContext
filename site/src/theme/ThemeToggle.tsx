@@ -36,6 +36,7 @@ export function ThemeToggle() {
         <button
             type="button"
             className={styles.toggle}
+            data-theme-toggle=""
             onClick={() => setPreference(next)}
             aria-label={`Theme: ${themeLabel(preference)}. Select to use the ${themeLabel(next).toLowerCase()} theme.`}
         >

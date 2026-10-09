@@ -203,7 +203,7 @@ export function ContextTimeline({ scenario : initialScenario = SCENARIOS[0]!.id,
                 </button>
             </div>
             {error ? <p className={styles.error} role="alert">The scenario stopped with an error: {error}</p> : null}
-            <div className={styles.panels} aria-live="polite" aria-busy={busy && runs.length === 0 ? true : undefined}>
+            <div className={styles.panels} aria-live="polite" aria-busy={busy && runs.length === 0 ? true : undefined} data-loading={busy && runs.length === 0 ? "" : undefined}>
                 {runs.filter(run => run.scenario.id === scenarioId).map(run => (
                     <Swimlanes key={run.implementation.id} run={run} scenario={scenario} />
                 ))}
