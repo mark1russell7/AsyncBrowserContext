@@ -1,9 +1,11 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { playwright } from "@vitest/browser-playwright";
-import { configDefaults, defineConfig, type TestProjectInlineConfiguration } from "vitest/config";
+import { configDefaults, defineConfig, type TestProjectInlineConfiguration, type ViteUserConfig } from "vitest/config";
 import type { Plugin } from "vite";
 import { asyncContext } from "./src/vite/plugin.js";
+import { BROWSER_HOST, freePort } from "./test/vitest/free-port.js";
+import { lostFilesCheck } from "./test/vitest/lost-files.js";
 
 export const here : string = path.dirname(fileURLToPath(import.meta.url));
 const source = (file : string) : string => path.resolve(here, "src", file);
@@ -77,7 +79,14 @@ function nodeProject(name : string, runtime : Runtime, transformed : boolean, in
     };
 }
 
-export default defineConfig({
+/**
+ * The configuration is a function, because the port of the browser API server
+ * comes from the operating system. The import of the exports above (for
+ * example by `vitest.stryker.config.ts`) does not open ports.
+ */
+export default defineConfig(async () : Promise<ViteUserConfig> => ({
+    // A run fails when a planned test file has no finished result (test/vitest/lost-files.ts)
+    plugins : [lostFilesCheck()],
     test : {
         globals : true,
         exclude : [...configDefaults.exclude, "**/.stryker-tmp/**", "test/smoke/fixture/**"],
@@ -89,7 +98,7 @@ export default defineConfig({
             reportsDirectory : "coverage",
         },
         projects : [
-            nodeProject("unit", "browser", true, ["src/**/*.test.ts"]),
+            nodeProject("unit", "browser", true, ["src/**/*.test.ts", "test/vitest/**/*.test.ts"]),
             nodeProject("rules (browser runtime, Node.js)", "browser", true, SHARED),
             nodeProject("rules (node runtime)", "node", true, SHARED),
             nodeProject("rules (node runtime, no transform)", "node", false, SHARED),
@@ -116,6 +125,9 @@ export default defineConfig({
                     name : "browser",
                     include : [...SHARED, "test/browser/**/*.test.ts"],
                     setupFiles : [path.resolve(here, "test/setup/leak-check.ts")],
+                    // The browser API server listens on 127.0.0.1, on a port that no other
+                    // program uses on a loopback or wildcard address. See test/vitest/free-port.ts.
+                    api : { host : BROWSER_HOST, port : await freePort(), strictPort : true },
                     browser : {
                         enabled : true,
                         headless : true,
@@ -127,4 +139,4 @@ export default defineConfig({
             },
         ],
     },
-});
+}));
