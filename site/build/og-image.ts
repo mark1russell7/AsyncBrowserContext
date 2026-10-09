@@ -84,13 +84,13 @@ function frameBox(box : FrameBox) : string {
 }
 
 /**
- * The motif of the image: a tree of context frames, as the frame tree page
- * shows it. Frame C continues after an await, and it gets the value of
+ * The motif of the image: a tree of context frames, as the context debugger
+ * shows it. Each arrow points to the parent frame. Frame C continues after an await, and it gets the value of
  * `user` from frame A, its nearest frame that sets `user`.
  */
 function frameTree() : string {
     const edge = (path : string, extra = "") : string =>
-        `<path d="${path}" fill="none" stroke="${COLORS.inkMuted}" stroke-width="1.75" marker-end="url(#arrow)"${extra}/>`;
+        `<path d="${path}" fill="none" stroke="${COLORS.inkMuted}" stroke-width="1.75" marker-start="url(#arrow)"${extra}/>`;
     return `<svg width="400" height="506" viewBox="0 0 400 506" aria-hidden="true">
         <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -98,7 +98,7 @@ function frameTree() : string {
             </marker>
         </defs>
         ${edge("M200 124V160H104V192")}
-        ${edge("M200 160H296V192")}
+        ${edge("M200 124V160H296V192")}
         ${edge("M104 268V334")}
         ${edge("M296 268V334", ` stroke-dasharray="2 5" stroke-linecap="round" opacity="0.5"`)}
         <rect x="74" y="289" width="60" height="24" rx="12" fill="${COLORS.markWash}" stroke="${COLORS.mark}" stroke-width="1.25"/>

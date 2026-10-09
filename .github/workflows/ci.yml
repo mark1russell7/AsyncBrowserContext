@@ -76,3 +76,26 @@ jobs:
       - name: Install Chromium and its system dependencies
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm smoke
+
+  site:
+    name: Site (types, tests and the prerendered build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Install Chromium and its system dependencies
+        run: pnpm --filter ./site exec playwright install --with-deps chromium
+      - run: pnpm --filter ./site typecheck
+      # The browser tests start the scenarios of the context debugger with the real library
+      - run: pnpm --filter ./site test
+      - name: Build the site with the prerender
+        run: pnpm --filter ./site build
+        env:
+          SITE_BASE: ${{ github.event.repository.name }}
