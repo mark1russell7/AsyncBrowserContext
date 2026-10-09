@@ -45,6 +45,14 @@ describe("instrumentScenario", () => {
     });
 });
 
+describe("instrumentScenario with loops", () => {
+    it("records a step at the start of each turn of a loop, also of a loop without statements", () => {
+        const code = instrumentScenario("while (true);\nfor (const x of y) {\n    log(x);\n}\n", OPTIONS);
+        expect(code).toMatch(/while \(true\) \{\s*__trace\.at\(1\);\s*;\s*\}/);
+        expect(code).toMatch(/for \(const x of y\) \{\s*__trace\.at\(2\);\s*__trace\.at\(3\);\s*log\(x\);/);
+    });
+});
+
 describe("splitScenario", () => {
     it("reads the metadata comment and gives the code after it", () => {
         const file = "/**\n * @title Two requests\n * @summary One line.\n *   A second line.\n * @order 3\n */\nconst a = 1;\n";

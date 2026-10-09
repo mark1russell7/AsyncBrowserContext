@@ -11,6 +11,12 @@ import { spaFallbackPlugin } from "./build/spa-fallback-plugin.ts";
 import { transformExamplesPlugin } from "./build/transform-examples-plugin.ts";
 
 const siteDir = fileURLToPath(new URL(".", import.meta.url));
+
+/** The Babel packages import node:path and node:assert. In the browser, the playground gives them these modules. */
+export const BABEL_BROWSER_ALIASES = [
+    { find : /^(node:)?path$/, replacement : "pathe" },
+    { find : /^(node:)?assert$/, replacement : path.resolve(siteDir, "src/playground/assert-shim.ts") },
+];
 const librarySource = (file : string) : string => path.resolve(siteDir, "..", "src", file);
 
 /** The site files that the library transforms. The module of the "untransformed dependency" demo stays as it is. */
@@ -39,6 +45,8 @@ export default defineConfig({
         alias : [
             { find : /^async-browser-context\/runtime$/, replacement : librarySource("runtime.ts") },
             { find : /^async-browser-context$/, replacement : librarySource("index.ts") },
+            // Vitest runs the Node.js tests of the site with this config, and they need the real node:path.
+            ...(process.env["VITEST"] === undefined ? BABEL_BROWSER_ALIASES : []),
         ],
     },
     optimizeDeps : {

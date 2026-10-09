@@ -43,8 +43,14 @@ function scheduleClock() : void {
     setTimeout(continueEarliest, 0);
 }
 
+/** The calls that the instrumented code makes. */
+export type TraceApi = {
+    at(line : number) : void;
+    after<T>(value : T, line : number) : T;
+};
+
 /** The trace object of the instrumented code. The build adds the calls (refer to `site/build/instrument.ts`). */
-export const __trace = {
+export const __trace : TraceApi = {
     at(line : number) : void {
         session?.tracer.at(line);
     },
@@ -208,3 +214,42 @@ export async function save(_value : unknown) : Promise<void> {
 
 /** A function of a module that the Vite plugin does not transform. Its native await loses the context. */
 export { loadWithCallback as untransformedLoad } from "../explore/untransformed-dependency";
+
+/** The error that stops the code of the playground. */
+export class PlaygroundStop extends Error {
+    override name = "PlaygroundStop";
+}
+
+/**
+ * This function makes a trace object for one run of the playground. The trace
+ * object stops the code after `limit` steps, and also after the run: thus a
+ * loop without an end cannot stop the page.
+ */
+export function createGuardedTrace(limit : number) : { trace : TraceApi; stop() : void } {
+    let steps = 0;
+    let stopped = false;
+    const check = () : void => {
+        if (stopped) throw new PlaygroundStop("The run is complete. The playground stopped this code.");
+        steps++;
+        if (steps > limit) {
+            stopped = true;
+            throw new PlaygroundStop(`The code made more than ${limit} steps. The playground stopped it.`);
+        }
+    };
+    return {
+        trace : {
+            at(line) {
+                check();
+                session?.tracer.at(line);
+            },
+            after(value, line) {
+                check();
+                session?.tracer.after(line);
+                return value;
+            },
+        },
+        stop() {
+            stopped = true;
+        },
+    };
+}

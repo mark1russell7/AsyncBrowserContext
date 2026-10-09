@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { usePrefersReducedMotion } from "../lib/use-media-query";
 import type { ContextMode } from "./instrumented";
 import { laneColor } from "./layout";
-import { scenarioById, scenarios as allScenarios, traceScenario } from "./run";
+import { scenarioById, scenarios as allScenarios, traceScenario, type DebuggerScenario } from "./run";
 import type { FrameInfo, Lane, Trace } from "./trace";
 import { useStepPlayer, type StepPlayer } from "./useStepPlayer";
 import { CodeView, ConsoleView, FrameGraph, LaneTimeline, ReadsBar, StepView } from "./views";
@@ -16,7 +16,20 @@ const COMPARE_LABELS : Record<CompareMode, string> = {
     "global-restored" : "Global variable, set back",
 };
 
+/** Code from outside the list of scenarios, for example the code of the playground. */
+export type DebuggerSource = {
+    /** A new ID starts the debugger again. */
+    id : string;
+    /** The name in the title of the code panel, for example "playground.js". */
+    title : string;
+    summary? : string;
+    lines : DebuggerScenario["lines"];
+    trace(mode : ContextMode) : Promise<Trace>;
+};
+
 export type ContextDebuggerProps = {
+    /** Code to show instead of the scenarios. Then the debugger shows no scenario tabs. */
+    source? : DebuggerSource;
     /** The ID of the first scenario. */
     scenario? : string;
     /** The IDs of the scenarios to show, separated with commas. The default is all the scenarios. */
@@ -86,11 +99,18 @@ function Panel({ title, aside, className, children } : { title : ReactNode; asid
  * tree and the search of each read. It also shows the lanes of the contexts
  * and the console. It can compare the console with a global variable.
  */
-export function ContextDebugger({ scenario : initial = "two-requests", scenarios : only, variant = "full", compare : initialCompare } : ContextDebuggerProps) {
+export function ContextDebugger({ source, scenario : initial = "two-requests", scenarios : only, variant = "full", compare : initialCompare } : ContextDebuggerProps) {
     const hero = variant === "hero";
     const list = useMemo(() => (only === undefined ? allScenarios : only.split(",").map(id => scenarioById(id.trim()))), [only]);
     const [scenarioId, setScenarioId] = useState(initial);
     const scenario = scenarioById(scenarioId);
+    const active = useMemo<DebuggerSource>(() => source ?? {
+        id : scenario.id,
+        title : `${scenario.id}.js`,
+        summary : scenario.summary,
+        lines : scenario.lines,
+        trace : mode => traceScenario(scenario, mode),
+    }, [source, scenario]);
     const [compare, setCompare] = useState<CompareMode | "none">(initialCompare ?? "none");
     const [trace, setTrace] = useState<Trace>();
     const [compareTrace, setCompareTrace] = useState<Trace>();
@@ -103,19 +123,19 @@ export function ContextDebugger({ scenario : initial = "two-requests", scenarios
     useEffect(() => {
         let live = true;
         setTrace(undefined);
-        traceScenario(scenario).then((result) => { if (live) setTrace(result); }, () => undefined);
+        active.trace("library").then((result) => { if (live) setTrace(result); }, () => undefined);
         return () => { live = false; };
-    }, [scenario]);
+    }, [active]);
 
     useEffect(() => {
         let live = true;
         setCompareTrace(undefined);
-        if (compare !== "none") traceScenario(scenario, compare).then((result) => { if (live) setCompareTrace(result); }, () => undefined);
+        if (compare !== "none") active.trace(compare).then((result) => { if (live) setCompareTrace(result); }, () => undefined);
         return () => { live = false; };
-    }, [scenario, compare]);
+    }, [active, compare]);
 
     const count = trace?.steps.length ?? 0;
-    const player = useStepPlayer(count, { loop : hero, resetKey : `${scenario.id}:${count}`, startAt : hero && reducedMotion ? "last" : "first" });
+    const player = useStepPlayer(count, { loop : hero, resetKey : `${active.id}:${count}`, startAt : hero && reducedMotion ? "last" : "first" });
 
     // The hero plays when it is on the screen, and stops while the pointer is on it.
     useEffect(() => {
@@ -174,9 +194,11 @@ export function ContextDebugger({ scenario : initial = "two-requests", scenarios
             {hero ? (
                 <div className={styles.windowBar}>
                     <span className={styles.windowDots} aria-hidden="true"><i /><i /><i /></span>
-                    <span className={styles.windowTitle}>{scenario.id}.js</span>
+                    <span className={styles.windowTitle}>{active.title}</span>
                     <span className={styles.live}><i aria-hidden="true" />Live in this page</span>
                 </div>
+            ) : source !== undefined ? (
+                source.summary === undefined ? null : <p className={styles.summary}>{source.summary}</p>
             ) : (
                 <>
                     <ul className={styles.tabs} aria-label="Scenario">
@@ -194,10 +216,10 @@ export function ContextDebugger({ scenario : initial = "two-requests", scenarios
                     <div className={styles.stage} tabIndex={0} aria-label="The steps. Use the left and right arrow keys to move through the steps, and the space key to play or pause.">
                         <Panel
                             className={styles.codePanel}
-                            title={hero ? "Code" : `${scenario.id}.js`}
+                            title={hero ? "Code" : active.title}
                             aside={step ? <span className={styles.where} style={{ "--lane" : laneColor(lanes.get(step.lane)) } as CSSProperties}><i aria-hidden="true" />{step.frameId === "root" ? "root frame" : step.frameId}</span> : undefined}
                         >
-                            <CodeView scenario={scenario} {...viewProps} />
+                            <CodeView lines={active.lines} {...viewProps} />
                             <ReadsBar {...viewProps} />
                         </Panel>
                         <Panel className={styles.framePanel} title="Frames" aside={hero ? undefined : "Arrows point to the parent"}>
@@ -216,7 +238,7 @@ export function ContextDebugger({ scenario : initial = "two-requests", scenarios
                     {hero ? (
                         <p className={styles.heroFoot}>
                             The page starts this code with the real library. Each step is a statement or the end of an <code>await</code>.{" "}
-                            <Link to="/explore/debugger">Open the debugger</Link>
+                            <Link to="/explore/debugger">Open the debugger</Link>, or <Link to="/explore/playground">write your own code in the playground</Link>.
                         </p>
                     ) : (
                         <div className={styles.lower}>

@@ -25,6 +25,7 @@ function lazyComponent<P extends object>(
 }
 
 const ContextTimeline = lazyComponent(() => import("../explore/ContextTimeline"), "The context timeline loads.");
+const Playground = lazyComponent(() => import("../playground/Playground"), "The playground loads.");
 const ContextDebugger = lazyComponent(() => import("../debugger/ContextDebugger"), "The context debugger loads.");
 const TransformViewer = lazyComponent(() => import("../explore/TransformViewer"), "The transform viewer loads.");
 const EventRuleDemo = lazyComponent(() => import("../explore/EventRuleDemo"), "The event demonstration loads.");
@@ -52,6 +53,7 @@ export const mdxComponents = {
     Figure,
     Mermaid,
     MutationChart,
+    Playground,
     PlotFigure,
     ProbeTable,
     Tab,

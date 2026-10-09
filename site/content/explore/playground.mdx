@@ -1,0 +1,22 @@
+---
+title: Playground
+description: Write your own async code and start it with the library. The context debugger shows each step, the frames and each read.
+order: 3
+layout: wide
+---
+
+## Use the playground
+
+Write code in the editor, then select "Run the code". The page compiles the code in your browser with the Babel preset of the library, the same preset as in an application. Then it starts the code with the real library and shows each step in the context debugger.
+
+- Import `AsyncLocalStorage` or `AsyncContext` from `async-browser-context`. The playground cannot import other modules.
+- Use `log()` to write to the console of the debugger. `sleep(ms)`, `fetchUser(id)` and `save(value)` wait without a server.
+- Select "Copy a link" to get a link that contains your code.
+
+<Playground />
+
+## Limits of the playground
+
+- The code can make at most 4,000 steps, and it must end in 5 seconds. After the run, the playground stops the code that still operates.
+- `sleep()` uses a clock that the page controls, so each run gives the same steps. Real timers, for example `setTimeout`, use the clock of the browser.
+- The debugger shows the frames of `run()`. It does not show the internal functions of the library.

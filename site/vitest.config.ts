@@ -1,6 +1,6 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, mergeConfig } from "vitest/config";
-import viteConfig from "./vite.config.ts";
+import viteConfig, { BABEL_BROWSER_ALIASES } from "./vite.config.ts";
 
 export default mergeConfig(viteConfig, defineConfig({
     test : {
@@ -19,6 +19,8 @@ export default mergeConfig(viteConfig, defineConfig({
                 test : {
                     name : "site (browser)",
                     include : ["src/**/*.browser.test.{ts,tsx}"],
+                    // The playground compiles code with @babel/core in the browser (refer to vite.config.ts).
+                    alias : BABEL_BROWSER_ALIASES,
                     testTimeout : 60_000,
                     browser : {
                         enabled : true,

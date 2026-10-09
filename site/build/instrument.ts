@@ -76,6 +76,15 @@ function instrumentPlugin(options : InstrumentOptions) : PluginObject<PluginPass
                     types.returnStatement(body),
                 ]);
             },
+            Loop(path) {
+                // Each turn of a loop records a step, also a loop without statements. Thus the playground can stop a loop without an end.
+                const node = path.node;
+                if (node.loc == null || done.has(node)) return;
+                done.add(node);
+                const call = types.expressionStatement(traceCall("at", node.loc.start.line));
+                if (types.isBlockStatement(node.body)) node.body.body.unshift(call);
+                else node.body = types.blockStatement([call, node.body]);
+            },
             AwaitExpression(path) {
                 const node = path.node;
                 if (node.loc == null || done.has(node)) return;
@@ -106,6 +115,10 @@ export function instrumentScenario(source : string, options : InstrumentOptions)
     const result = transformSync(source, {
         babelrc : false,
         configFile : false,
+        // With these options, Babel does not read process.env and the file system, so the function also operates in the browser.
+        envName : "production",
+        cwd : "/",
+        root : "/",
         sourceType : "module",
         parserOpts : { allowAwaitOutsideFunction : true },
         plugins : [() => instrumentPlugin(options)],

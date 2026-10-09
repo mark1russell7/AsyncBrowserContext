@@ -17,7 +17,7 @@ export type ViewProps = {
 };
 
 /** The code of the scenario. The line of the current step has the color of its lane. The marks at the left show the lanes of each line until this step. */
-export function CodeView({ scenario, trace, index, lanes } : ViewProps & { scenario : DebuggerScenario }) {
+export function CodeView({ lines : code, trace, index, lanes } : ViewProps & { lines : DebuggerScenario["lines"] }) {
     const step = trace.steps[index];
     const visited = useMemo(() => {
         const map = new Map<number, string[]>();
@@ -31,7 +31,7 @@ export function CodeView({ scenario, trace, index, lanes } : ViewProps & { scena
     return (
         <pre className={styles.code} aria-label={`The code of the scenario. ${step ? `Line ${step.line} is active.` : ""}`}>
             <code>
-                {scenario.lines.map((tokens, position) => {
+                {code.map((tokens, position) => {
                     const line = position + 1;
                     const active = step?.line === line;
                     return (
