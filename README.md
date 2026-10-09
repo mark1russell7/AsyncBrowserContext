@@ -23,7 +23,9 @@ function log(message : string) : void {
 }
 ```
 
-The documentation website has guides, the API reference and interactive diagrams: <https://mark1russell7.github.io/AsyncBrowserContext/>.
+The documentation website has guides, the API reference and interactive diagrams: <https://mark1russell7.github.io/AsyncBrowserContext/>. Its [context debugger](https://mark1russell7.github.io/AsyncBrowserContext/explore/debugger) starts code with the real library and shows each step. In the [playground](https://mark1russell7.github.io/AsyncBrowserContext/explore/playground), you can start your own code.
+
+[![The context debugger: two requests at the same time. Each step shows the line that runs, the frame tree of the contexts and the console.](https://raw.githubusercontent.com/mark1russell7/AsyncBrowserContext/main/docs/images/debugger.gif)](https://mark1russell7.github.io/AsyncBrowserContext/explore/debugger)
 
 ## How the library operates
 

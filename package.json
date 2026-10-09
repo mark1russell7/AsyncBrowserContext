@@ -111,7 +111,8 @@
     "site:dev": "pnpm --filter ./site dev",
     "site:build": "pnpm --filter ./site build",
     "prepublishOnly": "pnpm build && pnpm test",
-    "site:data": "tsx scripts/site-data.ts"
+    "site:data": "tsx scripts/site-data.ts",
+    "readme:media": "tsx scripts/readme-media.ts"
   },
   "dependencies": {
     "@babel/core": "^8.0.7",
