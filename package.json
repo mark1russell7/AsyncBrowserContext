@@ -1,6 +1,6 @@
 {
   "name": "async-browser-context",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AsyncLocalStorage and the TC39 AsyncContext API (Variable, Snapshot) for browsers. The context stays through await, promises, timers, events and generators. A Babel preset and a Vite plugin transform async functions. On Node.js, the package uses the native AsyncLocalStorage.",
   "license": "MIT",
   "author": "Mark Russell",

@@ -1,5 +1,11 @@
 # Change history
 
+## 0.1.1
+
+This version changes only the documentation. The code is the same as in 0.1.0.
+
+- The README describes the boundaries with code without the transform: the guarantee of rule C7, and the function that keeps the context at each boundary.
+
 ## 0.1.0
 
 This version replaces all of the first design. `docs/remediation-plan.md` gives the reasons, and `docs/design.md` describes the new design.
