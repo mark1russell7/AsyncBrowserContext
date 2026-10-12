@@ -19,6 +19,7 @@ export interface Frame {
 /** The native functions that the runtime uses. The store records them before a patch replaces them. */
 export interface Intrinsics {
     readonly Promise : PromiseConstructor;
+    /** The patch of version 0.3 does not use it. An older copy of the library that shares the store can use it. */
     readonly promiseThen : typeof Promise.prototype.then;
     readonly promiseResolve : <T>(value : T) => Promise<Awaited<T>>;
     readonly functionToString : () => string;

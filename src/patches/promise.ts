@@ -13,25 +13,26 @@ type Then = typeof Promise.prototype.then;
  *
  * `await` in native code does not use `then`. The Babel preset changes each
  * `await` so that the coroutine sets the context (rule C3).
+ *
+ * The patch starts the `then` that it replaces, as the other patches do. Thus a
+ * patch of `then` that another tool installed before stays in effect.
  */
 export function installPromisePatch() : void {
     if (!claim("Promise.prototype.then")) {
         return;
     }
-    const nativeThen = store.intrinsics.promiseThen;
     // Method syntax: a native method has no prototype property and is not a constructor
-    replaceFunction<Then>(Promise.prototype, "then", () => ({
+    replaceFunction<Then>(Promise.prototype, "then", (original) => ({
         then<T, R1 = T, R2 = never>(
             this : Promise<T>,
             onFulfilled? : ((value : T) => R1 | PromiseLike<R1>) | null,
             onRejected? : ((reason : unknown) => R2 | PromiseLike<R2>) | null,
         ) : Promise<R1 | R2> {
             const frame = store.current;
-            return nativeThen.call(
-                this,
+            return Reflect.apply(original, this, [
                 typeof onFulfilled === "function" ? bindOneArgument(frame, onFulfilled, "Promise.then") : onFulfilled,
                 typeof onRejected === "function" ? bindOneArgument(frame, onRejected, "Promise.then") : onRejected,
-            ) as Promise<R1 | R2>;
+            ]) as Promise<R1 | R2>;
         },
     }).then as Then);
 }
