@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { formatBytes, formatCount, formatDate, formatDateTime, formatMs, formatPercent, formatValue } from "./format";
 import { memoizePromise } from "./memoize-promise";
+import { pathWithoutHtmlFile } from "./page-path";
 
 describe("format", () => {
     it("formats durations", () => {
@@ -40,6 +41,18 @@ describe("format", () => {
         expect(formatDateTime("2026-10-06T09:41:33.000Z")).toBe("6 Oct 2026, 09:41 UTC");
         expect(formatDate("2026-10-06T23:59:00.000Z")).toBe("6 Oct 2026");
         expect(formatDate("soon")).toBe("soon");
+    });
+});
+
+describe("pathWithoutHtmlFile", () => {
+    it("removes the name of the HTML file of a page, and keeps each other path", () => {
+        expect(pathWithoutHtmlFile("/AsyncBrowserContext/docs.html")).toBe("/AsyncBrowserContext/docs");
+        expect(pathWithoutHtmlFile("/AsyncBrowserContext/docs/concepts/rules.html")).toBe("/AsyncBrowserContext/docs/concepts/rules");
+        expect(pathWithoutHtmlFile("/AsyncBrowserContext/index.html")).toBe("/AsyncBrowserContext/");
+        expect(pathWithoutHtmlFile("/docs/index.html")).toBe("/docs/");
+        expect(pathWithoutHtmlFile("/AsyncBrowserContext/docs")).toBe("/AsyncBrowserContext/docs");
+        expect(pathWithoutHtmlFile("/")).toBe("/");
+        expect(pathWithoutHtmlFile("/docs/.html")).toBe("/docs/.html");
     });
 });
 

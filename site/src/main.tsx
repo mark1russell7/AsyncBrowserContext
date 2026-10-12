@@ -12,6 +12,13 @@ import { createDefaultServices } from "./app/default-services";
 import { mountApp, routePathOf } from "./app/prerender-handoff";
 import { createAppRoutes, routerBasename } from "./app/routes";
 import { SiteProviders } from "./app/SiteProviders";
+import { pathWithoutHtmlFile } from "./lib/page-path";
+
+// A URL with the file name of a page, for example "/docs.html", gets the path of the page before the router starts.
+const pagePath = pathWithoutHtmlFile(window.location.pathname);
+if (pagePath !== window.location.pathname) {
+    window.history.replaceState(window.history.state, "", `${pagePath}${window.location.search}${window.location.hash}`);
+}
 
 const services = createDefaultServices();
 const router = createBrowserRouter(createAppRoutes(services.sections), {

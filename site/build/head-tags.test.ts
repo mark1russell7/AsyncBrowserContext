@@ -54,6 +54,21 @@ describe("head tags", () => {
         expect(tags).not.toContain("article:section");
     });
 
+    it("leaves out each image tag when the build makes no images", () => {
+        const tags = headTags(RULES, ROUTES, SITE, "Fallback.", { images : false });
+        expect(tags).not.toMatch(/og:image|twitter:image|\/og\//);
+        expect(tags).toContain(`<meta name="twitter:card" content="summary" />`);
+        expect(tags).toContain(`<meta property="og:title" content="Context rules" />`);
+        const graph = (jsonLd(tags) as { "@graph" : Array<Record<string, unknown>> })["@graph"];
+        expect(graph[0]).not.toHaveProperty("image");
+        expect(structuredData(RULES, ROUTES, SITE, { images : false })).toEqual(jsonLd(tags));
+    });
+
+    it("tells search engines not to index a draft", () => {
+        expect(headTags({ ...RULES, draft : true }, ROUTES, SITE, "Fallback.")).toContain(`<meta name="robots" content="noindex" />`);
+        expect(headTags(RULES, ROUTES, SITE, "Fallback.")).not.toContain("robots");
+    });
+
     it("uses the fallback description for a page without a description", () => {
         const tags = headTags({ path : "docs/x", title : "X – abc", heading : "X" }, ROUTES, SITE, "Fallback.");
         expect(tags).toContain(`<meta property="og:description" content="Fallback." />`);
