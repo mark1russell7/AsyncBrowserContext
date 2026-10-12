@@ -1,20 +1,21 @@
 /**
- * The benchmark runner. Start it with `pnpm bench` (the script builds the
- * library first).
+ * The benchmark runner. Start it with `pnpm bench`.
  *
- * The runner compiles `scenarios.ts` for each case and starts one Node.js
- * process for each case, so that the patches of one case do not change
- * another case. Each process measures the scenarios with tinybench and writes
- * its results as JSON. The runner writes `bench/results/latest.json` and
- * shows a table.
+ * The runner first builds the library, so that the runtime in `dist` and the
+ * transform of `src` come from the same source. Then it compiles
+ * `scenarios.ts` for each case and starts one Node.js process for each case,
+ * so that the patches of one case do not change another case. Each process
+ * measures the scenarios with tinybench and writes its results as JSON. The
+ * runner writes `bench/results/latest.json` and shows a table.
  *
  * The load of the machine can change while the runner operates. Thus the
  * runner does more than one round. Each round starts one process for each
  * case, and each round has a different order of the cases. The result of a
  * case is the median of its rounds. The range shows the lowest and the
- * highest factor "library / plain" of one round.
+ * highest factor "library / plain" of one round. The noise is the relative
+ * margin of error (rme) of tinybench, in percent, as the median of the rounds.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -25,11 +26,23 @@ import preset from "../src/babel/preset.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
-const outDir = path.join(here, ".out");
+/** The folder of the files of the runner. Other scripts can use other folders in `bench/.out`. */
+const outDir = path.join(here, ".out", "run");
 const dist = (file : string) : string => pathToFileURL(path.join(root, "dist", file)).href;
 
-/** The number of rounds. Set `BENCH_ROUNDS` to change it. */
-const ROUNDS = Math.max(1, Number(process.env["BENCH_ROUNDS"] ?? 5));
+/** The number of rounds: 5, or the value of `BENCH_ROUNDS`, which must be a positive integer. */
+function roundCount() : number {
+    const text = process.env["BENCH_ROUNDS"]?.trim();
+    if (text === undefined || text === "") {
+        return 5;
+    }
+    if (!/^\d+$/.test(text) || Number(text) < 1 || !Number.isSafeInteger(Number(text))) {
+        throw new Error(`BENCH_ROUNDS must be a positive integer, not "${process.env["BENCH_ROUNDS"]}".`);
+    }
+    return Number(text);
+}
+
+const ROUNDS = roundCount();
 
 interface Case {
     readonly name : string;
@@ -102,13 +115,13 @@ async function prepare(benchCase : Case) : Promise<string> {
     fs.writeFileSync(path.join(directory, "scenarios.mjs"), code);
     fs.writeFileSync(path.join(directory, "variable.mjs"), benchCase.library === undefined ? PLAIN_VARIABLE : `export { Variable } from ${JSON.stringify(benchCase.library)};\n`);
     fs.writeFileSync(path.join(directory, "child.mjs"), CHILD);
-    // The child resolves tinybench from the node_modules of the repository
+    // The folder of the child is in the repository, so the child finds tinybench in the node_modules folder of the repository.
     fs.writeFileSync(path.join(directory, "package.json"), JSON.stringify({ type : "module" }));
     return path.join(directory, "child.mjs");
 }
 
 function run(child : string) : TaskResult[] {
-    const output = execFileSync(process.execPath, [child], { cwd : root, encoding : "utf8", env : { ...process.env, NODE_PATH : path.join(root, "node_modules") } });
+    const output = execFileSync(process.execPath, [child], { cwd : root, encoding : "utf8" });
     return JSON.parse(output) as TaskResult[];
 }
 
@@ -119,10 +132,10 @@ function median(values : readonly number[]) : number {
 }
 
 async function main() : Promise<void> {
+    // The transform comes from src, and the runtime from dist. The build makes dist match src.
+    execSync("npx tsc -p tsconfig.build.json", { cwd : root, stdio : "inherit" });
     fs.rmSync(outDir, { recursive : true, force : true });
-    // Link node_modules, so that the children find tinybench
     fs.mkdirSync(outDir, { recursive : true });
-    fs.symlinkSync(path.join(root, "node_modules"), path.join(outDir, "node_modules"), "junction");
     const children = new Map<string, string>();
     const rounds = new Map<string, TaskResult[][]>();
     for (const benchCase of CASES) {
@@ -139,22 +152,26 @@ async function main() : Promise<void> {
         }
         process.stdout.write("\n");
     }
-    /** The mean times of one scenario in one case, one value for each round. */
-    const meansOf = (caseName : string, scenario : string) : number[] =>
-        (rounds.get(caseName) ?? []).flatMap((tasks) => tasks.filter((task) => task.name === scenario).map((task) => task.meanMs));
+    /** One value of one scenario in one case, for each round. */
+    const valuesOf = (caseName : string, scenario : string, value : (task : TaskResult) => number) : number[] =>
+        (rounds.get(caseName) ?? []).flatMap((tasks) => tasks.filter((task) => task.name === scenario).map(value));
+    const medianOrNull = (values : readonly number[]) : number | null => values.length === 0 ? null : median(values);
     const scenarios = (rounds.get("plain")?.[0] ?? []).map((task) => task.name);
     const rows = scenarios.map((scenario) => {
-        const plain = meansOf("plain", scenario);
-        const transformOnly = meansOf("transform only", scenario);
-        const library = meansOf("library", scenario);
+        const plain = valuesOf("plain", scenario, (task) => task.meanMs);
+        const transformOnly = valuesOf("transform only", scenario, (task) => task.meanMs);
+        const library = valuesOf("library", scenario, (task) => task.meanMs);
         const roundFactors = library.map((ms, round) => ms / (plain[round] as number));
+        const rme = (caseName : string) : number | null => medianOrNull(valuesOf(caseName, scenario, (task) => task.rme));
         return {
             benchmark : scenario,
             plainMs : median(plain),
-            transformOnlyMs : transformOnly.length === 0 ? null : median(transformOnly),
-            libraryMs : library.length === 0 ? null : median(library),
+            transformOnlyMs : medianOrNull(transformOnly),
+            libraryMs : medianOrNull(library),
             libraryFactor : library.length === 0 ? null : median(library) / median(plain),
             factorRange : roundFactors.length === 0 ? null : [Math.min(...roundFactors), Math.max(...roundFactors)],
+            /** The relative margin of error of tinybench in percent, the median of the rounds. */
+            rmePercent : { plain : rme("plain"), transformOnly : rme("transform only"), library : rme("library") },
         };
     });
     const results = {
@@ -173,6 +190,7 @@ async function main() : Promise<void> {
         "library (ms)" : row.libraryMs?.toFixed(3),
         "library / plain" : row.libraryFactor?.toFixed(2),
         "range of rounds" : row.factorRange?.map((factor) => factor.toFixed(2)).join(" to "),
+        "rme % (plain, transform, library)" : [row.rmePercent.plain, row.rmePercent.transformOnly, row.rmePercent.library].map((rme) => rme?.toFixed(1) ?? "-").join(", "),
     })));
 }
 

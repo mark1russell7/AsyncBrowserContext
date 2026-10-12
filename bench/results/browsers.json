@@ -1,16 +1,17 @@
 {
-  "date": "2026-10-12T19:18:07.705Z",
+  "date": "2026-10-12T21:44:01.635Z",
   "count": 50000,
   "runs": 7,
+  "minRunMs": 100,
   "rows": [
     {
       "engine": "Chromium",
       "version": "156.0.8078.4",
       "workload": "await null",
       "ms": {
-        "Native": 0.8999999761581421,
-        "Babel helper": 1.399999976158142,
-        "Library": 2.100000023841858
+        "Native": 0.9542857147398449,
+        "Babel helper": 1.462318840234176,
+        "Library": 2.1739130434782608
       }
     },
     {
@@ -18,9 +19,9 @@
       "version": "156.0.8078.4",
       "workload": "await a promise",
       "ms": {
-        "Native": 3.600000023841858,
-        "Babel helper": 5,
-        "Library": 2.800000011920929
+        "Native": 1.5212121217539816,
+        "Babel helper": 2.142553191235725,
+        "Library": 2.3295454545454546
       }
     },
     {
@@ -28,9 +29,9 @@
       "version": "156.0.8078.4",
       "workload": "async generator",
       "ms": {
-        "Native": 4.600000023841858,
-        "Babel helper": 7.399999976158142,
-        "Library": 9
+        "Native": 4.12,
+        "Babel helper": 7.8357142848627905,
+        "Library": 11.519999998807908
       }
     },
     {
@@ -38,9 +39,9 @@
       "version": "156.0.8078.4",
       "workload": "then chain",
       "ms": {
-        "Native": 0.7000000476837158,
-        "Babel helper": 0.699999988079071,
-        "Library": 2.200000047683716
+        "Native": 1.3767123287671232,
+        "Babel helper": 1.3440000001589458,
+        "Library": 2.3511627898659815
       }
     },
     {
@@ -48,9 +49,9 @@
       "version": "157.0",
       "workload": "await null",
       "ms": {
-        "Native": 0,
-        "Babel helper": 161,
-        "Library": 2
+        "Native": 0.6289308176100629,
+        "Babel helper": 268,
+        "Library": 3.4482758620689653
       }
     },
     {
@@ -58,9 +59,9 @@
       "version": "157.0",
       "workload": "await a promise",
       "ms": {
-        "Native": 1,
-        "Babel helper": 105,
-        "Library": 32
+        "Native": 1.294871794871795,
+        "Babel helper": 194,
+        "Library": 45.666666666666664
       }
     },
     {
@@ -68,9 +69,9 @@
       "version": "157.0",
       "workload": "async generator",
       "ms": {
-        "Native": 107,
-        "Babel helper": 529,
-        "Library": 370
+        "Native": 184,
+        "Babel helper": 828,
+        "Library": 645
       }
     },
     {
@@ -78,9 +79,9 @@
       "version": "157.0",
       "workload": "then chain",
       "ms": {
-        "Native": 35,
-        "Babel helper": 32,
-        "Library": 55
+        "Native": 49,
+        "Babel helper": 50,
+        "Library": 74.5
       }
     },
     {
@@ -88,9 +89,9 @@
       "version": "27.2",
       "workload": "await null",
       "ms": {
-        "Native": 2,
-        "Babel helper": 2,
-        "Library": 2
+        "Native": 1.694915254237288,
+        "Babel helper": 2.4634146341463414,
+        "Library": 2.55
       }
     },
     {
@@ -98,9 +99,9 @@
       "version": "27.2",
       "workload": "await a promise",
       "ms": {
-        "Native": 2,
-        "Babel helper": 3,
-        "Library": 4
+        "Native": 1.4285714285714286,
+        "Babel helper": 2.2444444444444445,
+        "Library": 2.8055555555555554
       }
     },
     {
@@ -108,9 +109,9 @@
       "version": "27.2",
       "workload": "async generator",
       "ms": {
-        "Native": 4,
-        "Babel helper": 10,
-        "Library": 13
+        "Native": 6.25,
+        "Babel helper": 15.142857142857142,
+        "Library": 15
       }
     },
     {
@@ -118,9 +119,9 @@
       "version": "27.2",
       "workload": "then chain",
       "ms": {
-        "Native": 1,
-        "Babel helper": 1,
-        "Library": 2
+        "Native": 2.061224489795918,
+        "Babel helper": 1.8518518518518519,
+        "Library": 3.0294117647058822
       }
     }
   ]

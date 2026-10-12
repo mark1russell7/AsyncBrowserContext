@@ -3,21 +3,30 @@
  * adds to a browser application:
  *
  * 1. The runtime: the classes, the patches and the runtime of the transform,
- *    in one minified bundle. zone.js is in the table for comparison.
+ *    in one minified bundle. The bundle exports all names of the entries
+ *    `async-browser-context` and `async-browser-context/runtime`, also
+ *    `asyncGenerator` and `OverloadYield`, which the transform imports.
+ *    zone.js is in the table for comparison.
  * 2. The transform: for each package of a set of real npm packages, the
  *    script builds four bundles with Vite:
  *    - without a transform;
  *    - with the Vite plugin of the library;
  *    - with the Vite plugin and the option `names: false`;
- *    - with the target ES2016, without the plugin. Vite then changes each
- *      async function into a generator with its own helpers. This column is
- *      for comparison: SWC and esbuild do the same with this target.
+ *    - with the target ES2016, without the plugin. Vite then changes all
+ *      syntax after ES2016, not only the async functions. Examples are async
+ *      generators, object spread, optional chaining, `??` and class fields.
+ *      Thus this column also has the cost of these other changes. It is for
+ *      comparison: SWC and esbuild do the same with this target.
  *    The bundles do not contain the runtime, because item 1 has it.
  *
+ * Vite builds each bundle as an application, not as a library. Thus the
+ * minifier also removes the white space, as in the build of an application.
+ * A dynamic `import()` gets the preload helper of Vite, in all four bundles.
+ *
  * The script installs the packages with npm in `node_modules/.cache/abc-size`
- * and uses that folder again on the next start. Each bundle imports all
- * exports of the package, so that the minifier removes no code. The script
- * writes `bench/results/size.json` and shows a table.
+ * and uses that folder again when it has the correct versions. Each bundle
+ * imports all exports of the package, so that the minifier removes no code.
+ * The script writes `bench/results/size.json` and shows a table.
  */
 import { execSync } from "node:child_process";
 import fs from "node:fs";
@@ -77,18 +86,33 @@ function sizeOf(code : string) : Size {
     };
 }
 
-/** Installs the packages in the cache folder, if the folder does not have these versions. */
+/** The packages of the set that the cache folder does not have in the correct version, as `name@version`. */
+function missingPackages(dependencies : Readonly<Record<string, string>>) : string[] {
+    return Object.entries(dependencies).filter(([name, version]) => {
+        const file = path.join(cache, "node_modules", ...name.split("/"), "package.json");
+        return !fs.existsSync(file) || (JSON.parse(fs.readFileSync(file, "utf8")) as { version? : string }).version !== version;
+    }).map(([name, version]) => `${name}@${version}`);
+}
+
+/**
+ * Installs the packages in the cache folder, if the folder does not have
+ * these versions. The script examines the installed versions, not only the
+ * manifest, so an install that fails does not leave packages of other
+ * versions under the new labels.
+ */
 function install() : void {
     const dependencies = Object.fromEntries([...SUBJECTS, ZONE].map((subject) => [subject.name, subject.version]));
-    const manifest = JSON.stringify({ name : "abc-size", private : true, type : "module", dependencies }, null, 2);
-    const file = path.join(cache, "package.json");
-    if (fs.existsSync(file) && fs.readFileSync(file, "utf8") === manifest && fs.existsSync(path.join(cache, "node_modules"))) {
+    if (missingPackages(dependencies).length === 0) {
         return;
     }
     fs.mkdirSync(cache, { recursive : true });
-    fs.writeFileSync(file, manifest);
+    fs.writeFileSync(path.join(cache, "package.json"), JSON.stringify({ name : "abc-size", private : true, type : "module", dependencies }, null, 2));
     console.log("installing the packages of the measurement with npm");
     execSync("npm install --no-audit --no-fund --silent --ignore-scripts", { cwd : cache, stdio : ["ignore", "inherit", "inherit"] });
+    const missing = missingPackages(dependencies);
+    if (missing.length > 0) {
+        throw new Error(`npm did not install these packages: ${missing.join(", ")}`);
+    }
 }
 
 const SCRIPT = /\.[cm]?[jt]sx?$/;
@@ -126,7 +150,12 @@ function keepAll(entries : readonly string[]) : string {
     return `${imports.join("\n")}\nglobalThis.keep = [${entries.map((_, index) => `module${index}`).join(", ")}];\n`;
 }
 
-/** Builds one minified bundle of `source`, and gives its code. */
+/**
+ * Builds one minified bundle of `source`, and gives its code. The build is an
+ * application build: a library build in the format `es` keeps the white
+ * space, also with `minify: true`. The option `preserveEntrySignatures`
+ * keeps the exports of the entry.
+ */
 async function bundle(source : string, plugins : Plugin[], target = "esnext") : Promise<string> {
     const directory = fs.mkdtempSync(path.join(cache, "build-"));
     try {
@@ -142,13 +171,16 @@ async function bundle(source : string, plugins : Plugin[], target = "esnext") : 
                 write : false,
                 minify : true,
                 target,
-                lib : { entry : file, formats : ["es"], fileName : "bundle" },
-                // The runtime of the transform is in the table of the runtime, not here
-                rolldownOptions : { external : [/^async-browser-context(\/|$)/] },
+                rolldownOptions : {
+                    input : file,
+                    preserveEntrySignatures : "strict",
+                    // The runtime of the transform is in the table of the runtime, not here
+                    external : [/^async-browser-context(\/|$)/],
+                },
             },
         });
-        const outputs = (Array.isArray(result) ? result : [result]) as { output : { code? : string }[] }[];
-        return outputs.flatMap((item) => item.output).map((chunk) => chunk.code ?? "").join("\n");
+        const outputs = (Array.isArray(result) ? result : [result]) as { output : { type : string; code? : string }[] }[];
+        return outputs.flatMap((item) => item.output).filter((chunk) => chunk.type === "chunk").map((chunk) => chunk.code ?? "").join("\n");
     } finally {
         fs.rmSync(directory, { recursive : true, force : true });
     }
@@ -186,9 +218,10 @@ install();
 execSync("npx tsc -p tsconfig.build.json", { cwd : root, stdio : "ignore" });
 const dist = (file : string) : string => JSON.stringify(path.join(root, "dist", file).replace(/\\/g, "/"));
 
+// All names of the two entries. A list of some names lets the bundler remove the others, for example asyncGenerator and OverloadYield.
 const runtime = sizeOf(await bundle([
-    `export { AsyncLocalStorage, AsyncContext, addCallbackHook } from ${dist("index.js")};`,
-    `export { coroutine, bindGenerator } from ${dist("runtime.js")};`,
+    `export * from ${dist("index.js")};`,
+    `export * from ${dist("runtime.js")};`,
 ].join("\n"), []));
 const zone = sizeOf(await bundle(`import "zone.js";`, []));
 

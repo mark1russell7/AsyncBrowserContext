@@ -1,20 +1,20 @@
 {
-  "date": "2026-10-12T19:19:33.091Z",
+  "date": "2026-10-12T21:39:28.825Z",
   "vite": "8.3.4",
   "runtime": {
     "entries": [
       "async-browser-context",
       "async-browser-context/runtime"
     ],
-    "minifiedBytes": 19046,
-    "gzipBytes": 5870,
-    "brotliBytes": 5142
+    "minifiedBytes": 17469,
+    "gzipBytes": 5997,
+    "brotliBytes": 5352
   },
   "zone": {
     "version": "0.16.3",
-    "minifiedBytes": 45574,
-    "gzipBytes": 13344,
-    "brotliBytes": 11920
+    "minifiedBytes": 34717,
+    "gzipBytes": 11846,
+    "brotliBytes": 10732
   },
   "transform": [
     {
@@ -27,24 +27,24 @@
       "asyncFunctions": 0,
       "generators": 0,
       "native": {
-        "minifiedBytes": 298294,
-        "gzipBytes": 75954,
-        "brotliBytes": 63875
+        "minifiedBytes": 219500,
+        "gzipBytes": 67637,
+        "brotliBytes": 58341
       },
       "transformed": {
-        "minifiedBytes": 298294,
-        "gzipBytes": 75954,
-        "brotliBytes": 63875
+        "minifiedBytes": 219500,
+        "gzipBytes": 67637,
+        "brotliBytes": 58341
       },
       "transformedWithoutNames": {
-        "minifiedBytes": 298294,
-        "gzipBytes": 75954,
-        "brotliBytes": 63875
+        "minifiedBytes": 219500,
+        "gzipBytes": 67637,
+        "brotliBytes": 58341
       },
       "loweredEs2016": {
-        "minifiedBytes": 298672,
-        "gzipBytes": 75980,
-        "brotliBytes": 63902
+        "minifiedBytes": 219784,
+        "gzipBytes": 67668,
+        "brotliBytes": 58318
       },
       "gzipIncreasePercent": {
         "transformed": 0,
@@ -62,29 +62,29 @@
       "asyncFunctions": 8,
       "generators": 0,
       "native": {
-        "minifiedBytes": 53553,
-        "gzipBytes": 13073,
-        "brotliBytes": 11779
+        "minifiedBytes": 39998,
+        "gzipBytes": 11366,
+        "brotliBytes": 10406
       },
       "transformed": {
-        "minifiedBytes": 55650,
-        "gzipBytes": 13848,
-        "brotliBytes": 12407
+        "minifiedBytes": 41235,
+        "gzipBytes": 11950,
+        "brotliBytes": 10905
       },
       "transformedWithoutNames": {
-        "minifiedBytes": 55597,
-        "gzipBytes": 13825,
-        "brotliBytes": 12386
+        "minifiedBytes": 41187,
+        "gzipBytes": 11932,
+        "brotliBytes": 10884
       },
       "loweredEs2016": {
-        "minifiedBytes": 69985,
-        "gzipBytes": 16903,
-        "brotliBytes": 14975
+        "minifiedBytes": 50685,
+        "gzipBytes": 14510,
+        "brotliBytes": 13112
       },
       "gzipIncreasePercent": {
-        "transformed": 5.9,
-        "transformedWithoutNames": 5.8,
-        "loweredEs2016": 29.3
+        "transformed": 5.1,
+        "transformedWithoutNames": 5,
+        "loweredEs2016": 27.7
       }
     },
     {
@@ -97,29 +97,29 @@
       "asyncFunctions": 28,
       "generators": 0,
       "native": {
-        "minifiedBytes": 39658,
-        "gzipBytes": 12120,
-        "brotliBytes": 10816
+        "minifiedBytes": 30940,
+        "gzipBytes": 10735,
+        "brotliBytes": 9669
       },
       "transformed": {
-        "minifiedBytes": 41365,
-        "gzipBytes": 12642,
-        "brotliBytes": 11244
+        "minifiedBytes": 31799,
+        "gzipBytes": 11175,
+        "brotliBytes": 10041
       },
       "transformedWithoutNames": {
-        "minifiedBytes": 41081,
-        "gzipBytes": 12512,
-        "brotliBytes": 11128
+        "minifiedBytes": 31531,
+        "gzipBytes": 11043,
+        "brotliBytes": 9928
       },
       "loweredEs2016": {
-        "minifiedBytes": 50545,
-        "gzipBytes": 14290,
-        "brotliBytes": 12708
+        "minifiedBytes": 37879,
+        "gzipBytes": 12494,
+        "brotliBytes": 11232
       },
       "gzipIncreasePercent": {
-        "transformed": 4.3,
-        "transformedWithoutNames": 3.2,
-        "loweredEs2016": 17.9
+        "transformed": 4.1,
+        "transformedWithoutNames": 2.9,
+        "loweredEs2016": 16.4
       }
     },
     {
@@ -132,29 +132,29 @@
       "asyncFunctions": 2,
       "generators": 1,
       "native": {
-        "minifiedBytes": 4712,
-        "gzipBytes": 1760,
-        "brotliBytes": 1571
+        "minifiedBytes": 3625,
+        "gzipBytes": 1476,
+        "brotliBytes": 1337
       },
       "transformed": {
-        "minifiedBytes": 5090,
-        "gzipBytes": 1902,
-        "brotliBytes": 1694
+        "minifiedBytes": 3924,
+        "gzipBytes": 1602,
+        "brotliBytes": 1441
       },
       "transformedWithoutNames": {
-        "minifiedBytes": 5080,
-        "gzipBytes": 1897,
-        "brotliBytes": 1690
+        "minifiedBytes": 3915,
+        "gzipBytes": 1596,
+        "brotliBytes": 1439
       },
       "loweredEs2016": {
-        "minifiedBytes": 9235,
-        "gzipBytes": 3017,
-        "brotliBytes": 2719
+        "minifiedBytes": 6462,
+        "gzipBytes": 2426,
+        "brotliBytes": 2223
       },
       "gzipIncreasePercent": {
-        "transformed": 8.1,
-        "transformedWithoutNames": 7.8,
-        "loweredEs2016": 71.4
+        "transformed": 8.5,
+        "transformedWithoutNames": 8.1,
+        "loweredEs2016": 64.4
       }
     },
     {
@@ -167,29 +167,29 @@
       "asyncFunctions": 358,
       "generators": 1,
       "native": {
-        "minifiedBytes": 273464,
-        "gzipBytes": 62635,
-        "brotliBytes": 51739
+        "minifiedBytes": 219070,
+        "gzipBytes": 56017,
+        "brotliBytes": 47384
       },
       "transformed": {
-        "minifiedBytes": 300922,
-        "gzipBytes": 66095,
-        "brotliBytes": 54272
+        "minifiedBytes": 234557,
+        "gzipBytes": 58639,
+        "brotliBytes": 49494
       },
       "transformedWithoutNames": {
-        "minifiedBytes": 296485,
-        "gzipBytes": 65065,
-        "brotliBytes": 53413
+        "minifiedBytes": 230372,
+        "gzipBytes": 57649,
+        "brotliBytes": 48648
       },
       "loweredEs2016": {
-        "minifiedBytes": 308358,
-        "gzipBytes": 67332,
-        "brotliBytes": 55192
+        "minifiedBytes": 239125,
+        "gzipBytes": 59548,
+        "brotliBytes": 50247
       },
       "gzipIncreasePercent": {
-        "transformed": 5.5,
-        "transformedWithoutNames": 3.9,
-        "loweredEs2016": 7.5
+        "transformed": 4.7,
+        "transformedWithoutNames": 2.9,
+        "loweredEs2016": 6.3
       }
     },
     {
@@ -202,29 +202,29 @@
       "asyncFunctions": 145,
       "generators": 19,
       "native": {
-        "minifiedBytes": 479825,
-        "gzipBytes": 91708,
-        "brotliBytes": 74007
+        "minifiedBytes": 371336,
+        "gzipBytes": 80619,
+        "brotliBytes": 67194
       },
       "transformed": {
-        "minifiedBytes": 513599,
-        "gzipBytes": 98554,
-        "brotliBytes": 77322
+        "minifiedBytes": 394312,
+        "gzipBytes": 85763,
+        "brotliBytes": 70002
       },
       "transformedWithoutNames": {
-        "minifiedBytes": 511441,
-        "gzipBytes": 97835,
-        "brotliBytes": 76830
+        "minifiedBytes": 392265,
+        "gzipBytes": 85189,
+        "brotliBytes": 69540
       },
       "loweredEs2016": {
-        "minifiedBytes": 521118,
-        "gzipBytes": 100921,
-        "brotliBytes": 80640
+        "minifiedBytes": 402086,
+        "gzipBytes": 88481,
+        "brotliBytes": 72940
       },
       "gzipIncreasePercent": {
-        "transformed": 7.5,
-        "transformedWithoutNames": 6.7,
-        "loweredEs2016": 10
+        "transformed": 6.4,
+        "transformedWithoutNames": 5.7,
+        "loweredEs2016": 9.8
       }
     },
     {
@@ -237,29 +237,29 @@
       "asyncFunctions": 210,
       "generators": 11,
       "native": {
-        "minifiedBytes": 407659,
-        "gzipBytes": 100799,
-        "brotliBytes": 82181
+        "minifiedBytes": 310950,
+        "gzipBytes": 91373,
+        "brotliBytes": 75806
       },
       "transformed": {
-        "minifiedBytes": 434613,
-        "gzipBytes": 104309,
-        "brotliBytes": 84672
+        "minifiedBytes": 328551,
+        "gzipBytes": 94113,
+        "brotliBytes": 77669
       },
       "transformedWithoutNames": {
-        "minifiedBytes": 432662,
-        "gzipBytes": 103814,
-        "brotliBytes": 84266
+        "minifiedBytes": 326704,
+        "gzipBytes": 93641,
+        "brotliBytes": 77280
       },
       "loweredEs2016": {
-        "minifiedBytes": 448243,
-        "gzipBytes": 108108,
-        "brotliBytes": 87743
+        "minifiedBytes": 338341,
+        "gzipBytes": 97362,
+        "brotliBytes": 80346
       },
       "gzipIncreasePercent": {
-        "transformed": 3.5,
-        "transformedWithoutNames": 3,
-        "loweredEs2016": 7.3
+        "transformed": 3,
+        "transformedWithoutNames": 2.5,
+        "loweredEs2016": 6.6
       }
     },
     {
@@ -275,29 +275,29 @@
       "asyncFunctions": 394,
       "generators": 1,
       "native": {
-        "minifiedBytes": 665232,
-        "gzipBytes": 161904,
-        "brotliBytes": 135198
+        "minifiedBytes": 510037,
+        "gzipBytes": 144455,
+        "brotliBytes": 123692
       },
       "transformed": {
-        "minifiedBytes": 696364,
-        "gzipBytes": 166520,
-        "brotliBytes": 138413
+        "minifiedBytes": 527502,
+        "gzipBytes": 147895,
+        "brotliBytes": 126475
       },
       "transformedWithoutNames": {
-        "minifiedBytes": 691590,
-        "gzipBytes": 165334,
-        "brotliBytes": 137416
+        "minifiedBytes": 523001,
+        "gzipBytes": 146776,
+        "brotliBytes": 125416
       },
       "loweredEs2016": {
-        "minifiedBytes": 720850,
-        "gzipBytes": 171225,
-        "brotliBytes": 141670
+        "minifiedBytes": 544387,
+        "gzipBytes": 151919,
+        "brotliBytes": 129316
       },
       "gzipIncreasePercent": {
-        "transformed": 2.9,
-        "transformedWithoutNames": 2.1,
-        "loweredEs2016": 5.8
+        "transformed": 2.4,
+        "transformedWithoutNames": 1.6,
+        "loweredEs2016": 5.2
       }
     }
   ]
