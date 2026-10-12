@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
-import { busyOther, delay, turns } from "../helpers.js";
+import { busyOther, compiler, delay, turns } from "../helpers.js";
 
 function pick<T>(_first : unknown, second : T) : T {
     return second;
@@ -106,6 +106,49 @@ describe("rule C3: an async function keeps the context of its call", () => {
             await expect(failing()).rejects.toThrow("early");
             expect(variable.get()).toBe("a");
         });
+    });
+
+    // SWC changes `async (a = f()) => body` into `(a = f()) => helper(body)`, so the default value throws outside the promise
+    it.skipIf(compiler === "swc-es2016")("rejects the promise of the call when a parameter default or a parameter destructuring throws (not with SWC, which evaluates the parameters of an async arrow function outside the promise)", async () => {
+        const fail = () : never => {
+            throw new Error("default");
+        };
+        const withDefault = async (value : unknown = fail()) : Promise<unknown> => value;
+        const withDestructuring = async ({ id } : { id : string }) : Promise<string> => id;
+        let promise : Promise<unknown> | undefined;
+        expect(() => { promise = withDefault(); }).not.toThrow();
+        await expect(promise).rejects.toThrow("default");
+        expect(() => { promise = withDestructuring(undefined as unknown as { id : string }); }).not.toThrow();
+        await expect(promise).rejects.toThrow(TypeError);
+    });
+
+    it("takes one microtask turn for each await of a value or of a native promise, as a native await", async () => {
+        const order : string[] = [];
+        const resolved = Promise.resolve();
+        const body = async () : Promise<void> => {
+            await null;
+            order.push("after await of a value");
+            await resolved;
+            order.push("after await of a promise");
+        };
+        const done = body();
+        const turnsDone = resolved.then(() => order.push("turn 1")).then(() => order.push("turn 2")).then(() => order.push("turn 3"));
+        await Promise.all([done, turnsDone]);
+        expect(order).toEqual(["after await of a value", "turn 1", "after await of a promise", "turn 2", "turn 3"]);
+    });
+
+    it("reads the then property of an awaited object in the context of the body", async () => {
+        const variable = new Variable<string>();
+        let seen : string | undefined;
+        const thenable = {
+            get then() {
+                seen = variable.get();
+                return (resolve : (value : number) => void) : void => resolve(1);
+            },
+        };
+        const value = await variable.run("body", async () => await thenable);
+        expect(value).toBe(1);
+        expect(seen).toBe("body");
     });
 
     it("runs the body synchronously until the first await", () => {

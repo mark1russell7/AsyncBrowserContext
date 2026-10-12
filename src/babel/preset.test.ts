@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { transformAsync } from "@babel/core";
 import { describe, expect, it } from "vitest";
 import preset, { DEFAULT_RUNTIME, METADATA_KEY } from "./preset.js";
@@ -150,12 +151,13 @@ describe("the Babel preset", () => {
         expect(countBindCalls(output.code)).toBe(1);
     });
 
-    it("asks Babel for version 7.22 or 8, and names its plugin", () => {
+    it("asks Babel for version 7.22 or 8, and names its plugins", () => {
         const ranges : string[] = [];
         const config = preset({ assertVersion : (range : string) => { ranges.push(range); } } as never);
         expect(ranges).toEqual(["^7.22.0 || ^8.0.0"]);
-        const [first] = config.plugins ?? [];
-        const [plugin, options] = first as [(api : unknown, options : object) => { name : string }, object];
+        const [first, second] = config.plugins ?? [];
+        expect((first as () => { name : string })().name).toBe("async-browser-context/skip-runtime");
+        const [plugin, options] = second as [(api : unknown, options : object) => { name : string }, object];
         expect(plugin({}, options).name).toBe("async-browser-context/bind-generators");
     });
 
@@ -164,11 +166,37 @@ describe("the Babel preset", () => {
         expect(output.code).toMatch(/function g\(/);
     });
 
-    it("names its second plugin, which names the coroutines", () => {
+    it("names its third plugin, which names the coroutines", () => {
         const config = preset({ assertVersion : () => undefined } as never);
-        const [, second] = config.plugins ?? [];
-        const [plugin, options] = second as [(api : unknown, options : object) => { name : string }, object];
+        const [, , third] = config.plugins ?? [];
+        const [plugin, options] = third as [(api : unknown, options : object) => { name : string }, object];
         expect(plugin({}, options).name).toBe("async-browser-context/name-coroutines");
+    });
+
+    it("does not change a function with the directive of the runtime, and changes the other functions", async () => {
+        const input = [
+            "export const drive = async () => { 'async-browser-context runtime'; await null; };",
+            "export const other = async () => { await null; };",
+        ].join("\n");
+        const output = await transform(input);
+        expect(output.code).toContain("drive = async () =>");
+        expect(coroutineNames(output.code)).toEqual(["other"]);
+    });
+
+    it("does not change the runtime of the library, which has native async functions", async () => {
+        for (const file of ["../core/coroutine.ts", "../node/runtime.ts"]) {
+            const source = fs.readFileSync(new URL(file, import.meta.url), "utf8");
+            const result = await transformAsync(source, {
+                filename : file.replace("../", "src/"),
+                babelrc : false,
+                configFile : false,
+                parserOpts : { plugins : ["typescript"] },
+                presets : [preset],
+            });
+            expect(source).toMatch(/\basync\b/);
+            expect(result?.code).toMatch(/\basync\b/);
+            expect(result?.code).not.toMatch(/_coroutine\(/);
+        }
     });
 });
 

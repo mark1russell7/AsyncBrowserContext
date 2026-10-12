@@ -32,46 +32,64 @@ export function coroutine<T, A extends unknown[], R>(
     generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>,
     name? : string,
 ) : (this : T, ...args : A) => Promise<R> {
-    const { Promise : NativePromise, promiseThen, promiseResolve } = store.intrinsics;
+    const { promiseResolve } = store.intrinsics;
     return function asyncFunction(this : T, ...args : A) : Promise<R> {
         // The context of the call. The body can change it with AsyncLocalStorage.enterWith.
         let frame : Frame = store.current;
-        const generator = generatorFunction.apply(this, args);
-        return new NativePromise<R>((resolve, reject) => {
-            /** `resumed` is `true` for a step after an `await`. Only these steps start the hook methods. */
-            const step = (resume : (argument : unknown) => IteratorResult<unknown, R>, argument : unknown, resumed : boolean) : void => {
-                const previous = store.current;
-                store.current = frame;
-                let result : IteratorResult<unknown, R>;
-                let awaited : Promise<unknown>;
-                try {
-                    const hooks = resumed ? store.hooks : undefined;
-                    result = hooks === undefined
-                        ? resume(argument)
-                        : applyWithHooks(hooks, namedForHooks(generatorFunction, name), "await", resume, undefined, [argument]);
-                    if (result.done) {
-                        frame = store.current;
-                        store.current = previous;
-                        resolve(result.value);
-                        return;
-                    }
-                    // Promise.resolve reads a "then" property of the value. Do it in the context of the body, as await does.
-                    awaited = promiseResolve(result.value);
-                } catch (error) {
-                    store.current = previous;
-                    reject(error);
-                    return;
+        let generator : Generator<unknown, R, unknown>;
+        const next = (value : unknown) : IteratorResult<unknown, R> => generator.next(value);
+        const throwInto = (error : unknown) : IteratorResult<unknown, R> => generator.throw(error);
+
+        /**
+         * This function does one step of the body in the context of the async function, and sets
+         * the previous context again. `resumed` is `true` for a step after an `await`. Only these
+         * steps start the hook methods. The function gives the value to await.
+         */
+        const step = (resume : (argument : unknown) => IteratorResult<unknown, R>, argument : unknown, resumed : boolean) : IteratorResult<unknown, R> => {
+            const previous = store.current;
+            store.current = frame;
+            try {
+                const hooks = resumed ? store.hooks : undefined;
+                const result = hooks === undefined
+                    ? resume(argument)
+                    : applyWithHooks(hooks, namedForHooks(generatorFunction, name), "await", resume, undefined, [argument]);
+                const value : unknown = result.value;
+                if (!result.done && ((typeof value === "object" && value !== null) || typeof value === "function")) {
+                    // Promise.resolve reads the "then" property of an object. Do it in the context of the body, as await does.
+                    // The result object is new for each step, so the change is not visible to other code.
+                    (result as { value : unknown }).value = promiseResolve(value);
                 }
+                return result;
+            } finally {
                 frame = store.current;
                 store.current = previous;
-                promiseThen.call(awaited, onFulfilled, onRejected);
-            };
-            const next = (value : unknown) : IteratorResult<unknown, R> => generator.next(value);
-            const throwInto = (error : unknown) : IteratorResult<unknown, R> => generator.throw(error);
-            const onFulfilled = (value : unknown) : void => step(next, value, true);
-            const onRejected = (error : unknown) : void => step(throwInto, error, true);
-            step(next, undefined, false);
-        });
+            }
+        };
+
+        /**
+         * The driver is a native async function: its `await` is faster than a `then` callback,
+         * mostly in Firefox. Each `await` takes the same number of microtask turns as the
+         * `await` of the source. Between the steps, the context of the caller stays current.
+         */
+        const drive = async () : Promise<R> => {
+            // The directive tells the Babel preset not to change this function (src/babel/skip-runtime.ts)
+            "async-browser-context runtime";
+            // In the driver, an error of the parameters rejects the promise, as with a native async function
+            generator = generatorFunction.apply(this, args);
+            let result = step(next, undefined, false);
+            while (result.done !== true) {
+                let value : unknown;
+                try {
+                    value = await result.value;
+                } catch (error) {
+                    result = step(throwInto, error, true);
+                    continue;
+                }
+                result = step(next, value, true);
+            }
+            return result.value;
+        };
+        return drive();
     };
 }
 

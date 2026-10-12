@@ -8,31 +8,28 @@
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 
-/** This function gives an async function that operates `generatorFunction`. */
+/**
+ * This function gives an async function that operates `generatorFunction`. The function is
+ * a native async function: each `await` of the source becomes one native `await`, with
+ * the same microtask turns. An error of the parameters rejects the promise.
+ */
 export function coroutine<T, A extends unknown[], R>(generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>) : (this : T, ...args : A) => Promise<R> {
-    return function asyncFunction(this : T, ...args : A) : Promise<R> {
+    return async function asyncFunction(this : T, ...args : A) : Promise<R> {
+        // The directive tells the Babel preset not to change this function (src/babel/skip-runtime.ts)
+        "async-browser-context runtime";
         const generator = generatorFunction.apply(this, args);
-        return new Promise<R>((resolve, reject) => {
-            const step = (method : "next" | "throw", argument : unknown) : void => {
-                let result : IteratorResult<unknown, R>;
-                let awaited : Promise<unknown>;
-                try {
-                    result = method === "next" ? generator.next(argument) : generator.throw(argument);
-                    if (result.done) {
-                        resolve(result.value);
-                        return;
-                    }
-                    awaited = Promise.resolve(result.value);
-                } catch (error) {
-                    reject(error);
-                    return;
-                }
-                awaited.then(onFulfilled, onRejected);
-            };
-            const onFulfilled = (value : unknown) : void => step("next", value);
-            const onRejected = (error : unknown) : void => step("throw", error);
-            step("next", undefined);
-        });
+        let result = generator.next();
+        while (result.done !== true) {
+            let value : unknown;
+            try {
+                value = await result.value;
+            } catch (error) {
+                result = generator.throw(error);
+                continue;
+            }
+            result = generator.next(value);
+        }
+        return result.value;
     };
 }
 

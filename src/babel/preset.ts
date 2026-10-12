@@ -3,6 +3,7 @@ import asyncGeneratorFunctions from "@babel/plugin-transform-async-generator-fun
 import asyncToGenerator from "@babel/plugin-transform-async-to-generator";
 import { bindGeneratorsPlugin } from "./bind-generators.js";
 import { nameCoroutinesPlugin } from "./name-coroutines.js";
+import { skipRuntimePlugin } from "./skip-runtime.js";
 
 export { METADATA_KEY } from "./bind-generators.js";
 
@@ -27,16 +28,19 @@ export const DEFAULT_RUNTIME = "async-browser-context/runtime";
 
 /**
  * The Babel preset of `async-browser-context`. It changes the code so that the
- * context stays through `await` and `yield`:
+ * context stays through `await` and `yield`. It does not change the runtime
+ * of the library, also when it transforms `node_modules`.
  *
- * 1. A plugin of this library binds each generator to the context of its
+ * 1. A plugin of this library skips the native async functions of the
+ *    runtime, which a directive marks.
+ * 2. A plugin of this library binds each generator to the context of its
  *    creation.
- * 2. A plugin of this library gives the name of each async function to
+ * 3. A plugin of this library gives the name of each async function to
  *    `coroutine`, for the callback hooks. The option `names: false` removes
  *    this step.
- * 3. `@babel/plugin-transform-async-generator-functions` changes async
+ * 4. `@babel/plugin-transform-async-generator-functions` changes async
  *    generators and `for await` loops.
- * 4. `@babel/plugin-transform-async-to-generator` changes each async function
+ * 5. `@babel/plugin-transform-async-to-generator` changes each async function
  *    into a generator that the `coroutine` function of the runtime operates.
  *
  * The preset operates with Babel 7.22 and later and with Babel 8. Put it last
@@ -48,6 +52,7 @@ export default function asyncBrowserContextPreset(api : PresetAPI, options : Pre
     const names : PluginItem[] = options.names === false ? [] : [[nameCoroutinesPlugin, { runtime }]];
     return {
         plugins : [
+            skipRuntimePlugin,
             [bindGeneratorsPlugin, { runtime }],
             ...names,
             asyncGeneratorFunctions,
