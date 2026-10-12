@@ -87,7 +87,7 @@ Firefox then loaded the test pages from the wrong server, and its sessions did n
 The fix:
 
 - `vitest.config.ts` gives the browser API server the address `127.0.0.1`. The browsers open `http://127.0.0.1:<port>`, thus a server on `::1` cannot get their connections.
-- `test/vitest/free-port.ts` gets the port from the operating system. No program uses this port on `127.0.0.1`, `::1`, `0.0.0.0` or `::`. Two runs that start at the same time get different ports. On a computer without IPv6, for example a CI container, the IPv6 addresses cannot hold a port.
+- `test/vitest/free-port.ts` gets the port from the operating system. No program uses this port on `127.0.0.1`, `::1`, `0.0.0.0` or `::`. Two runs that start at the same time get different ports. On a computer without IPv6, for example a CI container, the IPv6 addresses cannot hold a port. If `listen(0)` fails, or its server has no TCP port, the search stops with an error that tells the cause. The tests of `test/vitest/free-port.test.ts` replace the sockets with a simulated network.
 - Vitest binds the port with `strictPort`. If a different program takes the port first, the run stops with the error `Port ... is already in use`.
 
 The fix also removes a delay of approximately 2 seconds when a Firefox page connects to the server. Before the fix, Firefox tried `127.0.0.1` first, and Windows refused that connection only after this delay.
