@@ -7,7 +7,7 @@
  *
  * @packageDocumentation
  */
-import { AsyncLocalStorage as NodeAsyncLocalStorage } from "node:async_hooks";
+import { AsyncLocalStorage as NodeAsyncLocalStorage, AsyncResource } from "node:async_hooks";
 import { assertCallbackHook, type CallbackHook } from "../core/callback-hook.js";
 import type { VariableOptions } from "../core/variable.js";
 import { createCompatibleStorage } from "./compatible-storage.js";
@@ -72,13 +72,19 @@ export class Variable<T> {
 
 Object.defineProperty(Variable.prototype, Symbol.toStringTag, { value : "AsyncContext.Variable", configurable : true });
 
-/** The `AsyncContext.Snapshot` of the TC39 proposal, on the native `AsyncLocalStorage.snapshot()`. */
+/** The type of the async resources of the snapshots, for async_hooks. */
+const SNAPSHOT_TYPE = "AsyncContext.Snapshot";
+
+/**
+ * The `AsyncContext.Snapshot` of the TC39 proposal. An `AsyncResource` records the context, as
+ * `AsyncLocalStorage.snapshot()` does, at a much lower cost (src/node/runtime.ts).
+ */
 export class Snapshot {
-    readonly #run : <R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) => R = NodeAsyncLocalStorage.snapshot();
+    readonly #context = new AsyncResource(SNAPSHOT_TYPE);
 
     /** This method starts `fn` with `args` in the recorded context. `fn` gets `undefined` as its `this` value. */
     run<R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) : R {
-        return this.#run(() => fn(...args));
+        return this.#context.runInAsyncScope(fn, undefined, ...args);
     }
 
     /** This method records the current context. It gives a wrapper of `fn` that operates in that context. */
@@ -86,9 +92,9 @@ export class Snapshot {
         if (typeof fn !== "function") {
             throw new TypeError("Snapshot.wrap: the argument is not a function");
         }
-        const run = NodeAsyncLocalStorage.snapshot();
+        const context = new AsyncResource(SNAPSHOT_TYPE);
         const wrapped = function (this : T, ...args : A) : R {
-            return run(() => Reflect.apply(fn, this, args));
+            return context.runInAsyncScope(fn, this, ...args);
         };
         // As CopyNameAndLength with the prefix "wrapped" in the TC39 draft
         const name : unknown = fn.name;
