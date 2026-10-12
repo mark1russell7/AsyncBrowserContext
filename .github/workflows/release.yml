@@ -77,4 +77,5 @@ jobs:
       # Trusted publishing needs npm 11.5.1 or later
       - run: npm install --global npm@11.20.0
       - name: Publish the tested tarball
-        run: npm publish package/*.tgz --provenance --access public
+        # The ./ prefix makes npm read a file path, not a GitHub repository (owner/name)
+        run: npm publish ./package/*.tgz --provenance --access public
