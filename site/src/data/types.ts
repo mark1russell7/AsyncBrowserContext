@@ -24,7 +24,12 @@ export type ProbeResult = {
     after : string;
     /** The context rule that the probe examines, for example "C4". */
     rule? : string;
-    /** "fixed": the new result is correct. "safe": the new result is the root context (rule C7). "documentation": the probe examines a text error. */
+    /**
+     * "fixed": the old result is incorrect, and the new result is correct.
+     * "correct": the old and the new results are both correct.
+     * "safe": the new result is the root context (rule C7).
+     * "documentation": the probe examines a text error.
+     */
     status : "fixed" | "safe" | "documentation" | "correct";
 };
 
@@ -46,12 +51,17 @@ export type MutationRow = {
 
 /** The summary of a run of Stryker on the current tests. */
 export type StrykerSummary = {
-    /** The mutation score: the mutants that the tests found or that timed out, as a percentage of the mutants. */
+    /**
+     * The mutation score of Stryker: the killed and timeout mutants, as a
+     * percentage of the killed, timeout, survived and no-coverage mutants.
+     * The other mutants (for example, a mutant that does not compile) are not in the score.
+     */
     score : number;
     killed : number;
     survived : number;
     timeout : number;
     noCoverage : number;
+    /** All the mutants of the report, also the mutants that are not in the score. */
     total : number;
     /** The source files that Stryker changed. */
     scope : string[];

@@ -22,6 +22,31 @@ function requireFields(rows : readonly Record<string, unknown>[], fields : Reado
     });
 }
 
+/** This function makes sure that each row has one of the permitted values in `field`, or no value if the field is optional. */
+function requireOneOf(rows : readonly Record<string, unknown>[], field : string, values : readonly string[], name : string, optional = false) : void {
+    rows.forEach((row, index) => {
+        const value = row[field];
+        if (optional && value === undefined) return;
+        if (typeof value !== "string" || !values.includes(value)) {
+            throw new Error(`In data/${name}.json, row ${index + 1} has the "${field}" ${JSON.stringify(value)}. Use one of: ${values.join(", ")}.`);
+        }
+    });
+}
+
+function requireNumbers(record : Record<string, unknown>, fields : readonly string[], where : string) : void {
+    for (const field of fields) {
+        if (typeof record[field] !== "number" || !Number.isFinite(record[field])) throw new Error(`${where} has no number "${field}".`);
+    }
+}
+
+function requireStrings(value : unknown, where : string) : void {
+    if (!Array.isArray(value) || !value.every(item => typeof item === "string")) throw new Error(`${where} is not a list of text values.`);
+}
+
+/** The values of `ProbeResult.status` and `MutationRow.suite` (refer to `types.ts`). */
+const PROBE_STATUSES = ["fixed", "safe", "documentation", "correct"] as const;
+const MUTATION_SUITES = ["old", "new"] as const;
+
 /**
  * This function examines the shape of a data file. It gives the file if the
  * shape is correct, and it throws an error with the first problem if not.
@@ -30,22 +55,40 @@ export function validateDataFile<K extends SiteDataName>(name : K, value : unkno
     if (!isRecord(value)) throw new Error(`The file data/${name}.json is not an object.`);
     if (typeof value["generated"] !== "string") throw new Error(`The file data/${name}.json has no "generated" time.`);
     switch (name) {
-        case "probes":
-            requireFields(rowsOf(value, "probes", name), { id : "string", scenario : "string", before : "string", after : "string", status : "string" }, name);
+        case "probes": {
+            const probes = rowsOf(value, "probes", name);
+            requireFields(probes, { id : "string", scenario : "string", before : "string", after : "string", status : "string" }, name);
+            requireOneOf(probes, "status", PROBE_STATUSES, name);
+            probes.forEach((probe, index) => {
+                if (probe["rule"] !== undefined && typeof probe["rule"] !== "string") throw new Error(`In data/${name}.json, row ${index + 1} has a "rule" that is not text.`);
+            });
             break;
-        case "mutation":
-            requireFields(rowsOf(value, "rows", name), { mutant : "string", description : "string", suite : "string", passed : "number", total : "number" }, name);
+        }
+        case "mutation": {
+            const rows = rowsOf(value, "rows", name);
+            requireFields(rows, { mutant : "string", description : "string", suite : "string", passed : "number", total : "number" }, name);
+            requireOneOf(rows, "suite", MUTATION_SUITES, name);
+            const stryker = value["stryker"];
+            if (stryker !== undefined) {
+                if (!isRecord(stryker)) throw new Error(`In data/${name}.json, "stryker" is not an object.`);
+                requireNumbers(stryker, ["score", "killed", "survived", "timeout", "noCoverage", "total"], `In data/${name}.json, "stryker"`);
+                requireStrings(stryker["scope"], `In data/${name}.json, "stryker.scope"`);
+            }
             break;
+        }
         case "browsers":
             requireFields(rowsOf(value, "rows", name), { browser : "string", version : "string", passed : "number", failed : "number", skipped : "number" }, name);
             break;
         case "size":
-            for (const field of ["minifiedBytes", "gzipBytes", "brotliBytes"]) {
-                if (typeof value[field] !== "number") throw new Error(`The file data/${name}.json has no number "${field}".`);
-            }
+            requireNumbers(value, ["minifiedBytes", "gzipBytes", "brotliBytes"], `The file data/${name}.json`);
+            requireStrings(value["entries"], `In data/${name}.json, "entries"`);
             break;
         case "bench": {
-            if (!isRecord(value["environment"])) throw new Error(`The file data/${name}.json has no "environment".`);
+            const environment = value["environment"];
+            if (!isRecord(environment)) throw new Error(`The file data/${name}.json has no "environment".`);
+            for (const field of ["node", "os", "cpu"]) {
+                if (typeof environment[field] !== "string") throw new Error(`In data/${name}.json, "environment" has no text "${field}".`);
+            }
             requireFields(rowsOf(value, "rows", name), { benchmark : "string", plainMs : "number", transformOnlyMs : "number", libraryMs : "number" }, name);
             break;
         }

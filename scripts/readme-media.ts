@@ -46,7 +46,12 @@ try {
     // A mouse click shows no focus ring, so the frames have none.
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     const next = demo.locator("button[aria-label='Next step']");
-    const count = Number(/of (\d+)/.exec(await counter.textContent() ?? "")?.[1] ?? 0);
+    const counterText = await counter.textContent() ?? "";
+    const count = Number(/of (\d+)/.exec(counterText)?.[1] ?? 0);
+    // The static image is the frame of STILL_STEP, so the example must have more steps than that.
+    if (!Number.isInteger(count) || count <= STILL_STEP) {
+        throw new Error(`The live example must have more than ${STILL_STEP} steps for the static image, but its step counter shows "${counterText.trim()}". Change STILL_STEP in scripts/readme-media.ts, or make sure that the home page shows the live example.`);
+    }
     for (let step = 0; step < count; step++) {
         await page.waitForTimeout(120);
         const file = path.join(frames, `frame-${String(step).padStart(3, "0")}.png`);
