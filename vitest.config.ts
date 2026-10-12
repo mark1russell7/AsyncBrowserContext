@@ -69,7 +69,7 @@ function lowerTests(compiler : "swc-es2016" | "esbuild-es2016") : Plugin {
         enforce : "post",
         async transform(code, id) {
             const file = id.split("?", 1)[0] ?? id;
-            if (!inTests(file) || inUntransformedFixtures(file) || !/.[cm]?[jt]sx?$/.test(file)) {
+            if (!inTests(file) || inUntransformedFixtures(file) || !/\.[cm]?[jt]sx?$/.test(file)) {
                 return null;
             }
             if (compiler === "swc-es2016") {
