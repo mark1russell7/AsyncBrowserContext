@@ -5,7 +5,7 @@
  * generator creation (rule C5), with an `AsyncResource`.
  *
  * An `AsyncResource` records the context as `AsyncLocalStorage.snapshot()` does,
- * but at a much lower cost: `snapshot()` is `AsyncResource.bind()`, which also
+ * but at a much lower cost. `snapshot()` is `AsyncResource.bind()`, which also
  * defines properties on a new function (approximately 3 µs against 30 ns on
  * Node.js 24). The drivers record the context again after each step.
  *
