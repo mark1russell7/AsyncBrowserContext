@@ -3,7 +3,7 @@ import { useId } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HANDOFF_ID_PREFIX, mountApp, routePathOf } from "./prerender-handoff";
+import { findCounterpart, getHandoffState, HANDOFF_ID_PREFIX, mountApp, routePathOf, subscribeHandoff } from "./prerender-handoff";
 
 const added : HTMLElement[] = [];
 
@@ -81,6 +81,37 @@ describe("mountApp", () => {
         live.innerHTML = `<p data-loading="">The data loads.</p>`;
         await vi.waitFor(() => expect(root.isConnected).toBe(false), { timeout : 2000 });
         expect(live.inert).toBe(false);
+    });
+
+    it("gives the focus to the same element of the app at the swap, and tells the state of the handoff", async () => {
+        const root = prerenderedRoot("docs/api");
+        root.innerHTML = `<main><h1>Saved page</h1><p><a href="/docs/one">One</a> <a href="/docs/two">Two</a></p></main>`;
+        const states : string[] = [];
+        const stop = subscribeHandoff(() => states.push(getHandoffState()));
+        try {
+            const live = mountApp(root, "docs/api", { quietMs : 20, settleMs : 200, timeoutMs : 5000 }).element;
+            added.push(live);
+            expect(getHandoffState()).toBe("pending");
+            root.querySelectorAll("a")[1]?.focus();
+            expect(document.activeElement?.textContent).toBe("Two");
+            live.innerHTML = `<main><h1>Saved page</h1><p><a href="/docs/one">One</a> <a href="/docs/two">Two</a></p></main>`;
+            await vi.waitFor(() => expect(root.isConnected).toBe(false));
+            expect(document.activeElement).toBe(live.querySelectorAll("a")[1]);
+            expect(getHandoffState()).toBe("done");
+            expect(states).toEqual(["pending", "done"]);
+        } finally {
+            stop();
+        }
+    });
+
+    it("finds the element with the same text when the structure of the app is different", () => {
+        const from = document.createElement("div");
+        from.innerHTML = `<nav><a href="/a">A</a></nav><p><button>Copy</button><button>Copy</button></p>`;
+        const to = document.createElement("div");
+        to.innerHTML = `<div><nav><a href="/a">A</a></nav></div><section><p><button>Copy</button><button>Copy</button></p></section>`;
+        expect(findCounterpart(from, to, from.querySelectorAll("button")[1]!)).toBe(to.querySelectorAll("button")[1]);
+        expect(findCounterpart(from, to, from.querySelector("a")!)).toBe(to.querySelector("a"));
+        expect(findCounterpart(from, to, document.createElement("textarea"))).toBeUndefined();
     });
 
     it("gives React an ID prefix, so the IDs differ from the IDs in the saved HTML", () => {

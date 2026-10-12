@@ -19,10 +19,13 @@ function describe(error : unknown) : { title : string; text : string } {
 export function RouteError() {
     const { title, text } = describe(useRouteError());
     return (
-        <div className={styles.page} role="alert">
+        <div className={styles.page}>
             <title>{`Error – ${SITE_NAME}`}</title>
-            <h1>{title}</h1>
-            <p>{text}</p>
+            {/* Only the message is the alert. The buttons and the links are not part of it. */}
+            <div role="alert">
+                <h1>{title}</h1>
+                <p>{text}</p>
+            </div>
             <p>
                 <button type="button" className="button" onClick={() => window.location.reload()}>Load the page again</button>
             </p>

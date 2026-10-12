@@ -73,6 +73,8 @@
     --radius-small: 3px;
     --measure: 68ch;
     --page-width: 82rem;
+    /* The height of one line of the header. The header sets --header-height to its real height (it can wrap). */
+    --header-min-height: 3.5rem;
     --header-height: 3.5rem;
     --gutter: clamp(1rem, 3vw, 2rem);
 }
