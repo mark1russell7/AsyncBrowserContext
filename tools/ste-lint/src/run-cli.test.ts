@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Linter } from "./lint.js";
 import { parseArgs, runCli, UsageError, USAGE } from "./run-cli.js";
@@ -106,9 +106,25 @@ describe("runCli", () => {
         expect(result.stdout).not.toContain("README.md");
     });
 
-    it("exits with 2 when the patterns match no files, and with 0 when the default patterns match no files", () => {
+    it("exits with 2 when the patterns or the include patterns of the configuration match no files", () => {
         expect(run(["missing/*.md"])).toMatchObject({ code : 2, stderr : "ste-lint: no files match the patterns.\n" });
-        expect(run([])).toMatchObject({ code : 0, stderr : "ste-lint: no files to examine.\n" });
+        expect(run([])).toMatchObject({ code : 2, stderr : "ste-lint: no files match the include patterns of the configuration.\n" });
+    });
+
+    it("applies the ignore patterns of the configuration relative to its directory, also from a subdirectory", () => {
+        writeFileSync(join(root, "ste.config.json"), JSON.stringify({ include : ["docs/**/*.md"], ignore : ["docs/old.md"] }));
+        writeFileSync(join(root, "docs", "old.md"), "You should stop.\n");
+        writeFileSync(join(root, "docs", "new.md"), "You must stop.\n");
+        let stdout = "";
+        const code = runCli(["*.md"], { cwd : join(root, "docs"), env : {}, stdout : (text) => { stdout += text; }, stderr : () => {} });
+        expect(code).toBe(0);
+        expect(stdout).toContain("No problems found in 1 file.");
+    });
+
+    it("lints the files of a directory and of an absolute pattern", () => {
+        writeFileSync(join(root, "docs", "guide.md"), "You should stop.\n");
+        expect(run(["docs"]).stdout).toContain("docs/guide.md");
+        expect(run([`${root.split(sep).join("/")}/docs/*.md`]).stdout).toContain("docs/guide.md");
     });
 
     it("exits with 2 for an incorrect command line or configuration", () => {

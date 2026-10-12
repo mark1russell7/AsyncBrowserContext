@@ -16,3 +16,4 @@ bench/results/*
 !bench/results/size.json
 !bench/results/browsers.json
 .claude/
+.ste/

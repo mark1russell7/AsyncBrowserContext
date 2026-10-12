@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mark1russell7/lag/packages/ste-lint/ste.config.schema.json",
+  "$id": "https://raw.githubusercontent.com/mark1russell7/AsyncBrowserContext/main/tools/ste-lint/ste.config.schema.json",
   "title": "ste-lint configuration",
   "description": "The configuration of ste-lint. All properties are optional.",
   "type": "object",

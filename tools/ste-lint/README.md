@@ -1,4 +1,4 @@
-# @lag/ste-lint
+# ste-lint
 
 `ste-lint` examines the English prose of a project. It finds text that does not obey the writing rules of ASD-STE100 Simplified Technical English (STE), Issue 9. The project uses STE as its style for the README files, the documentation website and the TSDoc comments.
 
@@ -43,14 +43,14 @@ Start the tool from the root of the repository:
 ```sh
 pnpm lint:ste
 pnpm lint:ste --format json
-pnpm lint:ste --max-warnings 0 README.md "docs/**/*.md"
+pnpm lint:ste README.md "docs/**/*.md" site/content
 ```
 
-The options:
+The script `lint:ste` adds `--max-warnings 0`, thus a warning also stops CI. The options:
 
 | Option | Function |
 | --- | --- |
-| `[patterns...]` | The glob patterns of the files to examine. Without patterns, the tool uses the `include` patterns of the configuration. |
+| `[patterns...]` | The glob patterns, file names or directories to examine. A pattern is relative to the working directory, or absolute. A directory gives all its files. Without patterns, the tool uses the `include` patterns of the configuration. |
 | `--format text` | The default output: one group of findings for each file, a summary and the count of findings for each rule. |
 | `--format json` | The findings and the summary as JSON. |
 | `--max-warnings <n>` | Exit with code 1 when there are more than `n` warnings. |
@@ -59,7 +59,9 @@ The options:
 
 The exit code is 0 when there are no errors, and not more warnings than the maximum. The exit code is 1 when there are errors or too many warnings. The exit code is 2 for an incorrect command line or configuration, or when no file matches the patterns.
 
-The package also has the bin `ste-lint` (`dist/cli.js`) and a programmatic API. The `Linter` class examines text. The `runCli` function does the same work as the command line.
+The tool has no build step: `tsx` starts `src/cli.ts`. The package also has a programmatic API in `src/index.ts`. The `Linter` class examines text. The `runCli` function does the same work as the command line.
+
+The tests of the tool are in `src/**/*.test.ts`. Start them from the root of the repository with `pnpm test:ste-lint`.
 
 ## Configuration
 
@@ -86,7 +88,7 @@ The tool reads `ste.config.json` in the working directory or in a parent directo
 
 | Property | Function |
 | --- | --- |
-| `include`, `ignore` | Glob patterns. The syntax has `*`, `**`, `?`, `{a,b}` and `[abc]`. A file name in `include` without glob characters is always examined. |
+| `include`, `ignore` | Glob patterns. The syntax has `*`, `**`, `?`, `{a,b}` and `[abc]`. A file name in `include` without glob characters is always examined. A directory name in `include` gives all files in the directory. In `include`, `*`, `**` and `?` do not match a dot at the start of a name. The `ignore` patterns also apply to the patterns of the command line. |
 | `technicalNouns` | The nouns of the project glossary. A term can have more than one word. The noun-cluster rule counts a multi-word term as one noun. |
 | `technicalVerbs` | The verbs of the project glossary, in the base form. The tool accepts all forms of each verb. |
 | `properNouns` | Names of products, organizations and standards. A name with more than one word counts as one word. |
@@ -152,9 +154,11 @@ The full form has entries:
 
 A comment can stop the findings for some text. Give the rule IDs, or no IDs for all rules. Text after ` -- ` is a reason, and the tool ignores it.
 
-- In Markdown, write `<!-- ste-disable-next modal-verb -- quoted text -->`. This comment stops the findings in the next block: a paragraph, a heading, a list item or a table row.
+- In Markdown, write `<!-- ste-disable-next modal-verb -- quoted text -->`. This comment stops the findings in the next block: a paragraph, a heading, a list item or a table. A comment cannot come between the rows of a table, thus the comment applies to all the cells of the table.
 - `<!-- ste-disable -->` and `<!-- ste-enable -->` stop the findings in the text between them. In MDX, write `{/* ste-disable */}`.
-- In TypeScript, write `// ste-disable-next` on the line before a doc comment. `// ste-disable` and `// ste-enable` make a range.
+- In TypeScript, write `// ste-disable-next` on the line before a doc comment. `// ste-disable` and `// ste-enable` make a range. In JSX, write `{/* ste-disable-next */}` before the text of an element. Code between the comment and the next doc comment or JSX text cancels the comment.
+
+A rule ID that is not known gives an error with the ID `directive`. The configuration cannot change this error.
 
 ## How the heuristics operate
 
@@ -183,6 +187,6 @@ The tool has no part-of-speech tagger. Each heuristic looks at the words near a 
 
 - The tool cannot know the meaning of a word. It does not find most errors of STE Rules 1.3 and 9.2, for example "release" for a new version, or "listen" for a server port. Only these words have context tests: "about" with a number, "see" for a reference, and some verbs of the word list.
 - The heuristics miss some problems and report some false problems. For example, the noun-cluster rule does not count a word that is not on its lists. The `-ing` rule cannot always tell a gerund from a noun.
-- A sentence can have a capital letter after an abbreviation or an initial. Then the sentence division can be incorrect.
+- A sentence can have a capital letter after an abbreviation or an initial. Then the sentence division can be incorrect. After a period, a word in lower case starts a sentence only in two conditions. The word is a name of the glossary, for example `npm`, or the word looks like code.
 - The Markdown parser knows only the structure that the rules need. It is not a full CommonMark parser.
 - The tool examines only the rules in the table. It does not examine all 53 rules of the standard.
