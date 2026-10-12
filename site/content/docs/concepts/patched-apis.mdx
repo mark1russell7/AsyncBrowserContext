@@ -6,7 +6,7 @@ order: 13
 
 The runtime patches these APIs when it loads. It patches each API one time for each global object, also when the page loads two copies of the library. Each patched function keeps its name, its length and its other properties. `Function.prototype.toString` shows the source text of the original function.
 
-Each patched function is a method, as the native function: it has no `prototype` property and it is not a constructor. It gives the native function the same number of arguments. Thus `setTimeout()` without arguments throws the native `TypeError`, as without the library. Each patch, except the patch of `Function.prototype.toString`, starts the function that it replaces. Thus a patch of another tool that loads first stays in effect.
+Each patched function is a method, as the native function: it has no `prototype` property and it is not a constructor. It gives the native function the same number of arguments. Thus `setTimeout()` without arguments throws the native `TypeError`, as without the library. Each patch starts the function that it replaces. Thus a patch of another tool that loads first stays in effect.
 
 <Callout type="caution" title="Import the library first">
   Import `async-browser-context` before all other modules. Code that keeps a reference to a native function before the library loads does not get the context. A listener that code adds before the library loads, and adds again after, operates two times. The browser then has the listener and a wrapper of it.

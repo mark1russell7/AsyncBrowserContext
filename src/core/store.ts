@@ -22,6 +22,7 @@ export interface Intrinsics {
     /** The patch of version 0.3 does not use it. An older copy of the library that shares the store can use it. */
     readonly promiseThen : typeof Promise.prototype.then;
     readonly promiseResolve : <T>(value : T) => Promise<Awaited<T>>;
+    /** The patch of version 0.3 does not use it. An older copy of the library that shares the store can use it. */
     readonly functionToString : () => string;
 }
 
