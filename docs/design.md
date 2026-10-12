@@ -45,11 +45,12 @@ Thus, between tasks, the current frame is the root frame. Code that the library 
 
 ### The transform
 
-The Babel preset has three plugins:
+The Babel preset has four plugins:
 
 1. A plugin of this library changes each generator function. The function gives `bindGenerator(generator)`. The generator then keeps the context of its creation, as the TC39 draft specifies.
-2. `@babel/plugin-transform-async-generator-functions` changes async generators and `for await` loops.
-3. `@babel/plugin-transform-async-to-generator` changes each async function into a generator. The `coroutine` function of the runtime operates the generator. Before each step, `coroutine` sets the frame of the call. After the step, it sets the previous frame again.
+2. A plugin of this library gives the name of each async function to `coroutine`, for the callback hooks.
+3. `@babel/plugin-transform-async-generator-functions` changes async generators and `for await` loops.
+4. `@babel/plugin-transform-async-to-generator` changes each async function into a generator. The `coroutine` function of the runtime operates the generator. Before each step, `coroutine` sets the frame of the call. After the step, it sets the previous frame again.
 
 The Babel transforms already handle destructuring, `var`, labels, closures, sync iterables and the `return()` call on `break`. Thus, the library has no custom code that changes `await` expressions.
 
