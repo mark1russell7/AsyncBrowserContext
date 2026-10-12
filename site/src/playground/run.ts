@@ -1,4 +1,5 @@
-import { asyncGenerator, bindGenerator, coroutine, OverloadYield } from "async-browser-context/runtime";
+// All exports of the runtime: the compiled code imports the helpers of async functions and async generators from it
+import * as runtime from "async-browser-context/runtime";
 import {
     AsyncContext,
     AsyncLocalStorage,
@@ -86,7 +87,7 @@ export function tracePlayground(code : string, mode : ContextMode) : Promise<Tra
             log, sleep, fetchUser, save, untransformedLoad,
             ...timers.globals,
             __trace : guard.trace,
-            coroutine, bindGenerator, asyncGenerator, OverloadYield,
+            ...runtime,
         };
         const url = URL.createObjectURL(new Blob([code], { type : "text/javascript" }));
         try {

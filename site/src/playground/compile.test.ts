@@ -27,7 +27,7 @@ describe("compilePlayground", () => {
 
     it("gives the timer functions of the playground to the code, and the runtime of async generators", () => {
         const names = globalNames(compilePlayground("async function* ticks() {\n    yield 1;\n}\nsetInterval(() => log(1), 5);\nfor await (const tick of ticks()) log(tick);\n"));
-        expect(names).toEqual(expect.arrayContaining(["setInterval", "setTimeout", "clearTimeout", "clearInterval", "asyncGenerator", "OverloadYield"]));
+        expect(names).toEqual(expect.arrayContaining(["setInterval", "setTimeout", "clearTimeout", "clearInterval", "asyncGenerator", "awaitAsyncGenerator"]));
     });
 
     it("does not read a timer function from the playground when the code declares it", () => {
