@@ -49,3 +49,17 @@ The scenarios do no other work, so the factors are the largest possible factors.
 ## Changes that the measurements caused
 
 The first version of the frames used one `WeakMap` for each variable. The garbage collector processed the many `WeakMap` entries slowly, and the request handler scenario had a factor of 3.5. Private fields of the frames, with a cache of the last search, replaced the `WeakMap`. A comparison in one process showed that the new storage is 17 times faster. The factor of the request handler scenario became 1.84.
+
+## Size
+
+The command `pnpm bench:size` measures the size of the code that the library adds. It installs a set of npm packages in `node_modules/.cache/abc-size`, builds minified bundles with Vite, and writes `bench/results/size.json`.
+
+| Code | gzip |
+| --- | --- |
+| The runtime: the classes, the patches and the runtime of the transform | 5.9 kB |
+| zone.js 0.16.3, for comparison | 13.3 kB |
+| An application with React DOM, TanStack Query, supabase-js and ky, without the transform | 161.9 kB |
+| The same application with the Vite plugin, without the runtime | 166.5 kB (+2.9%) |
+| The same application with the target ES2016 and no plugin | 171.2 kB (+5.8%) |
+
+The transform adds 4 to 9 percent to packages with much async code, and nothing to React DOM. Babel adds its helpers for async iteration to each module with `for await` or an async generator, approximately 0.5 kB. The option `names: false` of the preset removes the names of the async functions: 0.1 to 1.6 percent. The page "Performance" of the website has the table of each package.

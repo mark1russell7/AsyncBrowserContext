@@ -36,6 +36,11 @@ const BOUNDARIES : readonly { other : string; action : string; tool? : string }[
 const WORKS_WITH : readonly { label : string; to : string }[] = [
     { label : "Vite", to : "/docs/getting-started" },
     { label : "Babel", to : "/docs/getting-started" },
+    { label : "Next.js", to : "/docs/guides/build-tools#nextjs" },
+    { label : "webpack", to : "/docs/guides/build-tools#webpack" },
+    { label : "Rspack", to : "/docs/guides/build-tools#rspack" },
+    { label : "Rollup", to : "/docs/guides/build-tools#rollup" },
+    { label : "esbuild", to : "/docs/guides/build-tools#esbuild" },
     { label : "React", to : "/docs/guides/react" },
     { label : "Vitest", to : "/docs/guides/testing-with-vitest" },
     { label : "OpenTelemetry", to : "/docs/guides/opentelemetry" },

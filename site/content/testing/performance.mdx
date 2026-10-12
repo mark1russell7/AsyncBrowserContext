@@ -36,3 +36,31 @@ The command `pnpm bench` starts each case in a separate Node.js process. Each pr
 <Callout type="note">
   The values are microbenchmarks. The benchmarks do no other work, so the factors are the largest possible factors. Measure your own application before and after you add the library.
 </Callout>
+
+## Size
+
+The command `pnpm bench:size` builds minified bundles with Vite 8.3.4, and measures them with gzip. The results go to `bench/results/size.json`.
+
+| Code | Minified | gzip | brotli |
+| --- | --- | --- | --- |
+| The runtime: the classes, the patches and the runtime of the transform | 19.0 kB | 5.9 kB | 5.1 kB |
+| zone.js 0.16.3, for comparison | 45.6 kB | 13.3 kB | 11.9 kB |
+
+The transform also makes the code of the application larger. The command builds each package of a set of npm packages four times. Each bundle keeps all exports of the package, and does not contain the runtime. The values are gzip sizes.
+
+| Package | Async functions | Without the transform | With the Vite plugin | With `names: false` | Target ES2016, no plugin |
+| --- | --- | --- | --- | --- | --- |
+| react-dom 19.3.0 | 0 | 76.0 kB | 76.0 kB (+0%) | 76.0 kB (+0%) | 76.0 kB (+0%) |
+| @tanstack/query-core 5.104.2 | 8 | 13.1 kB | 13.8 kB (+5.9%) | 13.8 kB (+5.8%) | 16.9 kB (+29.3%) |
+| ky 2.2.0 | 28 | 12.1 kB | 12.6 kB (+4.3%) | 12.5 kB (+3.3%) | 14.3 kB (+17.9%) |
+| idb 8.0.4 | 2 | 1.8 kB | 2.3 kB (+31.9%) | 2.3 kB (+31.4%) | 3.0 kB (+71.9%) |
+| @supabase/supabase-js 2.117.3 | 358 | 62.6 kB | 66.1 kB (+5.5%) | 65.1 kB (+3.9%) | 67.3 kB (+7.5%) |
+| openai 7.32.0 | 145 | 91.7 kB | 100.1 kB (+9.1%) | 99.4 kB (+8.4%) | 100.9 kB (+10%) |
+| @aws-sdk/client-s3 3.1149.0 | 210 | 100.8 kB | 105.7 kB (+4.9%) | 105.2 kB (+4.4%) | 108.1 kB (+7.3%) |
+| An application: React DOM, TanStack Query, supabase-js and ky | 394 | 161.9 kB | 166.5 kB (+2.9%) | 165.3 kB (+2.1%) | 171.2 kB (+5.8%) |
+
+- **User interface code.** React DOM has no async functions, so the transform does not change it. In an application, the code with async functions is usually a small part.
+- **Code with much async code.** The transform adds 4 to 9 percent to API clients. Each async function becomes a generator in a function that starts `coroutine`.
+- **Small packages with `for await` or async generators.** Babel adds its helpers for async iteration to each module that has such code: approximately 0.5 kB with gzip. This is the cause of the large percent of idb and TanStack Query.
+- **The names.** The preset gives the name of each async function to the callback hooks. The option `names: false` removes the names: 0.1 to 1.6 percent of the package.
+- **The target ES2016.** A compiler with this target also keeps the context through `await`, except rule C5 ([build tools](/docs/guides/build-tools)). The target also changes newer syntax, so the bundles are larger than with the preset.

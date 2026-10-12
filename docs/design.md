@@ -56,6 +56,8 @@ The Babel transforms already handle destructuring, `var`, labels, closures, sync
 
 The Vite plugin applies the preset to the modules of the application and of its dependencies.
 
+Other compilers can also change async functions into generators, for example SWC and esbuild with the target ES2016. Their helpers continue each step in a `then` callback, and the patch of `then` gives the callback the context of the step. Thus, all rules except rule C5 stay correct. These compilers do not bind generators, and they do not give the names of the async functions. The test projects `rules (browser runtime, SWC ES2016)` and `rules (browser runtime, esbuild ES2016)` examine this method.
+
 ### The patches
 
 The runtime patches only `Promise.prototype.then` of the `Promise` API. `catch`, `finally` and the combinators use `then`, so they also get the context of the registration. The runtime does not replace the `Promise` constructor.

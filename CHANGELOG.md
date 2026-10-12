@@ -1,5 +1,17 @@
 # Change history
 
+## 0.2.1
+
+### New functions
+
+- The option `names` of the Babel preset and of the Vite plugin. With `names: false`, the preset does not give the names of the async functions to `coroutine`. The code is then smaller by 0.1 to 1.6 percent.
+
+### Documentation and tests
+
+- The guide "Build tools" gives the setup for webpack, Rspack, Rollup, esbuild, Next.js and SWC. The test `pnpm test:bundlers` builds a page with each setup and examines it in Chromium.
+- SWC and esbuild with the target ES2016 keep all rules except rule C5. Two new test projects start all rule tests with these compilers in place of the preset.
+- The command `pnpm bench:size` measures the size of the runtime and the size that the transform adds to real npm packages. The runtime is 5.9 kB with gzip. The transform adds 2.9 percent to an example application.
+
 ## 0.2.0
 
 ### New functions

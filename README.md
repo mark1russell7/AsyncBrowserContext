@@ -81,6 +81,7 @@ The plugin transforms the modules of the application and of its dependencies, al
 | `include` | All JavaScript and TypeScript modules | A regular expression or a function that selects the modules to transform. |
 | `exclude` | None | A regular expression or a function that selects the modules not to transform. |
 | `runtime` | `async-browser-context/runtime` | The module that the transformed code imports. |
+| `names` | `true` | Set `false` to remove the names of the async functions for the callback hooks. The code is then smaller by 0.1 to 1.6 percent. |
 | `ssr` | `false` | Set `true` to also transform the modules of server-side rendering, for example for Vitest in Node.js. |
 
 ### Babel
@@ -96,6 +97,20 @@ The plugin transforms the modules of the application and of its dependencies, al
 2. Make sure that Babel transforms the dependencies too. With webpack, do not exclude `node_modules` from `babel-loader`.
 
 The preset operates with Babel 7.22 and later, and with Babel 8. CI examines Babel 7.22, the newest Babel 7 and the newest Babel 8 with the packed package (`pnpm test:babel`).
+
+### Other build tools
+
+A test in CI (`pnpm test:bundlers`) builds a page with each of these setups and examines it in Chromium. The [build tools guide](https://mark1russell7.github.io/AsyncBrowserContext/docs/guides/build-tools) gives each configuration.
+
+| Tool | Setup | Rules |
+| --- | --- | --- |
+| webpack 5, Rspack 2 | `babel-loader` with the preset. Do not exclude `node_modules`. | All |
+| Rollup 4 | `@rollup/plugin-babel` with the preset | All |
+| esbuild | A small plugin that applies the preset | All |
+| Next.js 16, Turbopack or webpack | `babel.config.js` with `next/babel` and the preset, and `transpilePackages` for the dependencies | All |
+| SWC, esbuild, Next.js without Babel | The target ES2016: the compiler changes async functions into generators | All except rule C5 |
+
+With the target ES2016, the patch of `then` keeps the context through `await`. A generator body then gets the context of each `next()` call, and the callback hooks get no names.
 
 ### Node.js
 
@@ -259,6 +274,8 @@ One read with `get()` takes approximately 4 ns. The [documentation website](http
 
 When the page loads, the library installs its patches in approximately 8 ms: the median of Chromium, Firefox and WebKit on the same computer.
 
+The runtime is 5.9 kB with gzip, and zone.js 0.16.3 is 13.3 kB. The transform adds 4 to 9 percent to packages with much async code, and nothing to React DOM. In an example application with React DOM, TanStack Query, supabase-js and ky, it adds 2.9 percent (`pnpm bench:size`).
+
 ## Tests
 
 | Command | Function |
@@ -268,8 +285,10 @@ When the page loads, the library installs its patches in approximately 8 ms: the
 | `pnpm test:browser` | The tests in Chromium, Firefox and WebKit |
 | `pnpm smoke` | Packs the package, installs it in a new Vite application, and examines the application in Chromium |
 | `pnpm test:babel` | Packs the package, transforms a program with the preset in Babel 7.22, the newest Babel 7 and Babel 8, and starts the output |
+| `pnpm test:bundlers` | Packs the package, builds a page with webpack, Rspack, Rollup, esbuild and Next.js, and examines each page in Chromium |
 | `pnpm mutation` | Mutation testing with Stryker |
 | `pnpm bench` | The benchmarks |
+| `pnpm bench:size` | The size of the runtime, and the size that the transform adds to a set of npm packages |
 | `pnpm lint:ste` | The STE linter of the documentation and the TSDoc comments |
 
 Set `BROWSERS=chromium,firefox,webkit` to select the browsers. Playwright WebKit does not start on all Windows computers, so the default on Windows is Chromium and Firefox. `docs/testing.md` tells more.

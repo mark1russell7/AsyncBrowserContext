@@ -32,12 +32,16 @@ Use `pnpm test:node` for the Node.js projects only, and `pnpm test:browser` for 
 | --- | --- | --- | --- |
 | `unit` | Browser runtime in Node.js | Yes | `src/**/*.test.ts` and `test/vitest/**/*.test.ts` |
 | `rules (browser runtime, Node.js)` | Browser runtime in Node.js | Yes | The shared files |
+| `rules (browser runtime, SWC ES2016)` | Browser runtime in Node.js | SWC with the target ES2016 in place of the preset | The shared files |
+| `rules (browser runtime, esbuild ES2016)` | Browser runtime in Node.js | esbuild with the target ES2016 in place of the preset | The shared files, without the probes |
 | `rules (node runtime)` | Node.js runtime | Yes | The shared files |
 | `rules (node runtime, no transform)` | Node.js runtime | No | The shared files |
 | `memory` | Browser runtime in Node.js, with `--expose-gc` | Yes | `test/memory/` |
 | `browser (chromium)`, `browser (firefox)`, `browser (webkit)` | Browser runtime | Yes | The shared files and `test/browser/` |
 
 The shared files are in `test/rules/`, `test/regression/`, `test/api/`, `test/interleave/` and `test/legacy/`. The library's own Vite plugin transforms the test files.
+
+The constant `__TEST_COMPILER__` tells a test file which compiler changed it. Only the preset binds generators to the context of their creation (rule C5), and gives the names of the async functions to the callback hooks. Thus the projects without the preset skip these tests. They start a test of the other behavior in place of the rule C5 tests: a generator body gets the context of each `next()` call. The esbuild project does not start the probes, because esbuild cannot change their top-level `for await` for the target ES2016.
 
 ## Test layers
 
@@ -54,6 +58,7 @@ The shared files are in `test/rules/`, `test/regression/`, `test/api/`, `test/in
 | Legacy | `test/legacy/` | The tests of the first test runner that were kept. `legacy-test-triage.md` gives the result for each test. |
 | Smoke | `test/smoke/run.ts` | `pnpm smoke` packs the package, installs it in a new Vite application, and examines the build and the dev server in Chromium. |
 | Babel versions | `test/babel/run.ts` | `pnpm test:babel` packs the package and installs it with Babel 7.22, the newest Babel 7 and Babel 8. Each version transforms `test/babel/program.js` with the preset, and the test starts the output on the browser runtime. The test also examines the names that the callback hooks get for the steps after an `await`. |
+| Build tools | `test/bundlers/run.ts` | `pnpm test:bundlers` packs the package and builds the checks of the smoke test with webpack, Rspack, Rollup, esbuild and Next.js. It opens each page in Chromium. The setups with the target ES2016 must keep all rules except rule C5. |
 | Mutation | `stryker.config.mjs` | `pnpm mutation` changes the source in small ways. The tests must find each change. |
 
 ## Rules for each test

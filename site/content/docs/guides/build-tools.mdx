@@ -1,0 +1,196 @@
+---
+title: Build tools
+description: Set up webpack, Rspack, Rollup, esbuild, Next.js or SWC. A test in CI builds and examines each setup.
+order: 37
+---
+
+A native `await` does not use a function that a library can patch. Thus, a compiler must change each async function into a generator. The [transform](/docs/concepts/transform) page tells how the runtime then keeps the context. There are two methods:
+
+| Method | Rules | Tools |
+| --- | --- | --- |
+| The Babel preset of the library | All rules | Vite, webpack, Rspack, Rollup, esbuild, Next.js, and each tool that can use Babel |
+| The target ES2016 of a compiler | All rules except rule C5. The callback hooks get no name for the steps after an `await`. | SWC, esbuild, TypeScript, and Next.js without Babel |
+
+Use the Babel preset if your build tool can use Babel. Use the target ES2016 if your build tool cannot use Babel, or if you do not want a Babel step.
+
+## The tested setups
+
+The command `pnpm test:bundlers` builds the same page with each setup, and opens the page in Chromium. The page examines the context after `await`, in a callback of a dependency in `node_modules`, in a generator and in an event of the browser. CI starts this test for each change.
+
+| Tool | Setup | Rules |
+| --- | --- | --- |
+| Vite 8 | The plugin `asyncContext()` | All rules (`pnpm smoke`) |
+| webpack 5 | `babel-loader` with the preset | All rules |
+| Rspack 2 | `babel-loader` with the preset | All rules |
+| Rspack 2 | `builtin:swc-loader` with the target ES2016 | All rules except rule C5 |
+| Rollup 4 | `@rollup/plugin-babel` with the preset | All rules |
+| esbuild 0.28 | A plugin that applies the preset | All rules |
+| esbuild 0.28 | The target `es2016` | All rules except rule C5 |
+| Next.js 16, Turbopack | A Babel configuration file | All rules |
+| Next.js 16, webpack | A Babel configuration file | All rules |
+| Next.js 16, Turbopack | A `browserslist` query with a browser without async functions | All rules except rule C5 |
+
+The configurations of the test are in `test/bundlers/fixture/build.mjs` and `test/bundlers/fixture/next/`.
+
+## Vite
+
+Add the plugin `asyncContext()` to `vite.config.ts`. The [get started](/docs/getting-started#configure-vite) page tells how.
+
+## webpack
+
+1. Install `babel-loader`.
+2. Add a rule for all JavaScript and TypeScript files, with the preset of the library.
+3. Do not exclude `node_modules`. Then the preset also transforms the dependencies.
+
+```js
+// webpack.config.js
+export default {
+    module : {
+        rules : [{
+            test : /\.[cm]?[jt]sx?$/,
+            use : { loader : "babel-loader", options : { presets : ["async-browser-context/babel-preset"] } },
+        }],
+    },
+};
+```
+
+If your configuration has other presets, put the preset of the library last.
+
+## Rspack
+
+Rspack can use `babel-loader`. Use the same rule as for webpack. With this rule, Rspack uses Babel for your code, and the build takes more time.
+
+Rspack can also compile with its own SWC loader. Set the target `es2016`. SWC then changes each async function into a generator:
+
+```js
+// rspack.config.js
+export default {
+    module : {
+        rules : [{
+            test : /\.[cm]?js$/,
+            loader : "builtin:swc-loader",
+            options : { jsc : { target : "es2016" } },
+            type : "javascript/auto",
+        }],
+    },
+};
+```
+
+For TypeScript, add the `parser` options of your project to `jsc`. The section [What the target ES2016 does not keep](#what-the-target-es2016-does-not-keep) tells the differences.
+
+## Rollup
+
+1. Install `@rollup/plugin-babel` and `@rollup/plugin-node-resolve`.
+2. Add the two plugins. The Babel plugin transforms all modules, also in `node_modules`.
+
+```js
+// rollup.config.js
+import { babel } from "@rollup/plugin-babel";
+import { nodeResolve } from "@rollup/plugin-node-resolve";
+
+export default {
+    input : "src/main.js",
+    output : { dir : "dist", format : "es" },
+    plugins : [
+        nodeResolve({ browser : true }),
+        babel({ babelHelpers : "bundled", presets : ["async-browser-context/babel-preset"] }),
+    ],
+};
+```
+
+## esbuild
+
+esbuild does not use Babel. A small plugin can apply the preset to each module before esbuild compiles it:
+
+```js
+// build.js
+import fs from "node:fs";
+import path from "node:path";
+import * as babel from "@babel/core";
+import * as esbuild from "esbuild";
+
+const asyncContext = {
+    name : "async-browser-context",
+    setup(build) {
+        build.onLoad({ filter : /\.[cm]?[jt]sx?$/ }, async (args) => {
+            const source = await fs.promises.readFile(args.path, "utf8");
+            if (!/\basync\b|\byield\b|function\s*\*/.test(source)) {
+                return undefined;
+            }
+            const typescript = /\.[cm]?tsx?$/.test(args.path);
+            const result = await babel.transformAsync(source, {
+                filename : args.path,
+                babelrc : false,
+                configFile : false,
+                sourceType : "unambiguous",
+                parserOpts : { plugins : typescript ? ["typescript", "jsx"] : ["jsx"] },
+                presets : ["async-browser-context/babel-preset"],
+            });
+            const loader = path.extname(args.path).slice(1).replace(/^[cm]/, "");
+            return { contents : result.code, loader };
+        });
+    },
+};
+
+await esbuild.build({ entryPoints : ["src/main.js"], bundle : true, format : "esm", outdir : "dist", plugins : [asyncContext] });
+```
+
+The plugin keeps the TypeScript and JSX syntax, and esbuild compiles it after the plugin.
+
+Without the plugin, set the target `es2016`. esbuild then changes each async function into a generator. With this target, esbuild does not accept a top-level `await`.
+
+## Next.js
+
+1. Add a Babel configuration file next to `package.json`, with the preset of Next.js and the preset of the library:
+
+   ```js
+   // babel.config.js
+   module.exports = {
+       presets : ["next/babel", "async-browser-context/babel-preset"],
+   };
+   ```
+
+2. Add the dependencies that start your callbacks after an `await` to `transpilePackages`:
+
+   ```js
+   // next.config.mjs
+   export default { transpilePackages : ["some-dependency"] };
+   ```
+
+With a Babel configuration file, Next.js uses Babel in place of SWC for your code, with Turbopack and with webpack. The build takes more time. Next.js does not apply the Babel configuration to the other packages in `node_modules`.
+
+The server code also gets the transform. On the server, the `node` export condition selects the Node.js entry of the library, which uses the native `AsyncLocalStorage`.
+
+Next.js can also keep SWC. Add a browser without async functions to the `browserslist` query of `package.json`, for example `"chrome 54"`. SWC then changes each async function into a generator. Turbopack applies the query also to `node_modules`. The webpack mode of Next.js does not, so it needs `transpilePackages`. The query also changes all newer syntax, so the bundles get larger.
+
+## SWC
+
+SWC cannot use Babel presets, and the library has no SWC plugin. Set the target `es2016` in `.swcrc`:
+
+```json
+{
+    "jsc": { "target": "es2016" }
+}
+```
+
+Apply SWC also to the dependencies in `node_modules`.
+
+## Other tools
+
+A tool that reads a Babel configuration file can use the preset, for example Parcel. CI does not examine these tools. Use the checks of the test (`test/smoke/fixture/checks.js`) to examine your setup.
+
+## The dependencies
+
+A dependency with native async functions continues after its own `await` without the context. A callback that the dependency starts after that `await` gets the root context (rule C7). It does not get the context of a different operation. Each setup on this page also transforms `node_modules`, except Next.js, which needs `transpilePackages`.
+
+A dependency that its authors compiled to generators before the publish needs nothing. Examples are the `__awaiter` helper of TypeScript and `_asyncToGenerator` of Babel. The helpers continue in `then` callbacks, and the patch of `then` keeps the context.
+
+## What the target ES2016 does not keep
+
+The target ES2016 changes each async function into a generator with `then` callbacks. The patch of `then` gives each callback the context of the step that started it. The command `pnpm test:node` starts all rule tests with SWC and with esbuild in place of the preset. All tests pass, except these:
+
+- **Rule C5.** A generator body gets the context of each `next()` call, as with `AsyncLocalStorage` of Node.js. With the preset, a generator body gets the context of the call that made the generator.
+- **The names of the callback hooks.** The hooks get each step after an `await` as a `then` callback of the helper of the compiler. The source is `"Promise.then"`, and the function is the helper.
+- **The size.** The target also changes the syntax that is newer than ES2016, for example `?.` and object spread. The [size](/testing/performance#size) table shows the cost.
+
+The esbuild project does not start the probes, because esbuild cannot change their top-level `for await` for the target ES2016.

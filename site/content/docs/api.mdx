@@ -163,6 +163,7 @@ function asyncContext(options? : {
     include? : RegExp | ((id : string) => boolean);
     exclude? : RegExp | ((id : string) => boolean);
     runtime? : string;
+    names? : boolean;
     ssr? : boolean;
 }) : Plugin;
 ```
@@ -174,6 +175,7 @@ The plugin applies the Babel preset to each JavaScript and TypeScript module. It
 | `include` | All modules, also in `node_modules` | The modules to transform. |
 | `exclude` | No module | The modules not to transform. |
 | `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. |
+| `names` | `true` | Give the name of each async function to the callback hooks. The option of the preset tells more. |
 | `ssr` | `false` | Also transform the modules of server-side rendering. On Node.js, the native `AsyncLocalStorage` keeps the context, so the default is `false`. Set it to `true` for tests in the Node.js environment of Vitest. |
 
 The plugin does not change a module that has no async function, no generator and no `for await` loop. It does not transform the runtime of the library.
@@ -187,10 +189,13 @@ presets : [["async-browser-context/babel-preset", { runtime : "async-browser-con
 | Option | Default | What it does |
 | --- | --- | --- |
 | `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. |
+| `names` | `true` | Give the name of each async function to `coroutine`, for the callback hooks. With `false`, the code is smaller, and the hooks get no name for the steps after an `await`. |
 
 The preset operates with Babel 7.22 and later and with Babel 8. Put it last in the `presets` list.
 
-The preset gives the name of each async function to `coroutine`, for example `_coroutine(function* () {...}, "load")`. The callback hooks show this name for the steps after an `await`.
+The preset gives the name of each async function to `coroutine`, for example `_coroutine(function* () {...}, "load")`. The callback hooks show this name for the steps after an `await`. A minifier does not change this name, because it is a string. The names add 0.1 to 1.6 percent to the gzip size of code with async functions ([size](/testing/performance#size)).
+
+The [build tools](/docs/guides/build-tools) guide shows the preset in webpack, Rspack, Rollup, esbuild and Next.js.
 
 ## The runtime
 
