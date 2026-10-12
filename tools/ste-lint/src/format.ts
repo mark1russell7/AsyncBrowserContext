@@ -1,4 +1,4 @@
-import { RULE_IDS, type Finding, type RuleId } from "./types.js";
+import { DIRECTIVE_ID, RULE_IDS, type Finding, type FindingId } from "./types.js";
 
 export type RuleCount = {
     readonly errors : number;
@@ -11,14 +11,14 @@ export type Summary = {
     readonly filesWithFindings : number;
     readonly errors : number;
     readonly warnings : number;
-    /** The counts of each rule that has findings, in the order of the rule list. */
-    readonly byRule : Readonly<Partial<Record<RuleId, RuleCount>>>;
+    /** The counts of each rule that has findings, in the order of the rule list. The directive findings come last. */
+    readonly byRule : Readonly<Partial<Record<FindingId, RuleCount>>>;
 };
 
 /** This function counts the findings, by severity and by rule. */
 export function summarize(findings : readonly Finding[], files : number) : Summary {
-    const byRule : Partial<Record<RuleId, { errors : number; warnings : number }>> = {};
-    for (const id of RULE_IDS) {
+    const byRule : Partial<Record<FindingId, { errors : number; warnings : number }>> = {};
+    for (const id of [...RULE_IDS, DIRECTIVE_ID] as const) {
         const own = findings.filter((finding) => finding.ruleId === id);
         if (own.length === 0) continue;
         byRule[id] = {
@@ -63,7 +63,7 @@ export function formatText(findings : readonly Finding[], summary : Summary) : s
     lines.push(`${plural(total, "problem")} (${plural(summary.errors, "error")}, ${plural(summary.warnings, "warning")}) in ${plural(summary.filesWithFindings, "file")} of ${summary.files}.`);
     lines.push("");
     lines.push("Findings by rule:");
-    const entries = Object.entries(summary.byRule) as Array<[RuleId, RuleCount]>;
+    const entries = Object.entries(summary.byRule) as Array<[FindingId, RuleCount]>;
     const width = Math.max(...entries.map(([id]) => id.length));
     for (const [id, count] of entries) {
         const parts = [count.errors > 0 ? plural(count.errors, "error") : null, count.warnings > 0 ? plural(count.warnings, "warning") : null].filter((part) => part !== null);

@@ -39,6 +39,11 @@ describe("extractJsxText", () => {
         expect(blocksOf("const a = <p>   </p>;")).toEqual([]);
     });
 
+    it("starts a block at its first line with text", () => {
+        const source = "const a = (\n    <p>\n        {/* note */}\n        The text.\n    </p>\n);";
+        expect(blocksOf(source)).toEqual([{ kind : "paragraph", text : "        The text.", offset : source.indexOf("        The text.") }]);
+    });
+
     it("keeps the text of inline elements in the paragraph", () => {
         const source = "const a = <p>Read the <Link to=\"/docs\">documentation</Link> first.</p>;";
         expect(blocksOf(source).map(b => b.text)).toEqual(["Read the |documentation| first."]);

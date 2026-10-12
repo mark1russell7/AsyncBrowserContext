@@ -101,6 +101,54 @@ describe("Linter", () => {
         expect(lintText(source, "a.ts", config()).map((finding) => [finding.line, finding.ruleId])).toEqual([[4, "modal-verb"]]);
     });
 
+    it("cancels an ste-disable-next in TypeScript when code comes before the next doc comment", () => {
+        const source = "// ste-disable-next\nexport const a = 1;\n/** You should stop. */\nexport const b = 2;\n";
+        expect(lintText(source, "a.ts", config()).map((finding) => [finding.line, finding.ruleId])).toEqual([[3, "modal-verb"]]);
+    });
+
+    it("applies an ste-disable-next in a doc comment to the next block of that doc comment", () => {
+        const source = "/**\n * <!-- ste-disable-next modal-verb -->\n * You should stop.\n *\n * You may stop.\n */\nexport const a = 1;\n/** You should stop. */\nexport const b = 2;\n";
+        expect(lintText(source, "a.ts", config()).map((finding) => [finding.line, finding.ruleId])).toEqual([[5, "modal-verb"], [8, "modal-verb"]]);
+    });
+
+    it("applies an ste-disable-next in JSX to the next JSX text, and not to a later doc comment", () => {
+        const source = [
+            "export const Page = () => (",
+            "    <div>",
+            "        {/* ste-disable-next modal-verb */}",
+            "        <p>You should stop.</p>",
+            "        <p>You may stop.</p>",
+            "    </div>",
+            ");",
+            "/** You should stop. */",
+            "export const b = 2;",
+        ].join("\n");
+        expect(lintText(source, "Page.tsx", config()).map((finding) => [finding.line, finding.ruleId])).toEqual([[5, "modal-verb"], [8, "modal-verb"]]);
+        const inline = "export const A = () => (\n    <p>\n        {/* ste-disable-next */}\n        You should stop.\n    </p>\n);\n/** You may stop. */\nexport const b = 2;\n";
+        expect(lintText(inline, "A.tsx", config()).map((finding) => [finding.line, finding.ruleId])).toEqual([[7, "modal-verb"]]);
+    });
+
+    it("applies an ste-disable-next before a table to all of its cells", () => {
+        const markdown = "<!-- ste-disable-next modal-verb -->\n| Rule | Use |\n| --- | --- |\n| should | You should stop. |\n| may | You may stop. |\n\nYou should stop.";
+        expect(lintText(markdown, "doc.md", config()).map((finding) => [finding.line, finding.ruleId])).toEqual([[7, "modal-verb"]]);
+    });
+
+    it("gives an error with the ID directive for a rule ID that is not known", () => {
+        const findings = lintText("<!-- ste-disable modal-verbs -->\nYou should stop.", "doc.md", config({ rules : { "modal-verb" : "off" } }));
+        expect(findings.map((finding) => [finding.line, finding.column, finding.ruleId, finding.severity])).toEqual([[1, 1, "directive", "error"]]);
+        expect(findings[0]!.message).toContain("\"modal-verbs\"");
+        expect(summarize(findings, 1).byRule).toEqual({ directive : { errors : 1, warnings : 0 } });
+        expect(lintText("// ste-disable-next semicolon, nope\n/** Text. */\nexport const a = 1;", "a.ts", config()).map((finding) => finding.ruleId)).toEqual(["directive"]);
+    });
+
+    it("divides sentences before a lower-case name of the glossary", () => {
+        const linter = new Linter(config({ properNouns : ["npm", "zone.js"] }));
+        const text = "Then it publishes the package. npm shows the statement. The manager keeps the context with zone.js. zone.js patches the APIs.";
+        expect(linter.units(text, "doc.md")[0]!.sentences).toHaveLength(4);
+        // Without the glossary, only the code-like word "zone.js" starts a sentence.
+        expect(new Linter(config()).units(text, "doc.md")[0]!.sentences).toHaveLength(3);
+    });
+
     it("keeps an ste-enable for one rule from stopping a range for all rules", () => {
         const markdown = "<!-- ste-disable semicolon modal-verb -->\nYou should; stop.\n<!-- ste-enable semicolon -->\nYou should; stop.\n\n<!-- ste-disable -->\n<!-- ste-enable semicolon -->\nYou should; stop.";
         expect(lintText(markdown, "doc.md", config()).map((finding) => [finding.line, finding.ruleId])).toEqual([[4, "semicolon"]]);

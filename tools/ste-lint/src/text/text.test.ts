@@ -90,6 +90,33 @@ describe("splitSentences", () => {
     it("ignores a sentence without words", () => {
         expect(sentences("Text. ...")).toEqual(["Text . ..."]);
     });
+
+    it("divides before a lower-case name of the glossary and before a word that looks like code", () => {
+        const all = tokens("It publishes the package. npm shows it. Use zone.js. zone.js patches it. Open it. package.json has it. Stop. then go.");
+        const texts = (ranges : readonly { from : number; to : number }[]) : string[] => ranges.map((range) => all.slice(range.from, range.to).map((token) => token.text).join(" "));
+        expect(texts(splitSentences(all, { lowercaseNames : new Set(["npm", "zone.js"]) }))).toEqual([
+            "It publishes the package .",
+            "npm shows it .",
+            "Use zone.js .",
+            "zone.js patches it .",
+            "Open it .",
+            "package.json has it .",
+            "Stop . then go .",
+        ]);
+        // Without the names, "npm" stays in the sentence before it.
+        expect(texts(splitSentences(all))[0]).toBe("It publishes the package . npm shows it .");
+    });
+
+    it("reads a single capital letter as an initial only when a name comes after it", () => {
+        expect(sentences("Use option A. The other option is slow. Plan B. It is fast. Ask J. Smith.")).toEqual([
+            "Use option A .",
+            "The other option is slow .",
+            "Plan B .",
+            "It is fast .",
+            "Ask J . Smith .",
+        ]);
+        expect(sentences("Select option B. Use the flag.")).toHaveLength(2);
+    });
 });
 
 describe("countWords", () => {

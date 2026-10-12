@@ -12,6 +12,7 @@
  * stops, and if the block is a heading, a table cell or text in a list item.
  */
 
+import { expressionEnd, tagEnd } from "./expression.js";
 import { indentWidth, isBlank, sliceLine, stripIndent, type Line } from "./lines.js";
 
 export type ListContext = {
@@ -30,6 +31,11 @@ export type ProseBlock = {
     readonly headingDepth : number;
     /** True for the cells of a table header row. */
     readonly tableHeader : boolean;
+    /**
+     * The file range that an `ste-disable-next` before the block stops. For a
+     * table cell, it is the whole table. Without it, the range of the block.
+     */
+    readonly suppressionRange? : { readonly start : number; readonly end : number };
 };
 
 export type DirectiveCommand = "disable" | "enable" | "disable-next";
@@ -379,6 +385,8 @@ function parseTagLine(lines : readonly Line[], start : number, body : Line, inPa
 
     if (options.mdx) {
         const end = findTagEnd(lines, start, body.offset - lines[start]!.offset);
+        // A tag that does not close hides only its own line.
+        if (end === null) return { index : start + 1, rest : null };
         const endLine = lines[end.line]!;
         const rest = sliceLine(endLine, end.column);
         // A line with only a tag is a JSX block, also after paragraph text. A tag with text after it in a paragraph is inline JSX.
@@ -399,63 +407,67 @@ function parseTagLine(lines : readonly Line[], start : number, body : Line, inPa
     return null;
 }
 
-type TagEnd = { readonly line : number; readonly column : number };
+type Position = { readonly line : number; readonly column : number };
 
-/** This function finds the `>` that closes a JSX tag. JSX can continue on the lines after the tag start. */
-function findTagEnd(lines : readonly Line[], startLine : number, startColumn : number) : TagEnd {
-    let quote : string | null = null;
-    let depth = 0;
-    for (let l = startLine; l < lines.length; l++) {
-        const text = lines[l]!.text;
-        for (let c = l === startLine ? startColumn + 1 : 0; c < text.length; c++) {
-            const char = text[c]!;
-            if (quote !== null) {
-                if (char === quote) quote = null;
-            } else if (char === "\"" || char === "'" || char === "`") {
-                quote = char;
-            } else if (char === "{") {
-                depth++;
-            } else if (char === "}") {
-                depth = Math.max(0, depth - 1);
-            } else if (char === ">" && depth === 0) {
-                return { line : l, column : c + 1 };
-            }
+/** The lines of a block parser level as one text, with the index of the start of each line in the text. */
+type JoinedLines = { readonly text : string; readonly starts : readonly number[] };
+
+const joinedCache = new WeakMap<readonly Line[], JoinedLines>();
+
+function joinLines(lines : readonly Line[]) : JoinedLines {
+    let joined = joinedCache.get(lines);
+    if (joined === undefined) {
+        const starts : number[] = [];
+        let length = 0;
+        for (const line of lines) {
+            starts.push(length);
+            length += line.text.length + 1;
         }
+        joined = { text : lines.map((line) => line.text).join("\n"), starts };
+        joinedCache.set(lines, joined);
     }
-    return { line : lines.length - 1, column : lines[lines.length - 1]!.text.length };
+    return joined;
 }
 
-/** This function skips an MDX `{...}` expression, and keeps a directive comment in it. */
-function parseExpressionBlock(lines : readonly Line[], start : number, body : Line, out : Block[]) : number {
-    let depth = 0;
-    let quote : string | null = null;
-    let collected = "";
-    for (let l = start; l < lines.length; l++) {
-        const text = l === start ? body.text : lines[l]!.text;
-        for (let c = 0; c < text.length; c++) {
-            const char = text[c]!;
-            collected += char;
-            if (quote !== null) {
-                if (char === quote) quote = null;
-            } else if (char === "\"" || char === "'" || char === "`") {
-                quote = char;
-            } else if (char === "{") {
-                depth++;
-            } else if (char === "}") {
-                depth--;
-                if (depth === 0) {
-                    const comment = /^\{\s*\/\*([\s\S]*)\*\/\s*\}$/.exec(collected);
-                    if (comment) {
-                        const directive = parseDirective(comment[1]!, body.offset);
-                        if (directive !== null) out.push(directive);
-                    }
-                    return l + 1;
-                }
-            }
-        }
-        collected += "\n";
+/** The line and the column of an index in the joined text. */
+function positionOf(joined : JoinedLines, index : number) : Position {
+    let low = 0;
+    let high = joined.starts.length - 1;
+    while (low < high) {
+        const middle = (low + high + 1) >> 1;
+        if (joined.starts[middle]! <= index) low = middle;
+        else high = middle - 1;
     }
-    return lines.length;
+    return { line : low, column : index - joined.starts[low]! };
+}
+
+/**
+ * This function finds the `>` that closes a JSX tag. JSX can continue on the
+ * lines after the tag start. The result is the position after the `>`, or
+ * null when the tag does not close.
+ */
+function findTagEnd(lines : readonly Line[], startLine : number, startColumn : number) : Position | null {
+    const joined = joinLines(lines);
+    const end = tagEnd(joined.text, joined.starts[startLine]! + startColumn);
+    return end === -1 ? null : positionOf(joined, end);
+}
+
+/**
+ * This function skips an MDX `{...}` expression, and keeps a directive
+ * comment in it. When the expression does not close, the function skips
+ * only the first line.
+ */
+function parseExpressionBlock(lines : readonly Line[], start : number, body : Line, out : Block[]) : number {
+    const joined = joinLines(lines);
+    const open = joined.starts[start]! + (body.offset - lines[start]!.offset);
+    const close = expressionEnd(joined.text, open);
+    if (close === -1) return start + 1;
+    const comment = /^\{\s*\/\*([\s\S]*)\*\/\s*\}$/.exec(joined.text.slice(open, close + 1));
+    if (comment) {
+        const directive = parseDirective(comment[1]!, body.offset);
+        if (directive !== null) out.push(directive);
+    }
+    return positionOf(joined, close).line + 1;
 }
 
 /** True for a GFM table delimiter row, for example `| --- | :-: |`. */
@@ -500,10 +512,10 @@ export function splitCells(row : Line) : Line[] {
     return cells;
 }
 
-/** The index of the next run of exactly `length` backticks at or after `from`, or -1. */
-export function findBacktickRun(text : string, from : number, length : number) : number {
+/** The index of the next run of exactly `length` backticks at or after `from` and before `to`, or -1. */
+export function findBacktickRun(text : string, from : number, length : number, to : number = text.length) : number {
     let i = from;
-    while (i < text.length) {
+    while (i < to) {
         if (text[i] === "`") {
             let run = 1;
             while (text[i + run] === "`") run++;
@@ -516,19 +528,26 @@ export function findBacktickRun(text : string, from : number, length : number) :
     return -1;
 }
 
+/**
+ * This function gives each cell of a table as a block. An `ste-disable-next`
+ * before the table stops the findings in all of its cells, because a comment
+ * cannot come between the rows of a table.
+ */
 function parseTable(lines : readonly Line[], start : number, context : Context, out : Block[]) : number {
-    const emitRow = (line : Line, header : boolean) : void => {
-        for (const cell of splitCells(stripIndent(line, 3))) {
-            if (cell.text.length > 0) out.push(proseBlock("table-cell", [cell], context, 0, header));
-        }
-    };
-    emitRow(lines[start]!, true);
-    let i = start + 2;
-    while (i < lines.length) {
-        const line = lines[i]!;
+    let end = start + 2;
+    while (end < lines.length) {
+        const line = lines[end]!;
         if (isBlank(line.text) || !line.text.includes("|") || startsBlock(stripIndent(line, 3).text)) break;
-        emitRow(line, false);
-        i++;
+        end++;
     }
-    return i;
+    const first = stripIndent(lines[start]!, 3);
+    const last = lines[end - 1]!;
+    const suppressionRange = { start : first.offset, end : last.offset + last.text.length };
+    for (let i = start; i < end; i++) {
+        if (i === start + 1) continue;
+        for (const cell of splitCells(stripIndent(lines[i]!, 3))) {
+            if (cell.text.length > 0) out.push({ ...proseBlock("table-cell", [cell], context, 0, i === start), suppressionRange });
+        }
+    }
+    return end;
 }

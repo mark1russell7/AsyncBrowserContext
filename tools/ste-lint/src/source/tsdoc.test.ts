@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectComments, docCommentLines, extractTsdoc, splitSections } from "./tsdoc.js";
+import { collectComments, docCommentLines, extractTsdoc, scanSource, splitSections } from "./tsdoc.js";
 
 describe("collectComments", () => {
     it("finds line, block and doc comments, but not comment syntax in strings, templates or regular expressions", () => {
@@ -29,6 +29,13 @@ describe("collectComments", () => {
     it("parses TSX, and does not read JSX text as a comment", () => {
         const source = "/** Doc. */\nexport const A = () => <div>/** text */</div>;\n";
         expect(collectComments(source, "a.tsx").map((comment) => source.slice(comment.pos, comment.end))).toEqual(["/** Doc. */"]);
+    });
+
+    it("gives the code tokens, but not the tokens of JSX markup", () => {
+        const source = "const a = <p title=\"x\">{/* c */}Text {f(x)}</p>;";
+        const tokens = scanSource(source, "a.tsx").codeTokens.map((offset) => source.slice(offset).match(/^(?:\w+|\S)/)![0]);
+        expect(tokens).toEqual(["const", "a", "=", "f", "(", "x", ")", ";"]);
+        expect(scanSource("// only a comment\n", "a.ts").codeTokens).toEqual([]);
     });
 
     it("parses JavaScript files", () => {
@@ -128,6 +135,19 @@ describe("extractTsdoc", () => {
             "/** A; b. */",
             "/* ste-disable */\n/** C; d. */\n",
         ]);
+    });
+
+    it("cancels an ste-disable-next at the next code token", () => {
+        const source = "// ste-disable-next\nconst a = 1;\n/** A; b. */\nexport const b = a;";
+        expect(extractTsdoc(source, "a.ts").suppressions).toEqual([]);
+    });
+
+    it("applies an ste-disable-next to the next text block after JSX markup", () => {
+        const source = "const a = (\n    <div>\n        {/* ste-disable-next semicolon */}\n        <p>A; b.</p>\n    </div>\n);";
+        const block = { kind : "paragraph" as const, lines : [{ text : "A; b.", offset : source.indexOf("A; b.") }], list : null, quote : false, headingDepth : 0, tableHeader : false };
+        const { suppressions, blocks } = extractTsdoc(source, "a.tsx", [{ block, origin : { source : "jsx", tsdocSection : null, tsdocTag : null } }]);
+        expect(suppressions.map((range) => source.slice(range.start, range.end))).toEqual(["A; b."]);
+        expect(blocks).toHaveLength(1);
     });
 
     it("reads a directive inside a doc comment", () => {

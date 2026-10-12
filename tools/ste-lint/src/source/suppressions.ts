@@ -1,3 +1,4 @@
+import { isRuleId } from "../types.js";
 import type { Directive } from "./blocks.js";
 
 /** A range of the file in which some rules (or all rules) do not report findings. */
@@ -8,6 +9,13 @@ export type Suppression = {
     readonly rules : ReadonlySet<string> | null;
 };
 
+/** A problem in a directive comment, for example a rule ID that is not known. */
+export type DirectiveProblem = {
+    /** The file offset of the directive. */
+    readonly offset : number;
+    readonly message : string;
+};
+
 type OpenRange = { start : number; rules : Set<string> | null };
 
 /**
@@ -16,17 +24,24 @@ type OpenRange = { start : number; rules : Set<string> | null };
  * - `ste-disable [rules]` starts a range. `ste-enable [rules]` stops it.
  *   Without an `ste-enable`, the range continues to the end of the file.
  * - `ste-disable-next [rules]` applies to the next block only: the next
- *   paragraph, heading, list item or table row in Markdown, or the next doc
- *   comment in TypeScript.
+ *   paragraph, heading, list item or table in Markdown, or the next doc
+ *   comment or JSX text in TypeScript. In TypeScript, code before the next
+ *   block cancels the directive.
  *
- * Without rule IDs, a directive applies to all rules.
+ * Without rule IDs, a directive applies to all rules. The collector records
+ * a problem for each rule ID that is not known.
  */
 export class SuppressionCollector {
     private readonly ranges : Suppression[] = [];
     private readonly open : OpenRange[] = [];
     private pending : Set<string> | null | undefined = undefined;
+    /** The problems in the directives. */
+    readonly problems : DirectiveProblem[] = [];
 
     directive(directive : Directive) : void {
+        for (const rule of directive.rules) {
+            if (!isRuleId(rule)) this.problems.push({ offset : directive.offset, message : `The directive "ste-${directive.command}" has the rule ID "${rule}", which is not a known rule.` });
+        }
         const rules = directive.rules.length === 0 ? null : new Set(directive.rules);
         if (directive.command === "disable-next") {
             this.pending = rules;
@@ -35,6 +50,11 @@ export class SuppressionCollector {
         } else {
             this.enable(directive.offset, rules);
         }
+    }
+
+    /** This method cancels a pending `ste-disable-next`. The extractor starts it for code that is not a block. */
+    cancelPending() : void {
+        this.pending = undefined;
     }
 
     /**

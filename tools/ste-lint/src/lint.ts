@@ -13,7 +13,7 @@ import { extractMarkdown, type Extraction } from "./source/markdown.js";
 import { isSuppressed } from "./source/suppressions.js";
 import { extractTsdoc } from "./source/tsdoc.js";
 import { extractJsxText } from "./source/jsx.js";
-import type { Finding, RuleId, Severity } from "./types.js";
+import { DIRECTIVE_ID, type Finding, type FindingId, type Severity } from "./types.js";
 import { buildUnit, type ProseUnit } from "./units.js";
 
 export type FileKind = "markdown" | "mdx" | "typescript";
@@ -53,7 +53,7 @@ export class Linter {
     lintText(text : string, path : string) : Finding[] {
         const extraction = extract(text, path);
         const lineIndex = new LineIndex(text);
-        type Raw = { ruleId : RuleId; severity : Severity; start : number; end : number; message : string };
+        type Raw = { ruleId : FindingId; severity : Severity; start : number; end : number; message : string };
         const raw : Raw[] = [];
         for (const block of extraction.blocks) {
             const unit = buildUnit(block, this.lexicon);
@@ -79,10 +79,16 @@ export class Linter {
         }
         // An unknown word that another rule reports already gets no second finding.
         const others = raw.filter((finding) => finding.ruleId !== "unknown-word");
-        const kept = raw.filter((finding) => finding.ruleId !== "unknown-word"
+        const kept : Raw[] = raw.filter((finding) => finding.ruleId !== "unknown-word"
             || !others.some((other) => other.start < finding.end && finding.start < other.end));
-        return kept
-            .filter((finding) => !isSuppressed(extraction.suppressions, finding.ruleId, finding.start))
+        const directives : Raw[] = extraction.problems.map((problem) => ({
+            ruleId : DIRECTIVE_ID,
+            severity : "error",
+            start : problem.offset,
+            end : problem.offset,
+            message : problem.message,
+        }));
+        return [...kept.filter((finding) => !isSuppressed(extraction.suppressions, finding.ruleId, finding.start)), ...directives]
             .sort((a, b) => a.start - b.start || a.end - b.end || a.ruleId.localeCompare(b.ruleId))
             .map((finding) => {
                 const start = lineIndex.position(finding.start);
@@ -109,12 +115,11 @@ export class Linter {
 function extract(text : string, path : string) : Extraction {
     const kind = fileKind(path);
     if (kind === "typescript") {
-        const comments = extractTsdoc(text, path);
-        if (!/\.[jt]sx$/i.test(path)) return comments;
-        // The text that the user interface shows
-        return { blocks : [...comments.blocks, ...extractJsxText(text, path).blocks], suppressions : comments.suppressions };
+        // In a TSX or JSX file, also the text that the user interface shows
+        const jsx = /\.[jt]sx$/i.test(path) ? extractJsxText(text, path).blocks : [];
+        return extractTsdoc(text, path, jsx);
     }
-    if (kind === null) return { blocks : [], suppressions : [] };
+    if (kind === null) return { blocks : [], suppressions : [], problems : [] };
     return extractMarkdown(text, { mdx : kind === "mdx" });
 }
 

@@ -74,6 +74,23 @@ describe("normalizeInline", () => {
         expect(clean("Open {brace", { mdx : true, tsdoc : false })).toBe("Open {brace");
     });
 
+    it("does not read a quote in an MDX comment or in JSX text as a string", () => {
+        const mdx = { mdx : true, tsdoc : false };
+        expect(clean("Text {/* the table's cells */} and {show && <b>Don't</b>} more 'quoted' text.", mdx))
+            .toBe("Text  and [expr:show && <b>Don't</b>] more [quote:quoted] text.");
+        expect(clean("A {x ? '}' : \"{\"} b.", mdx)).toBe("A [expr:x ? '}' : \"{\"] b.");
+        expect(clean("See <Ref to={/* it's */ \"a\"}>the page</Ref>.", mdx)).toBe("See the page.");
+    });
+
+    it("needs a linear time for many brackets and tags without a partner", () => {
+        // With a scan to the end of the block for each "[", these blocks took more than 25 s.
+        const start = performance.now();
+        expect(clean(`${"[".repeat(120_000)} and the text.`).endsWith(" and the text.")).toBe(true);
+        expect(clean(`${"[a](".repeat(40_000)}x`).endsWith("x")).toBe(true);
+        expect(clean(`${"<code>".repeat(40_000)}x`).endsWith("x")).toBe(true);
+        expect(performance.now() - start).toBeLessThan(5_000);
+    });
+
     it("keeps the file offset of each character", () => {
         const lines = splitLines("ab\n`c` d", 100);
         const inline = normalizeInline(lines, markdown);

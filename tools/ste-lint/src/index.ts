@@ -1,8 +1,8 @@
 /**
- * `@lag/ste-lint`: a linter for prose in Markdown, MDX and TypeScript doc
- * comments. It is an automated approximation of the writing rules of
- * ASD-STE100 Simplified Technical English. It does not certify that a text
- * obeys the standard.
+ * `@async-browser-context/ste-lint`: a linter for prose in Markdown, MDX,
+ * TypeScript doc comments and JSX text. It is an automated approximation of
+ * the writing rules of ASD-STE100 Simplified Technical English. It does not
+ * certify that a text obeys the standard.
  */
 
 export {
@@ -30,5 +30,5 @@ export { buildLexicon, type Lexicon } from "./lexicon.js";
 export { fileKind, Linter, lintText, type FileKind } from "./lint.js";
 export { getRule, RULES, type Rule } from "./rules/index.js";
 export { parseArgs, runCli, USAGE, type CliIo, type CliOptions } from "./run-cli.js";
-export { isRuleId, RULE_IDS, type Finding, type RuleId, type RuleSetting, type Severity } from "./types.js";
+export { DIRECTIVE_ID, isRuleId, RULE_IDS, type Finding, type FindingId, type RuleId, type RuleSetting, type Severity } from "./types.js";
 export { DEFAULT_WORD_LIST, type WordListEntry } from "./word-list.js";

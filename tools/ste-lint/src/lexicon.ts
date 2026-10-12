@@ -17,6 +17,8 @@ export type Lexicon = {
     readonly technicalVerbs : ReadonlySet<string>;
     /** Single-word proper nouns, in lower case. */
     readonly properNouns : ReadonlySet<string>;
+    /** Single-word proper nouns that start with a lower-case letter, as the glossary writes them, for example "npm". */
+    readonly lowercaseNames : ReadonlySet<string>;
     readonly allowedWords : ReadonlySet<string>;
     /** All glossary terms, single words and phrases, for the unknown-word rule. */
     readonly glossaryPhrases : PhraseMatcher;
@@ -69,10 +71,13 @@ export function buildLexicon(config : ResolvedConfig, dictionary : Dictionary | 
     for (const noun of COMMON_NOUNS) if (!verbSet.has(noun)) nounSet.add(noun);
     for (const noun of [...nouns.single, ...proper.single, ...(dictionary?.nouns ?? [])]) nounSet.add(noun);
 
+    const lowercaseNames = new Set(config.properNouns.map((name) => name.trim()).filter((name) => /^\p{Ll}\S*$/u.test(name)));
+
     return {
         technicalNouns : nouns.single,
         technicalVerbs : verbs.single,
         properNouns : proper.single,
+        lowercaseNames,
         allowedWords : allowed.single,
         glossaryPhrases,
         technicalNounPhrases,

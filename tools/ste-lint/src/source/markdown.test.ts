@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isDelimiterRow, parseBlocks, parseDirective, splitCells, type Block, type ProseBlock } from "./blocks.js";
 import { splitLines } from "./lines.js";
-import { extractMarkdown, stripFrontMatter } from "./markdown.js";
+import { extractMarkdown, stripBom, stripFrontMatter } from "./markdown.js";
 
 const prose = (blocks : readonly Block[]) : ProseBlock[] => blocks.filter((block) : block is ProseBlock => block.kind !== "directive");
 
@@ -125,6 +125,18 @@ describe("Markdown block extraction", () => {
         const lines = splitLines("---\nno end");
         expect(stripFrontMatter(lines)).toBe(lines);
     });
+
+    it("removes front matter after a byte order mark, and keeps the offsets", () => {
+        const markdown = "﻿---\ntitle: x\n---\nBody.";
+        const blocks = extractMarkdown(markdown, { mdx : false }).blocks;
+        expect(blocks.map((entry) => entry.block.lines[0]!.text)).toEqual(["Body."]);
+        expect(blocks[0]!.block.lines[0]!.offset).toBe(markdown.indexOf("Body."));
+        expect(stripBom(splitLines("﻿Text"))[0]).toEqual({ text : "Text", offset : 1 });
+    });
+
+    it("reads a --- line with a blank line after it as a thematic break, not as front matter", () => {
+        expect(outline("---\n\nFirst text.\n\n---\n\nSecond text.")).toEqual(["paragraph: First text.", "paragraph: Second text."]);
+    });
 });
 
 describe("MDX", () => {
@@ -155,12 +167,44 @@ describe("MDX", () => {
         ]);
     });
 
-    it("keeps an expression block that does not close as code to the end", () => {
+    it("skips only the first line of an expression block that does not close", () => {
         expect(outline("Text.\n\n{open(", true)).toEqual(["paragraph: Text."]);
+        expect(outline("{open(\nThe text after it.", true)).toEqual(["paragraph: The text after it."]);
     });
 
-    it("finds a tag end at the end of the file when the tag does not close", () => {
-        expect(outline("<Open\n  attr", true)).toEqual([]);
+    it("skips only the first line of a tag that does not close", () => {
+        expect(outline("<Open\n  attr", true)).toEqual(["paragraph: attr"]);
+    });
+
+    it("does not read a quote in a comment or in JSX text of an expression as a string", () => {
+        const mdx = [
+            "{/* ste-disable-next sentence-length -- the table's cells */}",
+            "",
+            "First text.",
+            "",
+            "{show && <p>Don't stop</p>}",
+            "",
+            "Second text.",
+            "",
+            "{`a ${b ? \"}\" : '{'} c`}",
+            "",
+            "{items.map((item) => (",
+            "  <li key={item}>It's {item}</li>",
+            "))}",
+            "",
+            "Third text.",
+        ].join("\n");
+        expect(outline(mdx, true)).toEqual(["paragraph: First text.", "paragraph: Second text.", "paragraph: Third text."]);
+        const directives = parseBlocks(splitLines(mdx), { mdx : true }).filter((block) => block.kind === "directive");
+        expect(directives).toEqual([{ kind : "directive", command : "disable-next", rules : ["sentence-length"], offset : 0 }]);
+    });
+
+    it("ends a string at the end of its line, so that a quote without a partner hides only its line", () => {
+        expect(outline("{a ? 'x : b\n}\n\nText.", true)).toEqual(["paragraph: Text."]);
+    });
+
+    it("finds the end of a tag with an expression that has a comment or a string with a quote", () => {
+        expect(outline("<Chart data={/* it's */ [1]} label={\"a > b\"} />\nText after the tag.", true)).toEqual(["paragraph: Text after the tag."]);
     });
 });
 
@@ -190,6 +234,20 @@ describe("directives", () => {
         expect([...next!.rules!]).toEqual(["semicolon"]);
         expect(markdown.slice(range!.start, range!.end)).toContain("E.");
         expect(range!.rules).toBeNull();
+    });
+
+    it("makes an ste-disable-next before a table apply to all of its cells", () => {
+        const markdown = "<!-- ste-disable-next -->\n| Name | Use |\n| --- | --- |\n| a | b |\n| c | d |\n\nAfter.";
+        const extraction = extractMarkdown(markdown, { mdx : false });
+        expect(extraction.suppressions.map((range) => markdown.slice(range.start, range.end))).toEqual(["| Name | Use |\n| --- | --- |\n| a | b |\n| c | d |"]);
+    });
+
+    it("records a problem for each rule ID that is not known", () => {
+        const extraction = extractMarkdown("<!-- ste-disable-next modal-verbs, semicolon -->\nText.\n\n{/* ste-enable nope */}", { mdx : true });
+        expect(extraction.problems.map((problem) => [problem.offset, problem.message])).toEqual([
+            [0, "The directive \"ste-disable-next\" has the rule ID \"modal-verbs\", which is not a known rule."],
+            [56, "The directive \"ste-enable\" has the rule ID \"nope\", which is not a known rule."],
+        ]);
     });
 });
 
