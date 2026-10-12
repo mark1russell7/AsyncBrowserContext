@@ -16,16 +16,27 @@ export type { AsyncLocalStorageOptions } from "../core/async-local-storage.js";
 export type { CallbackHook } from "../core/callback-hook.js";
 export type { VariableOptions } from "../core/variable.js";
 
-/** The value of a `Variable` in one context. The box tells "a value is set" apart from `undefined`. */
-interface Box<T> {
-    readonly value : T;
+/**
+ * One value of one variable in a context, and the values of the parent context. The chain
+ * tells "a value is set" apart from `undefined`.
+ */
+interface Entry {
+    readonly variable : object;
+    readonly value : unknown;
+    readonly parent : Entry | undefined;
 }
+
+/**
+ * One native storage for all variables. Its store is the chain of the values of the current
+ * context. On Node.js 22, each native storage that operated stays in a global list of
+ * async_hooks, and each new async resource examines the list. One storage keeps that list short.
+ */
+const values = new NodeAsyncLocalStorage<Entry>();
 
 /** The `AsyncContext.Variable` of the TC39 proposal, on the native `AsyncLocalStorage`. */
 export class Variable<T> {
     readonly #name : string;
     readonly #defaultValue : T | undefined;
-    readonly #storage : NodeAsyncLocalStorage<Box<T>> = new NodeAsyncLocalStorage<Box<T>>();
 
     constructor(options : VariableOptions<T> = {}) {
         this.#name = options.name === undefined ? "" : String(options.name);
@@ -39,23 +50,35 @@ export class Variable<T> {
 
     /** This method gives the value of this variable in the current context, or the default value. */
     get() : T | undefined {
-        const box = this.#storage.getStore();
-        return box === undefined ? this.#defaultValue : box.value;
+        for (let entry = values.getStore(); entry !== undefined; entry = entry.parent) {
+            if (entry.variable === this) {
+                return entry.value as T;
+            }
+        }
+        return this.#defaultValue;
     }
 
-    /** This method starts `fn` with `args` in a new context in which `get()` gives `value`. */
+    /**
+     * This method starts `fn` with `args` in a new context in which `get()` gives `value`. As
+     * in the TC39 draft, `fn` gets `undefined` as its `this` value.
+     */
     run<R, A extends unknown[]>(value : T, fn : (...args : A) => R, ...args : A) : R {
-        return this.#storage.run({ value }, fn, ...args);
+        const current = values.getStore();
+        // A value of the same variable in the current context gets replaced, so the chain stays short
+        const parent = current !== undefined && current.variable === this ? current.parent : current;
+        return values.run({ variable : this, value, parent }, () => fn(...args));
     }
 }
+
+Object.defineProperty(Variable.prototype, Symbol.toStringTag, { value : "AsyncContext.Variable", configurable : true });
 
 /** The `AsyncContext.Snapshot` of the TC39 proposal, on the native `AsyncLocalStorage.snapshot()`. */
 export class Snapshot {
     readonly #run : <R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) => R = NodeAsyncLocalStorage.snapshot();
 
-    /** This method starts `fn` with `args` in the recorded context. */
+    /** This method starts `fn` with `args` in the recorded context. `fn` gets `undefined` as its `this` value. */
     run<R, A extends unknown[]>(fn : (...args : A) => R, ...args : A) : R {
-        return this.#run(fn, ...args);
+        return this.#run(() => fn(...args));
     }
 
     /** This method records the current context. It gives a wrapper of `fn` that operates in that context. */
@@ -65,23 +88,37 @@ export class Snapshot {
         }
         const run = NodeAsyncLocalStorage.snapshot();
         const wrapped = function (this : T, ...args : A) : R {
-            return run(() => fn.apply(this, args));
+            return run(() => Reflect.apply(fn, this, args));
         };
-        Object.defineProperty(wrapped, "name", { value : fn.name, configurable : true });
+        // As CopyNameAndLength with the prefix "wrapped" in the TC39 draft
+        const name : unknown = fn.name;
+        Object.defineProperty(wrapped, "name", { value : `wrapped ${typeof name === "string" ? name : ""}`, configurable : true });
         Object.defineProperty(wrapped, "length", { value : fn.length, configurable : true });
         return wrapped;
     }
 }
 
-/** This function gives `true` if the native class supports the `defaultValue` option (Node.js 24 and later). */
+Object.defineProperty(Snapshot.prototype, Symbol.toStringTag, { value : "AsyncContext.Snapshot", configurable : true });
+
+/**
+ * This function gives `true` if the native class supports the `defaultValue` option (Node.js 24
+ * and later), and `exit()` then gives `undefined` as in the browser class. Without
+ * AsyncContextFrame (`--no-async-context-frame`), `exit()` gives the default value, so the
+ * compatible class is used. The probe disables itself, so it does not stay in the list of
+ * async_hooks.
+ */
 function supportsOptions() : boolean {
     const probe = new NodeAsyncLocalStorage<number>({ defaultValue : 1 } as never);
-    return probe.getStore() === 1;
+    try {
+        return probe.getStore() === 1 && probe.run(2, () => probe.exit(() => probe.getStore())) === undefined;
+    } finally {
+        probe.disable();
+    }
 }
 
 /**
  * The native `AsyncLocalStorage` of Node.js. On a Node.js version without the
- * `defaultValue` and `name` options, a subclass adds them.
+ * `defaultValue` and `name` options, a compatible class adds them (compatible-storage.ts).
  */
 export const AsyncLocalStorage : typeof NodeAsyncLocalStorage = supportsOptions()
     ? NodeAsyncLocalStorage

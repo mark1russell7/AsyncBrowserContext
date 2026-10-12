@@ -3,6 +3,25 @@ import { store, type HookEntry } from "./store.js";
 
 export type { CallbackHook } from "./callback-hook.js";
 
+let warned = false;
+
+/**
+ * Version 0.1 of the library has no callback hooks. If a copy of version 0.1 installed some
+ * patches first, the callbacks of those patches do not start the hooks. The function tells
+ * this one time on the console.
+ */
+function warnAboutOldPatches() : void {
+    if (warned) {
+        return;
+    }
+    const withHooks = store.hookPatches;
+    const without = [...store.patches].filter((name) => withHooks?.has(name) !== true);
+    if (without.length > 0) {
+        warned = true;
+        console.warn(`async-browser-context: an older copy of the library installed these patches, and their callbacks do not start the callback hooks: ${without.join(", ")}`);
+    }
+}
+
 /**
  * This function adds a hook. The library starts its methods before and after each
  * callback that it starts. These callbacks are the callbacks of the patched
@@ -16,6 +35,7 @@ export type { CallbackHook } from "./callback-hook.js";
  */
 export function addCallbackHook(hook : CallbackHook) : () => void {
     assertCallbackHook(hook);
+    warnAboutOldPatches();
     const entry : HookEntry = { hook };
     store.hooks = [...(store.hooks ?? []), entry];
     let removed = false;

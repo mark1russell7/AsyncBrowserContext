@@ -217,6 +217,74 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         expect(listenerCalls).toBe(1);
     });
 
+    it("starts the callback when a getter of a hook method throws, or when reportError throws", async () => {
+        const variable = new Variable<string>();
+        const holder = globalThis as { reportError? : (error : unknown) => void };
+        const nativeReportError = holder.reportError;
+        holder.reportError = () => { throw new Error("report failed"); };
+        try {
+            const hook = {} as CallbackHook;
+            Object.defineProperty(hook, "before", { get() { if (variable.get() === "g") throw new Error("getter"); return undefined; } });
+            removers.push(addCallbackHook(hook));
+            removers.push(addCallbackHook({ after : () => { if (variable.get() === "g") throw new Error("after"); } }));
+            const value = await variable.run("g", () => Promise.resolve().then(() => variable.get()));
+            expect(value).toBe("g");
+        } finally {
+            if (nativeReportError === undefined) {
+                delete holder.reportError;
+            } else {
+                holder.reportError = nativeReportError;
+            }
+        }
+    });
+
+    it("does not start the hooks for a callback that a hook schedules, so a hook cannot start itself without end", async () => {
+        const variable = new Variable<string>();
+        const sources : string[] = [];
+        const scheduled = Promise.withResolvers<void>();
+        removers.push(addCallbackHook({
+            after : (_callback, source) => {
+                if (variable.get() !== "s") {
+                    return;
+                }
+                sources.push(source);
+                // A flush that a hook schedules with a patched API
+                setTimeout(() => scheduled.resolve(), 0);
+            },
+        }));
+        await variable.run("s", () => Promise.resolve().then(() => undefined));
+        await scheduled.promise;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        expect(sources).toEqual(["Promise.then"]);
+    });
+
+    it("tells one time on the console when an older copy without hooks installed some patches", () => {
+        const holder = globalThis as unknown as Record<symbol, unknown>;
+        const store = holder[Symbol.for("async-browser-context/store/v1")] as { hookPatches? : Set<string> | undefined };
+        const saved = store.hookPatches;
+        const warnings : unknown[] = [];
+        const nativeWarn = console.warn;
+        console.warn = (...args : unknown[]) => { warnings.push(args.join(" ")); };
+        try {
+            // As if a copy of version 0.1 installed the patches: no patch has hooks
+            store.hookPatches = new Set();
+            removers.push(addCallbackHook({}));
+            removers.push(addCallbackHook({}));
+        } finally {
+            console.warn = nativeWarn;
+            store.hookPatches = saved;
+        }
+        expect(warnings).toHaveLength(1);
+        expect(String(warnings[0])).toContain("older copy of the library");
+    });
+
+    it("starts a callback that has its own call and apply properties", async () => {
+        const variable = new Variable<string>();
+        const callback = Object.assign((value : number) => value + 1, { call : 1, apply : 2 });
+        expect(await variable.run("c", () => Promise.resolve(1).then(callback))).toBe(2);
+        expect(await new Promise((resolve) => setTimeout(Object.assign(() => resolve("timer"), { apply : null }), 0))).toBe("timer");
+    });
+
     it("stops the calls when the hook is removed, and keeps the other hooks", async () => {
         const variable = new Variable<string>();
         const first = record(variable, "first:");

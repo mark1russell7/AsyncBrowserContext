@@ -42,6 +42,11 @@ export interface ContextStore {
     hooks? : readonly HookEntry[] | undefined;
     /** `true` while a hook operates. Callbacks that start in a hook do not start the hook methods. */
     inHook? : boolean | undefined;
+    /**
+     * The patches that a copy with callback hooks installed. The patches of version 0.1 have
+     * no hooks. The store of an older copy of the library does not have this property.
+     */
+    hookPatches? : Set<string> | undefined;
 }
 
 /** The methods of a callback hook. The public type is `CallbackHook` in `hooks.ts`. */
@@ -75,6 +80,7 @@ function createStore() : ContextStore {
         // Own properties from the start: each callback reads `hooks`, and the read of an own property is faster
         hooks : undefined,
         inHook : false,
+        hookPatches : new Set(),
     };
 }
 
@@ -115,7 +121,8 @@ class ValueFrame implements Frame {
     /**
      * The result of the last search for another variable from this frame. A
      * frame does not change, so the result stays correct. The cached value
-     * comes from a parent frame, so the cache keeps no other object in memory.
+     * comes from a parent frame. The cache also keeps the last variable of a
+     * search, so a frame can keep one more variable in memory.
      */
     #cachedVariable : object | undefined = undefined;
     #cachedValue : unknown = undefined;
@@ -145,6 +152,16 @@ class ValueFrame implements Frame {
         return value;
     }
 
+    /**
+     * This method makes a frame that sets `variable`. When `parent` sets the same variable,
+     * the new frame replaces it: the new frame has the parent of `parent`. A search gives the
+     * same values. Many uses of enterWith() in one context thus do not make a long chain.
+     */
+    static create(parent : Frame, variable : object, value : unknown) : ValueFrame {
+        const base = #variable in parent && parent.#variable === variable ? parent.parent : parent;
+        return new ValueFrame(base, variable, value);
+    }
+
     static #search(start : Frame | null, variable : object) : unknown {
         for (let frame = start; frame !== null; frame = frame.parent) {
             if (#variable in frame && frame.#variable === variable) {
@@ -157,7 +174,7 @@ class ValueFrame implements Frame {
 
 /** This function makes a new frame that has `parent` as its parent and sets `variable` to `value`. */
 export function createFrame(parent : Frame, variable : object, value : unknown) : Frame {
-    return new ValueFrame(parent, variable, value);
+    return ValueFrame.create(parent, variable, value);
 }
 
 /** This function gives the value of `variable` in `frame`, or `NOT_FOUND` if no frame sets it. */
@@ -167,12 +184,16 @@ export function findValue(frame : Frame, variable : object) : unknown {
 
 /** This function gives the error of a hook to the host. A hook error does not stop the callback. */
 function reportHookError(error : unknown) : void {
-    const report = (globalThis as { reportError? : unknown }).reportError;
-    if (typeof report === "function") {
-        (report as (error : unknown) => void)(error);
-        return;
+    try {
+        const report = (globalThis as { reportError? : unknown }).reportError;
+        if (typeof report === "function") {
+            Reflect.apply(report, globalThis, [error]);
+            return;
+        }
+        console.error(error);
+    } catch {
+        // The report itself failed. The callback must operate, so the error stops here.
     }
-    console.error(error);
 }
 
 /**
@@ -187,12 +208,12 @@ function callHooks(hooks : readonly HookEntry[], phase : "before" | "after", cal
         const count = hooks.length;
         for (let step = 0; step < count; step++) {
             const { hook } = hooks[phase === "before" ? step : count - 1 - step] as HookEntry;
-            const method = hook[phase];
-            if (typeof method !== "function") {
-                continue;
-            }
             try {
-                method.call(hook, callback, source);
+                // A getter of the method can also throw
+                const method = hook[phase];
+                if (typeof method === "function") {
+                    Reflect.apply(method, hook, [callback, source]);
+                }
             } catch (error) {
                 reportHookError(error);
             }
@@ -218,11 +239,11 @@ export function applyWithHooks<T, A extends unknown[], R>(
     args : A,
 ) : R {
     if (store.inHook === true) {
-        return fn.apply(thisValue, args);
+        return Reflect.apply(fn, thisValue, args);
     }
     callHooks(hooks, "before", callback, source);
     try {
-        return fn.apply(thisValue, args);
+        return Reflect.apply(fn, thisValue, args);
     } finally {
         callHooks(hooks, "after", callback, source);
     }
@@ -242,13 +263,15 @@ export function applyWithHooks<T, A extends unknown[], R>(
  * `fn`, for the callback hooks.
  */
 export function bindToFrame<T, A extends unknown[], R>(frame : Frame, fn : (this : T, ...args : A) => R, source : string) : (this : T, ...args : A) => R {
+    // A callback that a hook registers does not start the hooks, so a hook cannot start itself without end
+    const quiet = store.inHook === true;
     return function asyncBrowserContextWrapper(this : T, ...args : A) : R {
         const previous = store.current;
         store.current = frame;
         try {
-            const hooks = store.hooks;
+            const hooks = quiet ? undefined : store.hooks;
             if (hooks === undefined) {
-                return fn.apply(this, args);
+                return Reflect.apply(fn, this, args);
             }
             return applyWithHooks(hooks, fn, source, fn, this, args);
         } finally {
@@ -263,13 +286,14 @@ export function bindToFrame<T, A extends unknown[], R>(frame : Frame, fn : (this
  * `bindToFrame` on the hot path.
  */
 export function bindOneArgument<T, A, R>(frame : Frame, fn : (this : T, argument : A) => R, source : string) : (this : T, argument : A) => R {
+    const quiet = store.inHook === true;
     return function asyncBrowserContextWrapper(this : T, argument : A) : R {
         const previous = store.current;
         store.current = frame;
         try {
-            const hooks = store.hooks;
+            const hooks = quiet ? undefined : store.hooks;
             if (hooks === undefined) {
-                return fn.call(this, argument);
+                return Reflect.apply(fn, this, [argument]);
             }
             return applyWithHooks(hooks, fn, source, fn, this, [argument]);
         } finally {

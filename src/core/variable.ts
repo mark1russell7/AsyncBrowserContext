@@ -64,6 +64,8 @@ export class Variable<T> {
     }
 }
 
+Object.defineProperty(Variable.prototype, Symbol.toStringTag, { value : "AsyncContext.Variable", configurable : true });
+
 /**
  * This function makes a new current frame in which `variable` has `value`.
  * The frame stays current until the code that controls the current step sets

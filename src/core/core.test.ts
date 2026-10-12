@@ -15,6 +15,29 @@ describe("the context store", () => {
         expect(descriptor?.enumerable).toBe(false);
     });
 
+    it("replaces a frame of the same variable, so many enterWith() calls do not make a long chain", () => {
+        const storage = new AsyncLocalStorage<number>();
+        const other = new Variable<string>();
+        const depth = (frame : typeof store.current) : number => {
+            let count = 0;
+            for (let current : typeof frame | null = frame; current !== null; current = current.parent) {
+                count++;
+            }
+            return count;
+        };
+        other.run("kept", () => {
+            const start = depth(store.current);
+            storage.run(0, () => {
+                for (let index = 1; index <= 1000; index++) {
+                    storage.enterWith(index);
+                }
+                expect(storage.getStore()).toBe(1000);
+                expect(other.get()).toBe("kept");
+                expect(depth(store.current)).toBe(start + 1);
+            });
+        });
+    });
+
     it("makes frames that show only their parent", () => {
         const variable = {};
         const frame = createFrame(store.root, variable, "secret");
@@ -237,7 +260,7 @@ describe("Snapshot.wrap", () => {
         const wrapped = Snapshot.wrap(function sum(a : number, b : number) : number {
             return a + b;
         });
-        expect(Object.getOwnPropertyDescriptor(wrapped, "name")).toMatchObject({ value : "sum", configurable : true });
+        expect(Object.getOwnPropertyDescriptor(wrapped, "name")).toMatchObject({ value : "wrapped sum", configurable : true });
         expect(Object.getOwnPropertyDescriptor(wrapped, "length")).toMatchObject({ value : 2, configurable : true });
     });
 });

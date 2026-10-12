@@ -39,13 +39,17 @@ export class Snapshot {
             const previous = store.current;
             store.current = frame;
             try {
-                return fn.apply(this, args);
+                return Reflect.apply(fn, this, args);
             } finally {
                 store.current = previous;
             }
         };
-        Object.defineProperty(wrapped, "name", { value : fn.name, configurable : true });
+        // As CopyNameAndLength with the prefix "wrapped" in the TC39 draft
+        const name : unknown = fn.name;
+        Object.defineProperty(wrapped, "name", { value : `wrapped ${typeof name === "string" ? name : ""}`, configurable : true });
         Object.defineProperty(wrapped, "length", { value : fn.length, configurable : true });
         return wrapped;
     }
 }
+
+Object.defineProperty(Snapshot.prototype, Symbol.toStringTag, { value : "AsyncContext.Snapshot", configurable : true });

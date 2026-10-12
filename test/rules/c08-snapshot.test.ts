@@ -53,15 +53,29 @@ describe("rule C8: a snapshot runs functions in the recorded context", () => {
         expect(seen).toBe("recorded");
     });
 
-    it("wraps a function with Snapshot.wrap and keeps this, the arguments, the name and the length", () => {
+    it("wraps a function with Snapshot.wrap, keeps this, the arguments and the length, and names it as the TC39 draft does", () => {
         const variable = new Variable<string>();
         function named(this : { id : number }, a : number, b : number) : string {
             return `${this.id}:${a + b}:${variable.get() ?? ""}`;
         }
         const wrapped = variable.run("recorded", () => Snapshot.wrap(named));
         expect(variable.run("current", () => wrapped.call({ id : 7 }, 1, 2))).toBe("7:3:recorded");
-        expect(wrapped.name).toBe("named");
+        // CopyNameAndLength with the prefix "wrapped" (Stage 2 draft of 2026-06-16)
+        expect(wrapped.name).toBe("wrapped named");
         expect(wrapped.length).toBe(2);
+    });
+
+    it("gives Variable and Snapshot the toStringTag of the TC39 draft", () => {
+        expect(Object.prototype.toString.call(new Variable())).toBe("[object AsyncContext.Variable]");
+        expect(Object.prototype.toString.call(new Snapshot())).toBe("[object AsyncContext.Snapshot]");
+    });
+
+    it("starts the function of run() with the this value undefined, as the TC39 draft does", () => {
+        const variable = new Variable<string>();
+        const seen : unknown[] = [];
+        variable.run("a", function (this : unknown) { seen.push(this); });
+        new Snapshot().run(function (this : unknown) { seen.push(this); });
+        expect(seen).toEqual([undefined, undefined]);
     });
 
     it("throws a TypeError when Snapshot.wrap gets a value that is not a function", () => {
