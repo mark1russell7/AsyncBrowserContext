@@ -79,6 +79,13 @@
     --gutter: clamp(1rem, 3vw, 2rem);
 }
 
+/* Before the header measures itself, a narrow screen uses the height of a header with two lines. */
+@media (max-width: 34rem) {
+    :root {
+        --header-height: 6.25rem;
+    }
+}
+
 :root[data-theme="dark"] {
     color-scheme: dark;
 
