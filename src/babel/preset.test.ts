@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { transformAsync, types, type PluginObject } from "@babel/core";
 import { describe, expect, it } from "vitest";
-import preset, { DEFAULT_RUNTIME, METADATA_KEY } from "./preset.js";
+import preset, { DEFAULT_RUNTIME, METADATA_KEY, supportsResourceManagement } from "./preset.js";
 
 interface Output {
     readonly code : string;
@@ -46,7 +46,8 @@ describe("the Babel preset", () => {
     for (const [name, input] of Object.entries(FIXTURES)) {
         it(`transforms ${name} (output snapshot)`, async () => {
             const output = await transform(input);
-            expect(output.changed).toBe(true);
+            // Babel keeps a top-level for await, so that file does not change
+            expect(output.changed).toBe(name !== "top-level-for-await");
             await expect(`// Input:\n// ${input}\n\n${output.code}\n`).toMatchFileSnapshot(`./__snapshots__/${name}.js.txt`);
         });
     }
@@ -86,9 +87,9 @@ describe("the Babel preset", () => {
         expect(METADATA_KEY).toBe("asyncBrowserContext");
     });
 
-    it("tells that it changed a file with only a top-level for await", async () => {
+    it("tells that it did not change a file with only a top-level for await, which Babel keeps", async () => {
         const output = await transform("for await (const value of source()) use(value);");
-        expect(output.changed).toBe(true);
+        expect(output.changed).toBe(false);
     });
 
     it("binds a generator one time when it transforms its own output again, and gives an async generator to the driver", async () => {
@@ -115,14 +116,35 @@ describe("the Babel preset", () => {
         expect(countBindCalls(second.code)).toBe(0);
     });
 
-    it("gives the async generators to asyncGenerator and OverloadYield of the runtime, in place of the Babel helper", async () => {
+    it("gives the async generators to the helpers of the runtime, in place of the Babel helpers", async () => {
         const output = await transform("export async function* g(items) { for await (const item of items) { yield* item; } }");
-        expect(output.code).toMatch(/import \{[^}]*asyncGenerator as _asyncGenerator[^}]*\} from "async-browser-context\/runtime"/);
-        expect(output.code).toMatch(/import \{[^}]*OverloadYield as _OverloadYield[^}]*\} from "async-browser-context\/runtime"/);
-        expect(output.code).not.toMatch(/function AsyncGenerator\(|function _wrapAsyncGenerator\(|function _OverloadYield\(/);
-        // The other helpers stay in the file, and they make the OverloadYield values of the runtime
-        expect(output.code).toContain("function _awaitAsyncGenerator(e) { return new _OverloadYield(e, 0); }");
-        expect(output.code).toMatch(/function _asyncGeneratorDelegate\(/);
+        for (const name of ["asyncGenerator", "awaitAsyncGenerator", "asyncGeneratorDelegate"]) {
+            expect(output.code).toMatch(new RegExp(`import \\{[^}]*${name} as _${name}[^}]*\\} from "async-browser-context/runtime"`));
+        }
+        expect(output.code).not.toMatch(/function AsyncGenerator\(|function _wrapAsyncGenerator\(|function _OverloadYield\(|function _awaitAsyncGenerator\(|function _asyncGeneratorDelegate\(/);
+    });
+
+    it("keeps the helpers of the runtime for async generators when @babel/plugin-transform-runtime gives the other helpers", async () => {
+        // As @babel/plugin-transform-runtime does: each helper from @babel/runtime
+        const transformRuntime = () : PluginObject => ({
+            pre(file) {
+                file.set("helperGenerator", (name : string) => types.identifier(`RUNTIME_${name}`));
+            },
+        });
+        const result = await transformAsync("export async function* g(items) { await null; for await (const item of items) yield* item; }", {
+            filename : "input.js",
+            babelrc : false,
+            configFile : false,
+            plugins : [transformRuntime],
+            presets : [preset],
+        });
+        const code = result?.code ?? "";
+        expect(code).toContain("_asyncGenerator(function* (items)");
+        expect(code).toContain("_awaitAsyncGenerator(null)");
+        expect(code).toContain("_asyncGeneratorDelegate(");
+        expect(code).not.toMatch(/RUNTIME_(wrapAsyncGenerator|awaitAsyncGenerator|asyncGeneratorDelegate|OverloadYield)/);
+        // The other helpers still come from the earlier plugin
+        expect(code).toContain("RUNTIME_asyncIterator(items)");
     });
 
     it("keeps the helperGenerator of an earlier plugin for the other helpers", async () => {
@@ -234,10 +256,52 @@ describe("the Babel preset", () => {
                 parserOpts : { plugins : ["typescript"] },
                 presets : [preset],
             });
-            expect(source).toMatch(/\basync\b/);
-            expect(result?.code).toMatch(/\basync\b/);
+            // The native async functions of the runtime: "async () =>" and "async function"
+            const asyncFunctions = /\basync\s*(?:\(|function\b)/;
+            expect(source).toMatch(asyncFunctions);
+            expect(result?.code).toMatch(asyncFunctions);
             expect(result?.code).not.toMatch(/_coroutine\(/);
         }
+    });
+
+    it("changes await using before the async transform, so the output has no await using in a generator", async () => {
+        const output = await transform("export async function f(resource) { await using handle = resource(); await null; return handle; }");
+        expect(output.code).not.toContain("await using");
+        expect(output.code).toMatch(/_usingCtx/);
+        expect(output.code).toContain("_coroutine(function* (resource)");
+    });
+
+    it("uses the plugin of explicit resource management only with Babel 7.23.9 and later", () => {
+        expect(supportsResourceManagement("7.22.20")).toBe(false);
+        expect(supportsResourceManagement("7.23.8")).toBe(false);
+        expect(supportsResourceManagement("7.23.9")).toBe(true);
+        expect(supportsResourceManagement("7.29.7")).toBe(true);
+        expect(supportsResourceManagement("8.0.0-rc.1")).toBe(true);
+        expect(supportsResourceManagement(undefined)).toBe(false);
+    });
+
+    it("binds the generator that a Babel helper of a compiled dependency gets", async () => {
+        const output = await transform("function _wrapAsyncGenerator(e) { return e; } export const g = _wrapAsyncGenerator(function* () { yield 1; });");
+        expect(countBindCalls(output.code)).toBe(1);
+    });
+
+    it("does not bind the generator of coroutine when it transforms its own output again", async () => {
+        const first = await transform("export async function load() { await null; }");
+        const second = await transform(first.code);
+        expect(countBindCalls(second.code)).toBe(0);
+        expect(second.code).not.toMatch(/import \{[^}]*bindGenerator/);
+    });
+
+    it("keeps a generator declaration of a block of a script in the block", async () => {
+        const output = await transform("var g = 'outer'; { function* g() { yield 1; } } module.exports = typeof g;", { sourceType : "script" });
+        expect(output.code).toMatch(/\{\s*let g = function g\(\)/);
+    });
+
+    it("moves a static field with an async arrow function into a static private method", async () => {
+        const output = await transform("class A extends B { static load = async () => { await null; return super.x(); }; }");
+        expect(output.code).toContain("static load = this.#asyncContext1();");
+        expect(output.code).toMatch(/static #asyncContext1\(\) \{/);
+        expect(output.code).not.toMatch(/^var _superprop/m);
     });
 });
 
@@ -280,9 +344,25 @@ describe("the names of the async functions (for the callback hooks)", () => {
         expect(coroutineNames(output.code)).toEqual([]);
     });
 
-    it("gives no name to an async generator", async () => {
-        const output = await transform("async function* numbers() { await null; yield 1; }");
-        expect(coroutineNames(output.code)).toEqual([]);
+    it("gives the name of an async generator to asyncGenerator", async () => {
+        const output = await transform("async function* numbers() { await null; yield 1; } const o = { async *rows() { yield 1; } };");
+        expect(coroutineNames(output.code).toSorted()).toEqual(["numbers", "rows"]);
+    });
+
+    it("gives the name through a TypeScript wrapper and to an accessor field", async () => {
+        const result = await transformAsync("const h = (async () => { await null; }) as Handler; class C { accessor a = async () => { await null; }; }", {
+            filename : "input.ts",
+            babelrc : false,
+            configFile : false,
+            parserOpts : { plugins : ["typescript", "decoratorAutoAccessors"] },
+            presets : [preset],
+        });
+        expect(coroutineNames(result?.code ?? "").toSorted()).toEqual(["a", "h"]);
+    });
+
+    it("does not record names in a function with the directive of the runtime", async () => {
+        const output = await transform("export const drive = async () => { 'async-browser-context runtime'; const inner = async () => { await null; }; await inner(); };");
+        expect(output.code).not.toContain("_coroutine");
     });
 
     it("gives the name in CommonJS output", async () => {

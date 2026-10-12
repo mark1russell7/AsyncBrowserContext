@@ -9,7 +9,9 @@ export type ModuleFilter = RegExp | ((id : string) => boolean);
 export interface AsyncContextPluginOptions {
     /**
      * The modules to transform. The default is all JavaScript and TypeScript
-     * modules, also the modules in `node_modules`.
+     * modules, also the modules in `node_modules`, and the JavaScript of Vue,
+     * Svelte, Astro and MDX components. This filter can only select from these
+     * modules: the plugin does not transform styles.
      */
     readonly include? : ModuleFilter | undefined;
     /** The modules not to transform. */
@@ -30,13 +32,35 @@ export interface AsyncContextPluginOptions {
 }
 
 const SCRIPT = /\.[cm]?[jt]sx?$/;
+/** The component files that other Vite plugins compile to JavaScript before this plugin operates. */
+const COMPONENT = /\.(?:vue|svelte|astro|mdx)$/;
+/** The parts of a component that are styles, not JavaScript, for example `App.vue?vue&type=style&lang.css`. */
+const STYLE_QUERY = /[?&](?:type=style|lang\.(?:css|scss|sass|less|styl|stylus|pcss|postcss|sss))(?:&|$)/;
 /** A module without these words has no async function, generator or `for await`. */
 const MIGHT_CHANGE = /\basync\b|\byield\b|function\s*\*/;
 /** The runtime of this library. The plugin must not transform it. */
 const OWN_RUNTIME = /[\\/]async-browser-context[\\/]dist[\\/]/;
+/** A line that starts with a static import or export. */
+const MODULE_SYNTAX = /^\s*(?:import\s*[\w*{"']|export\s)/m;
+/** The marks of a CommonJS module. */
+const COMMONJS = /\brequire\s*\(|\bmodule\.exports\b|\bexports\.[A-Za-z_$]/;
 
 function matches(filter : ModuleFilter, id : string) : boolean {
     return filter instanceof RegExp ? filter.test(id) : filter(id);
+}
+
+/**
+ * This function gives the source type for Babel. Vite serves each module as an ES module, also
+ * a worker or a file with only a dynamic `import()`. With "unambiguous", Babel reads such a file
+ * as a script and adds a `require()` of the runtime, which a browser does not have. Thus only a
+ * `.cjs` or `.cts` file, or a file with CommonJS marks and no static import or export, gets
+ * "unambiguous". Babel then reads it as a script, unless it has an import or an export.
+ */
+function sourceTypeOf(file : string, code : string) : "module" | "unambiguous" {
+    if (/\.c[jt]s$/.test(file)) {
+        return "unambiguous";
+    }
+    return COMMONJS.test(code) && !MODULE_SYNTAX.test(code) ? "unambiguous" : "module";
 }
 
 /**
@@ -58,6 +82,8 @@ function matches(filter : ModuleFilter, id : string) : boolean {
  */
 export function asyncContext(options : AsyncContextPluginOptions = {}) : Plugin {
     const runtime = options.runtime ?? DEFAULT_RUNTIME;
+    // One presets array for all modules, so the configuration cache of Babel operates
+    const presets : NonNullable<NonNullable<Parameters<typeof transformAsync>[1]>["presets"]> = [[preset, { runtime, names : options.names }]];
     return {
         name : "async-browser-context",
         enforce : "post",
@@ -71,7 +97,7 @@ export function asyncContext(options : AsyncContextPluginOptions = {}) : Plugin 
                     return null;
                 }
                 const file = id.split("?", 1)[0] ?? id;
-                if (!SCRIPT.test(file) || OWN_RUNTIME.test(file)) {
+                if (!(SCRIPT.test(file) || COMPONENT.test(file)) || STYLE_QUERY.test(id) || OWN_RUNTIME.test(file)) {
                     return null;
                 }
                 if (options.include !== undefined && !matches(options.include, file)) {
@@ -87,9 +113,13 @@ export function asyncContext(options : AsyncContextPluginOptions = {}) : Plugin 
                     filename : file,
                     babelrc : false,
                     configFile : false,
-                    sourceType : "unambiguous",
+                    sourceType : sourceTypeOf(file, code),
                     sourceMaps : true,
-                    presets : [[preset, { runtime, names : options.names }]],
+                    // The map of Vite describes the code that this plugin gets, not a map file of the module
+                    inputSourceMap : false,
+                    // Large modules, for example the dependency bundles of Vite, keep their format
+                    compact : false,
+                    presets,
                 });
                 const changed = (result?.metadata as Record<string, unknown> | undefined)?.[METADATA_KEY] === true;
                 if (result?.code == null || !changed) {

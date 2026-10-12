@@ -126,11 +126,11 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         };
         await variable.run("g", consume);
         expect(values).toEqual(["g"]);
-        // The step after the await of the generator body. The generator has no name, and the steps of consume have its name.
-        const steps = calls.filter((call) => call.source === "await" && call.name === "");
+        // The step after the await of the generator body, with the name of the async generator
+        const steps = calls.filter((call) => call.source === "await" && call.name === "ticks");
         expect(steps).toEqual([
-            { phase : "before", source : "await", name : "", value : "g" },
-            { phase : "after", source : "await", name : "", value : "g" },
+            { phase : "before", source : "await", name : "ticks", value : "g" },
+            { phase : "after", source : "await", name : "ticks", value : "g" },
         ]);
     });
 

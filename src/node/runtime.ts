@@ -9,7 +9,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createAsyncGenerator, type ResumeKey } from "../core/async-generator.js";
 
-export { OverloadYield } from "../core/async-generator.js";
+export { asyncGeneratorDelegate, awaitAsyncGenerator, OverloadYield } from "../core/async-generator.js";
 
 /**
  * This function gives an async function that operates `generatorFunction`. The function is
@@ -44,6 +44,7 @@ export function coroutine<T, A extends unknown[], R>(generatorFunction : (this :
  */
 export function asyncGenerator<T, A extends unknown[]>(
     generatorFunction : (this : T, ...args : A) => Generator<unknown, unknown, unknown>,
+    _name? : string,
 ) : (this : T, ...args : A) => AsyncGenerator<unknown, unknown, unknown> {
     return function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
         let snapshot = AsyncLocalStorage.snapshot();

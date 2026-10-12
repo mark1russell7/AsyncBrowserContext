@@ -20,6 +20,9 @@ importers:
       '@babel/plugin-transform-async-to-generator':
         specifier: ^8.0.1
         version: 8.0.1(@babel/core@8.0.7)
+      '@babel/plugin-transform-explicit-resource-management':
+        specifier: ^8.0.5
+        version: 8.0.5(@babel/core@8.0.7)
     devDependencies:
       '@opentelemetry/api':
         specifier: ^1.9.1

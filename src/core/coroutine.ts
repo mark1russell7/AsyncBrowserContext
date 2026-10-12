@@ -86,7 +86,7 @@ export function coroutine<T, A extends unknown[], R>(
     name? : string,
 ) : (this : T, ...args : A) => Promise<R> {
     const NativePromise = store.intrinsics.Promise;
-    return function asyncFunction(this : T, ...args : A) : Promise<R> {
+    const asyncFunction = function asyncFunction(this : T, ...args : A) : Promise<R> {
         // The context of the call. The body can change it with AsyncLocalStorage.enterWith.
         let frame : Frame = store.current;
         let generator : Generator<unknown, R, unknown>;
@@ -143,18 +143,28 @@ export function coroutine<T, A extends unknown[], R>(
         };
         return drive();
     };
+    // Where Babel gives no named wrapper, for example in a class field, the function keeps the name and the length of the source
+    if (name !== undefined && name !== "") {
+        Object.defineProperty(asyncFunction, "name", { value : name, configurable : true });
+    }
+    if (generatorFunction.length > 0) {
+        Object.defineProperty(asyncFunction, "length", { value : generatorFunction.length, configurable : true });
+    }
+    return asyncFunction;
 }
 
 /**
  * This function gives a function that makes an async generator object, which operates
  * `generatorFunction`. The preset gives this function in place of the helper
- * `wrapAsyncGenerator` of `@babel/plugin-transform-async-generator-functions`.
+ * `wrapAsyncGenerator` of `@babel/plugin-transform-async-generator-functions`, and adds `name`,
+ * the name of the async generator, if it has one.
  *
  * Each step of the body operates in the context of the call that made the generator
  * (rule C5). The driver continues each step with a native `await` (`async-generator.ts`).
  */
 export function asyncGenerator<T, A extends unknown[]>(
     generatorFunction : (this : T, ...args : A) => Generator<unknown, unknown, unknown>,
+    name? : string,
 ) : (this : T, ...args : A) => AsyncGenerator<unknown, unknown, unknown> {
     const NativePromise = store.intrinsics.Promise;
     return function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
@@ -173,7 +183,7 @@ export function asyncGenerator<T, A extends unknown[]>(
                 const hooks = resumed ? store.hooks : undefined;
                 return hooks === undefined
                     ? methods[key](argument)
-                    : applyWithHooks(hooks, generatorFunction, "await", methods[key], undefined, [argument]);
+                    : applyWithHooks(hooks, namedForHooks(generatorFunction, name), "await", methods[key], undefined, [argument]);
             } finally {
                 frame = store.current;
                 store.current = previous;

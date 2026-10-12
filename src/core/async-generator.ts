@@ -30,6 +30,61 @@ export class OverloadYield {
 }
 
 /**
+ * The helper `awaitAsyncGenerator` of Babel: the body gives its value for an `await`. The preset
+ * gives this function in place of the helper of Babel, so the marker is always the class of this
+ * module, also when `@babel/plugin-transform-runtime` gives the other helpers.
+ */
+export function awaitAsyncGenerator(value : unknown) : OverloadYield {
+    return new OverloadYield(value, 0);
+}
+
+/**
+ * The helper `asyncGeneratorDelegate` of Babel 8: a sync iterator for `yield*` in an async
+ * generator. Each step of the inner async iterator becomes `new OverloadYield(promise, 1)`.
+ * The driver awaits the promise, and gives its result back to the iterator.
+ */
+export function asyncGeneratorDelegate(inner : AsyncIterator<unknown, unknown, unknown>) : Iterator<unknown, unknown, unknown> {
+    const iterator = inner as unknown as Record<ResumeKey, ((value : unknown) => unknown) | undefined>;
+    let waiting = false;
+    const pump = (key : ResumeKey, value : unknown) : IteratorResult<unknown, unknown> => {
+        waiting = true;
+        const promise = new NativePromise((resolve) => {
+            resolve(Reflect.apply(iterator[key] as (value : unknown) => unknown, inner, [value]));
+        });
+        return { done : false, value : new OverloadYield(promise, 1) };
+    };
+    const delegate : Record<PropertyKey, unknown> = {
+        [Symbol.iterator]() { return this; },
+        next(value : unknown) : unknown {
+            if (waiting) {
+                waiting = false;
+                return value;
+            }
+            return pump("next", value);
+        },
+    };
+    if (typeof iterator.throw === "function") {
+        delegate["throw"] = (value : unknown) : unknown => {
+            if (waiting) {
+                waiting = false;
+                throw value;
+            }
+            return pump("throw", value);
+        };
+    }
+    if (typeof iterator.return === "function") {
+        delegate["return"] = (value : unknown) : unknown => {
+            if (waiting) {
+                waiting = false;
+                return value;
+            }
+            return pump("return", value);
+        };
+    }
+    return delegate as unknown as Iterator<unknown, unknown, unknown>;
+}
+
+/**
  * A value that is not a thenable, in a box. The browser runtime reads the `then` property of an
  * awaited object one time, in the context of the body. When the object has no `then` method,
  * the driver awaits the box. Thus the engine does not read `then` a second time, and the

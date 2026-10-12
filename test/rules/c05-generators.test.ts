@@ -164,6 +164,17 @@ describe.skipIf(needsPreset)("rule C5: a generator body runs in the context of t
         expect(generator.next()).toEqual({ value : "done", done : true });
     });
 
+    it("keeps the value of a parameter that the body declares again with var", () => {
+        // eslint-disable-next-line no-var
+        function* withOptions(options? : { size : number }) : Generator<{ size : number }> {
+            // eslint-disable-next-line no-var, no-redeclare
+            var options : { size : number } | undefined = options ?? { size : 0 };
+            yield options;
+        }
+        expect(withOptions({ size : 7 }).next().value).toEqual({ size : 7 });
+        expect(withOptions().next().value).toEqual({ size : 0 });
+    });
+
     it("throws parameter errors when the program makes the generator, as native generators do", () => {
         function* needsObject({ id } : { id : number }) : Generator<number> {
             yield id;

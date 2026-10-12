@@ -10,7 +10,7 @@
  * 4. It starts the output on the browser runtime in Node.js. Each request
  *    must get its own context after each `await`, in a generator, in an async
  *    generator, through `yield*` and in a `super` call. The callback hook must get the name of
- *    each async function for the steps after an `await`.
+ *    each async function and async generator for the steps after an `await`.
  */
 import { execSync } from "node:child_process";
 import fs from "node:fs";
@@ -25,8 +25,11 @@ const root = path.resolve(here, "..", "..");
 const VERSIONS = ["7.22.0", "7", "8"] as const;
 
 const expected = (id : string) => ({ fromAwait : [id, id, id], fromGenerator : id, fromAsyncGenerator : id, fromDelegate : [id, `done:${id}`], fromSuper : `child:${id}` });
-/** The anonymous async arrow functions give the empty name. `inner` and the two `read` methods give their names. */
-const EXPECTED = JSON.stringify({ requests : [expected("a"), expected("b")], awaitNames : ["", "inner", "read"] });
+/**
+ * The anonymous async arrow functions give the empty name. `inner`, the two `read` methods and the
+ * async generators `ticks`, `delegated` and `delegating` give their names.
+ */
+const EXPECTED = JSON.stringify({ requests : [expected("a"), expected("b")], awaitNames : ["", "delegated", "delegating", "inner", "read", "ticks"] });
 
 /** The script that transforms and starts the program, in the folder of one version. */
 const CHECK = `

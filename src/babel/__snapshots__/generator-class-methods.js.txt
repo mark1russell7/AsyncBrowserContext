@@ -1,8 +1,7 @@
 // Input:
 // class C { static *s() { yield 1; } *#p() { yield this; } async *a() { await null; yield 2; } }
 
-import { bindGenerator as _bindGenerator, asyncGenerator as _asyncGenerator, OverloadYield as _OverloadYield } from "async-browser-context/runtime";
-function _awaitAsyncGenerator(e) { return new _OverloadYield(e, 0); }
+import { bindGenerator as _bindGenerator, asyncGenerator as _asyncGenerator, awaitAsyncGenerator as _awaitAsyncGenerator } from "async-browser-context/runtime";
 class C {
   static s() {
     return _bindGenerator(function* () {
@@ -19,6 +18,6 @@ class C {
     return _asyncGenerator(function* () {
       yield _awaitAsyncGenerator(null);
       yield 2;
-    })();
+    }, "a")();
   }
 }

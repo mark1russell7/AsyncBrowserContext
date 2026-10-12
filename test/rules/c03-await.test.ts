@@ -219,3 +219,43 @@ describe("rule C3: an async function keeps the context of its call", () => {
         expect(order).toEqual(["body:a", "caller"]);
     });
 });
+
+describe("rule C3 in static class members", () => {
+    it("keeps this and super of an async arrow function of a static field and of a static block", async () => {
+        class Base {
+            static label() : string {
+                return "base";
+            }
+        }
+        class Service extends Base {
+            static load = async () : Promise<unknown[]> => {
+                await null;
+                return [this === Service, super.label()];
+            };
+            static fromBlock : () => Promise<boolean>;
+            static {
+                this.fromBlock = async () : Promise<boolean> => {
+                    await null;
+                    return this === Service;
+                };
+            }
+        }
+        expect(await Service.load()).toEqual([true, "base"]);
+        expect(await Service.fromBlock()).toBe(true);
+    });
+
+    // SWC and esbuild change the class fields with their own helpers, which give other names
+    it.skipIf(lowered)("keeps the name and the length of an async arrow function in a class field (not with SWC or esbuild)", () => {
+        class Service {
+            static load = async (_first : number, _second : number) : Promise<void> => {
+                await null;
+            };
+            save = async (_value : string) : Promise<void> => {
+                await null;
+            };
+        }
+        expect([Service.load.name, Service.load.length]).toEqual(["load", 2]);
+        const service = new Service();
+        expect([service.save.name, service.save.length]).toEqual(["save", 1]);
+    });
+});

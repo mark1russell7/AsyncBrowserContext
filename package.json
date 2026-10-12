@@ -127,7 +127,8 @@
     "@babel/core": "^8.0.7",
     "@babel/helper-module-imports": "^8.0.0",
     "@babel/plugin-transform-async-generator-functions": "^8.0.6",
-    "@babel/plugin-transform-async-to-generator": "^8.0.1"
+    "@babel/plugin-transform-async-to-generator": "^8.0.1",
+    "@babel/plugin-transform-explicit-resource-management": "^8.0.5"
   },
   "peerDependencies": {
     "@opentelemetry/api": "^1.0.0",

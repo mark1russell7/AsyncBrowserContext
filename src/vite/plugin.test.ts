@@ -68,6 +68,33 @@ describe("the Vite plugin", () => {
         expect(result?.code).toContain("/custom/runtime.js");
     });
 
+    it("imports the runtime in a module without import or export, for example a worker", async () => {
+        const result = await handlerOf()("self.onmessage = async (event) => { await fetch(event.data); };", "/app/src/worker.ts");
+        expect(result?.code).toContain(`from "async-browser-context/runtime"`);
+        expect(result?.code).not.toContain("require(");
+    });
+
+    it("uses require in a CommonJS module of a dependency, which Rollup or Rolldown changes", async () => {
+        const result = await handlerOf()("const fs = require('fs'); module.exports = async function read() { await fs.promises.stat('.'); };", "/app/node_modules/dep/index.js");
+        expect(result?.code).toContain(`require("async-browser-context/runtime")`);
+        expect((await handlerOf()(ASYNC_CODE, "/app/node_modules/dep/index.cjs"))?.code).toContain("async-browser-context/runtime");
+    });
+
+    it("transforms the JavaScript of Vue, Svelte, Astro and MDX components, but not their styles", async () => {
+        const handler = handlerOf();
+        for (const id of ["/app/src/App.vue", "/app/src/App.vue?vue&type=script&setup=true&lang.ts", "/app/src/Card.svelte", "/app/src/page.astro", "/app/src/post.mdx"]) {
+            expect(await handler(ASYNC_CODE, id)).not.toBeNull();
+        }
+        expect(await handler(ASYNC_CODE, "/app/src/App.vue?vue&type=style&index=0&lang.css")).toBeNull();
+        expect(await handler(ASYNC_CODE, "/app/src/Card.svelte?svelte&type=style&lang.scss")).toBeNull();
+    });
+
+    it("gives no input source map to Babel, so the map describes the code that the plugin gets", async () => {
+        const code = `${ASYNC_CODE}\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(JSON.stringify({ version : 3, sources : ["../src/original.ts"], names : [], mappings : "AAAA" })).toString("base64")}`;
+        const result = await handlerOf()(code, "/app/node_modules/dep/index.js");
+        expect(JSON.parse(result?.map ?? "{}").sources).not.toContain("../src/original.ts");
+    });
+
     it("gives the names of the async functions to the preset, unless the option names is false", async () => {
         expect((await handlerOf()(ASYNC_CODE, "/app/src/load.ts"))?.code).toContain(`}, "load")`);
         const result = await handlerOf({ names : false })(ASYNC_CODE, "/app/src/load.ts");
