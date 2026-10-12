@@ -375,9 +375,11 @@ function installMediaQueryListPatch() : void {
     }
     const patchedAdd = eventTarget.addEventListener;
     const patchedRemove = eventTarget.removeEventListener;
+    // The native method throws a TypeError for an object that is not a MediaQueryList
+    const isQueryList = (value : unknown) : boolean => typeof value === "object" && value !== null && Object.prototype.isPrototypeOf.call(prototype, value);
     replaceFunction<LegacyListenerMethod>(prototype, "addListener", (native) => ({
         addListener(this : unknown, callback : Listener | null) : void {
-            if (typeof callback === "function" || (typeof callback === "object" && callback !== null)) {
+            if (isQueryList(this) && (typeof callback === "function" || (typeof callback === "object" && callback !== null))) {
                 Reflect.apply(patchedAdd, this, ["change", callback]);
                 return;
             }
@@ -386,7 +388,7 @@ function installMediaQueryListPatch() : void {
     }).addListener);
     replaceFunction<LegacyListenerMethod>(prototype, "removeListener", (native) => ({
         removeListener(this : unknown, callback : Listener | null) : void {
-            if (typeof callback === "function" || (typeof callback === "object" && callback !== null)) {
+            if (isQueryList(this) && (typeof callback === "function" || (typeof callback === "object" && callback !== null))) {
                 Reflect.apply(patchedRemove, this, ["change", callback]);
                 return;
             }

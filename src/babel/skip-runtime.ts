@@ -3,14 +3,21 @@ import { isRuntimeFunction } from "./runtime-calls.js";
 
 export { RUNTIME_DIRECTIVE } from "./runtime-calls.js";
 
-/** The visitor that skips each function with the directive of the runtime. */
-const SKIP_RUNTIME : Visitor<PluginPass> = {
-    Function(functionPath : NodePath<types.Function>) {
-        if (isRuntimeFunction(functionPath.node)) {
-            functionPath.skip();
-        }
-    },
-};
+/** This function skips a function with the directive of the runtime. */
+function skipRuntimeFunction(functionPath : NodePath<types.Function>) : void {
+    if (isRuntimeFunction(functionPath.node)) {
+        functionPath.skip();
+    }
+}
+
+/**
+ * This function gives a new visitor that skips each function with the directive of the runtime.
+ * Babel changes a visitor object when it prepares it (explode). Thus each use gets its own object,
+ * and two copies of Babel in one process do not share it.
+ */
+function skipRuntimeVisitor() : Visitor<PluginPass> {
+    return { Function : skipRuntimeFunction };
+}
 
 /**
  * The first plugin of the preset. It skips each function with the directive of the runtime
@@ -21,7 +28,7 @@ const SKIP_RUNTIME : Visitor<PluginPass> = {
 export function skipRuntimePlugin() : PluginObject<PluginPass> {
     return {
         name : "async-browser-context/skip-runtime",
-        visitor : SKIP_RUNTIME,
+        visitor : skipRuntimeVisitor(),
     };
 }
 
@@ -32,7 +39,7 @@ export type PluginFactory = (api : PluginAPI, options : object, dirname : string
  * The plugin of Babel for async generators changes the async generators and the `for await`
  * loops in its own traversal. It starts that traversal in its `Program` visitor. The skip of the main
  * traversal does not apply to that traversal. This function gives a plugin that operates as
- * `factory`. But it puts `SKIP_RUNTIME` in front of each traversal that the `Program` visitor
+ * `factory`. But it puts the visitor of `skipRuntimePlugin` in front of each traversal that the `Program` visitor
  * starts.
  *
  * The function uses the traversal of the Babel that loads the plugin (`api.traverse`).
@@ -51,7 +58,7 @@ export function withRuntimeSkipped(factory : PluginFactory) : PluginFactory {
                 const ownTraverse = path.traverse;
                 // An own property of this path object hides the method of the prototype during the visitor
                 path.traverse = function (this : NodePath, inner : Visitor<unknown>, innerState? : unknown) : void {
-                    Reflect.apply(ownTraverse, this, [api.traverse.visitors.merge([SKIP_RUNTIME as Visitor<unknown>, inner]), innerState]);
+                    Reflect.apply(ownTraverse, this, [api.traverse.visitors.merge([skipRuntimeVisitor() as Visitor<unknown>, inner]), innerState]);
                 } as typeof path.traverse;
                 try {
                     Reflect.apply(program, this, [path, state]);

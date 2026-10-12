@@ -229,6 +229,13 @@ describe("rule C13: event listeners", () => {
         expect(seen).toEqual(["function registered", "object registered"]);
     });
 
+    it("throws as the native MediaQueryList.addListener does for an object that is not a MediaQueryList", () => {
+        const target = new EventTarget();
+        const listener = () : void => undefined;
+        expect(() => Reflect.apply(MediaQueryList.prototype.addListener, target, [listener])).toThrow(TypeError);
+        expect(() => Reflect.apply(MediaQueryList.prototype.removeListener, target, [listener])).toThrow(TypeError);
+    });
+
     it("accepts null and other values as options, as the DOM does", () => {
         const target = new EventTarget();
         let calls = 0;
