@@ -18,8 +18,10 @@ type Method = (this : unknown, ...args : unknown[]) => unknown;
  * This function gives a view of `underlying` in which each method of `methods` is a wrapper.
  * The view is a Proxy, so the other properties, for example `type`, come from `underlying`
  * with their getters and private fields. The target of the Proxy is an empty object, so a
- * frozen object also operates. The browser reads the members of a dictionary with [[Get]]
- * only. Each method gets `underlying` as its `this` value, as the specification tells.
+ * frozen object also operates. The specification reads the members with [[Get]], but the
+ * streams of WebKit first examine each member with the `in` operator: the `has` trap gives
+ * the answer of `underlying`. Each method gets `underlying` as its `this` value, as the
+ * specification tells.
  */
 function wrapUnderlying(underlying : object, methods : readonly string[], frame : Frame, name : string) : object {
     // A method that a hook registers does not start the hooks
@@ -54,6 +56,9 @@ function wrapUnderlying(underlying : object, methods : readonly string[], frame 
                 return wrapperOf(property, value as Method);
             }
             return value;
+        },
+        has(_target, property) : boolean {
+            return Reflect.has(underlying, property);
         },
     });
 }

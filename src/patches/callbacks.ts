@@ -74,6 +74,10 @@ function withCallback(options : object, keys : readonly string[], frame : Frame,
             }
             return wrapper;
         },
+        // For an engine that examines a member with the `in` operator first, as the streams of WebKit do
+        has(_target, property) : boolean {
+            return Reflect.has(options, property);
+        },
     });
 }
 
