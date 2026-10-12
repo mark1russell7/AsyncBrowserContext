@@ -114,6 +114,7 @@
     "smoke": "pnpm build && tsx test/smoke/run.ts",
     "test:babel": "pnpm build && tsx test/babel/run.ts",
     "lint:ste": "tsx tools/ste-lint/src/cli.ts",
+    "test:ste-lint": "vitest run --config tools/ste-lint/vitest.config.ts",
     "site:dev": "pnpm --filter ./site dev",
     "site:build": "pnpm --filter ./site build",
     "prepublishOnly": "pnpm build && pnpm test",
