@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { transformAsync, types, type PluginObject } from "@babel/core";
+import { parseSync, transformAsync, traverse, types, type NodePath, type PluginObject } from "@babel/core";
 import { describe, expect, it } from "vitest";
 import preset, { DEFAULT_RUNTIME, METADATA_KEY, supportsResourceManagement } from "./preset.js";
 
@@ -256,12 +256,36 @@ describe("the Babel preset", () => {
                 parserOpts : { plugins : ["typescript"] },
                 presets : [preset],
             });
-            // The native async functions of the runtime: "async () =>" and "async function"
-            const asyncFunctions = /\basync\s*(?:\(|function\b)/;
-            expect(source).toMatch(asyncFunctions);
-            expect(result?.code).toMatch(asyncFunctions);
+            // The native async functions of the syntax tree, not the words of the comments
+            const asyncFunctions = (code : string) : number => {
+                let count = 0;
+                const ast = parseSync(code, { filename : file, babelrc : false, configFile : false, parserOpts : { plugins : ["typescript"] } });
+                if (ast === null) throw new Error(`Babel did not parse ${file}`);
+                traverse(ast, {
+                    Function(path : NodePath<types.Function>) {
+                        if (path.node.async) count++;
+                    },
+                });
+                return count;
+            };
+            expect(asyncFunctions(source), file).toBeGreaterThan(0);
+            expect(asyncFunctions(result?.code ?? ""), file).toBe(asyncFunctions(source));
             expect(result?.code).not.toMatch(/_coroutine\(/);
         }
+    });
+
+    it("does not change an async generator or a for await loop in a function with the directive of the runtime", async () => {
+        const output = await transform([
+            "const prototype = async function* () { \"async-browser-context runtime\"; };",
+            "async function drain(items) { \"async-browser-context runtime\"; for await (const item of items) { await item; } }",
+            "async function* user() { yield 1; }",
+        ].join("\n"));
+        expect(output.code).toContain("async function* () {");
+        expect(output.code).toContain("for await (const item of items)");
+        expect(output.code).toContain("async function drain(items)");
+        // The other async generator changes as usual
+        expect(output.code).not.toContain("async function* user");
+        expect(output.code).toContain("_asyncGenerator(");
     });
 
     it("changes await using before the async transform, so the output has no await using in a generator", async () => {

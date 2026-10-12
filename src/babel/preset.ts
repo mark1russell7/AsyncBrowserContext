@@ -5,7 +5,7 @@ import explicitResourceManagement from "@babel/plugin-transform-explicit-resourc
 import { asyncGeneratorHelpersPlugin } from "./async-generator-helpers.js";
 import { bindGeneratorsPlugin } from "./bind-generators.js";
 import { nameCoroutinesPlugin } from "./name-coroutines.js";
-import { skipRuntimePlugin } from "./skip-runtime.js";
+import { skipRuntimePlugin, withRuntimeSkipped, type PluginFactory } from "./skip-runtime.js";
 import { staticMembersPlugin } from "./static-members.js";
 
 export { METADATA_KEY } from "./bind-generators.js";
@@ -25,6 +25,9 @@ export interface PresetOptions {
      */
     readonly names? : boolean | undefined;
 }
+
+/** The plugin of Babel for async generators, without a change of the functions of the runtime (skip-runtime.ts). */
+const asyncGeneratorFunctionsOutsideRuntime = withRuntimeSkipped(asyncGeneratorFunctions as unknown as PluginFactory);
 
 /** The default runtime module. */
 export const DEFAULT_RUNTIME = "async-browser-context/runtime";
@@ -70,7 +73,7 @@ export default function asyncBrowserContextPreset(api : PresetAPI, options : Pre
             staticMembersPlugin,
             [asyncGeneratorHelpersPlugin, { runtime }],
             ...resources,
-            asyncGeneratorFunctions,
+            asyncGeneratorFunctionsOutsideRuntime,
             [asyncToGenerator, { module : runtime, method : "coroutine" }],
         ],
     };
