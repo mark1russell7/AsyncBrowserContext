@@ -2,9 +2,9 @@ import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type K
 import { Link } from "react-router";
 import { usePrefersReducedMotion } from "../lib/use-media-query";
 import type { ContextMode } from "./instrumented";
-import { laneColor } from "./layout";
+import { describeStep, laneColor } from "./layout";
 import { scenarioById, scenarios as allScenarios, traceScenario, type DebuggerScenario } from "./run";
-import type { FrameInfo, Lane, Trace } from "./trace";
+import type { FrameInfo, Lane, Trace, TraceStep } from "./trace";
 import { useStepPlayer, type StepPlayer } from "./useStepPlayer";
 import { CodeView, ConsoleView, FrameGraph, LaneTimeline, ReadsBar, StepView } from "./views";
 import styles from "./Debugger.module.css";
@@ -41,6 +41,17 @@ export type ContextDebuggerProps = {
 };
 
 const SPEEDS = [0.5, 1, 2] as const;
+
+function errorText(error : unknown) : string {
+    return error instanceof Error ? error.message : String(error);
+}
+
+/** The text of the live region for one step: the number of the step, what happens, and the new lines of the console. */
+function describeForReader(trace : Trace, step : TraceStep, frames : ReadonlyMap<string, FrameInfo>) : string {
+    const text = describeStep(trace, step, frames);
+    const logs = trace.logs.filter(log => log.step === step.index).map(log => `The console shows: ${log.text}.`);
+    return [`Step ${step.index + 1} of ${trace.steps.length}. ${text.title}.`, ...text.sentences, ...logs].join(" ");
+}
 
 function Icon({ name } : { name : "first" | "previous" | "play" | "pause" | "next" | "last" }) {
     const paths = {
@@ -113,29 +124,53 @@ export function ContextDebugger({ source, scenario : initial = "two-requests", s
     }, [source, scenario]);
     const [compare, setCompare] = useState<CompareMode | "none">(initialCompare ?? "none");
     const [trace, setTrace] = useState<Trace>();
+    const [traceError, setTraceError] = useState<string>();
     const [compareTrace, setCompareTrace] = useState<Trace>();
+    const [compareError, setCompareError] = useState<string>();
+    // A new value starts the trace again, after a failed start.
+    const [attempt, setAttempt] = useState(0);
+    const [compareAttempt, setCompareAttempt] = useState(0);
     const reducedMotion = usePrefersReducedMotion();
     const root = useRef<HTMLElement>(null);
     const [visible, setVisible] = useState(false);
     const [hovered, setHovered] = useState(false);
     const [stopped, setStopped] = useState(false);
+    // The live region tells the step only after the reader moves to a step.
+    const [announce, setAnnounce] = useState(false);
 
     useEffect(() => {
         let live = true;
         setTrace(undefined);
-        active.trace("library").then((result) => { if (live) setTrace(result); }, () => undefined);
+        setTraceError(undefined);
+        active.trace("library").then(
+            (result) => { if (live) setTrace(result); },
+            (error : unknown) => { if (live) setTraceError(errorText(error)); },
+        );
         return () => { live = false; };
-    }, [active]);
+    }, [active, attempt]);
 
     useEffect(() => {
         let live = true;
         setCompareTrace(undefined);
-        if (compare !== "none") active.trace(compare).then((result) => { if (live) setCompareTrace(result); }, () => undefined);
+        setCompareError(undefined);
+        if (compare !== "none") {
+            active.trace(compare).then(
+                (result) => { if (live) setCompareTrace(result); },
+                (error : unknown) => { if (live) setCompareError(errorText(error)); },
+            );
+        }
         return () => { live = false; };
-    }, [active, compare]);
+    }, [active, compare, compareAttempt]);
 
     const count = trace?.steps.length ?? 0;
-    const player = useStepPlayer(count, { loop : hero, resetKey : `${active.id}:${count}`, startAt : hero && reducedMotion ? "last" : "first" });
+    const basePlayer = useStepPlayer(count, { loop : hero, resetKey : `${active.id}:${count}`, startAt : hero && reducedMotion ? "last" : "first" });
+    // Each move of the reader turns on the announcement of the step.
+    const player : StepPlayer = {
+        ...basePlayer,
+        setIndex : (index) => { setAnnounce(true); basePlayer.setIndex(index); },
+        next : () => { setAnnounce(true); basePlayer.next(); },
+        previous : () => { setAnnounce(true); basePlayer.previous(); },
+    };
 
     // The hero plays when it is on the screen, and stops while the pointer is on it.
     useEffect(() => {
@@ -158,7 +193,11 @@ export function ContextDebugger({ source, scenario : initial = "two-requests", s
     const frames = useMemo(() => new Map<string, FrameInfo>((trace?.frames ?? []).map(frame => [frame.id, frame])), [trace]);
 
     const onKeyDown = (event : KeyboardEvent<HTMLElement>) => {
-        const onButton = event.target instanceof HTMLButtonElement || event.target instanceof HTMLSelectElement;
+        const target = event.target;
+        // A form control uses the arrow keys, Home and End itself, for example a select.
+        if (target instanceof HTMLSelectElement || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+            || (target instanceof HTMLElement && target.isContentEditable)) return;
+        const onButton = target instanceof HTMLButtonElement;
         if (event.key === "ArrowRight") player.next();
         else if (event.key === "ArrowLeft") player.previous();
         else if (event.key === "Home") player.setIndex(0);
@@ -171,6 +210,8 @@ export function ContextDebugger({ source, scenario : initial = "two-requests", s
 
     const step = trace?.steps[player.index];
     const viewProps = trace ? { trace, index : player.index, lanes, frames } : undefined;
+    // One live region for the debugger. It is empty while the steps play, so autoplay does not speak each step.
+    const announcement = trace && step && announce && !player.playing ? describeForReader(trace, step, frames) : "";
     const heroPlayer : StepPlayer = {
         ...player,
         toggle : () => {
@@ -213,7 +254,8 @@ export function ContextDebugger({ source, scenario : initial = "two-requests", s
             )}
             {trace && viewProps ? (
                 <>
-                    <div className={styles.stage} tabIndex={0} aria-label="The steps. Use the left and right arrow keys to move through the steps, and the space key to play or pause.">
+                    <p className="visually-hidden" aria-live="polite" aria-atomic="true">{announcement}</p>
+                    <div className={styles.stage} role="group" tabIndex={0} aria-label="The steps. Use the left and right arrow keys to move through the steps, and the space key to play or pause.">
                         <Panel
                             className={styles.codePanel}
                             title={hero ? "Code" : active.title}
@@ -259,12 +301,24 @@ export function ContextDebugger({ source, scenario : initial = "two-requests", s
                                     </label>
                                 )}
                             >
-                                <ConsoleView {...viewProps} compare={compare === "none" ? undefined : compareTrace} compareLabel={compare === "none" ? "" : COMPARE_LABELS[compare]} />
+                                {compare !== "none" && compareError !== undefined ? (
+                                    <div className={styles.failed}>
+                                        <p role="alert">The comparison did not start: {compareError}</p>
+                                        <button type="button" className="button" onClick={() => setCompareAttempt(value => value + 1)}>Try again</button>
+                                    </div>
+                                ) : (
+                                    <ConsoleView {...viewProps} compare={compare === "none" ? undefined : compareTrace} compareLabel={compare === "none" ? "" : COMPARE_LABELS[compare]} />
+                                )}
                             </Panel>
                         </div>
                     )}
                     {trace.error ? <p className={styles.error} role="alert">The scenario stopped with an error: {trace.error}</p> : null}
                 </>
+            ) : traceError !== undefined ? (
+                <div className={`${styles.loading} ${styles.failed}`}>
+                    <p role="alert">The scenario did not start: {traceError}</p>
+                    <button type="button" className="button" onClick={() => setAttempt(value => value + 1)}>Try again</button>
+                </div>
             ) : (
                 <p className={styles.loading} data-loading="true" aria-busy="true">The scenario starts.</p>
             )}

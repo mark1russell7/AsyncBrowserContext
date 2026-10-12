@@ -98,16 +98,16 @@ export function EventRuleDemo() {
             </div>
             {log.length === 0 ? (
                 <p className={styles.meta}>Add the handlers, then click the button. Each click adds a line here.</p>
-            ) : (
-                <ol className={styles.log} aria-live="polite" aria-label="Clicks">
-                    {log.map(entry => (
-                        <li key={entry.id} className={styles.logEntry} data-status={entry.seen === entry.expected ? "correct" : "wrong"}>
-                            <strong>{entry.handler}</strong>: dispatched by {entry.dispatcher}. The handler got{" "}
-                            <code>{entry.seen}</code>. The rule gives <code>{entry.expected}</code>.
-                        </li>
-                    ))}
-                </ol>
-            )}
+            ) : null}
+            {/* The live region is always in the page, so a screen reader tells the first line too. */}
+            <ol className={styles.log} aria-live="polite" aria-label="Clicks">
+                {log.map(entry => (
+                    <li key={entry.id} className={styles.logEntry} data-status={entry.seen === entry.expected ? "correct" : "wrong"}>
+                        <strong>{entry.handler}</strong>: dispatched by {entry.dispatcher}. The handler got{" "}
+                        <code>{entry.seen}</code>. The rule gives <code>{entry.expected}</code>.
+                    </li>
+                ))}
+            </ol>
         </div>
     );
 }

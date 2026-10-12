@@ -28,9 +28,10 @@
     overflow: visible;
 }
 
-.plot :global(text) {
-    fill: currentColor;
-}
+/*
+ * The axes of Plot use currentColor, so they get the color of .plot. A text
+ * mark keeps its own fill (for example the letters on the dots of a timeline).
+ */
 
 /* The tooltip that Plot draws. */
 .plot :global([aria-label="tip"]) {

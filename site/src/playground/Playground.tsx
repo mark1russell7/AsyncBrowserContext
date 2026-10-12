@@ -54,7 +54,9 @@ type CompileProblem = { message : string; line? : number | undefined };
 type RunState =
     | { kind : "ready"; source : DebuggerSource }
     | { kind : "error"; problem : CompileProblem }
-    | { kind : "compiling" };
+    | { kind : "compiling" }
+    /** Code from a link. The page does not start it until the reader selects "Run the code". */
+    | { kind : "linked" };
 
 let runs = 0;
 
@@ -69,11 +71,14 @@ export function Playground() {
     const linked = useMemo(() => codeFromAddress(), []);
     const [code, setCode] = useState(() => linked ?? scenarioById(FIRST_SCENARIO).source);
     const [tokenize, setTokenize] = useState<Tokenize>();
-    const [run, setRun] = useState<RunState>(() => (linked === undefined ? { kind : "ready", source : scenarioSource(scenarioById(FIRST_SCENARIO)) } : { kind : "compiling" }));
+    const [run, setRun] = useState<RunState>(() => (linked === undefined ? { kind : "ready", source : scenarioSource(scenarioById(FIRST_SCENARIO)) } : { kind : "linked" }));
     const [copied, setCopied] = useState(false);
+    const copiedTimer = useRef<number | undefined>(undefined);
     const helpId = useId();
     const exampleId = useId();
     const loading = useRef(false);
+
+    useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
 
     /** This function starts to load Shiki and Babel, one time. */
     const prepare = useCallback(() => {
@@ -123,8 +128,13 @@ export function Playground() {
                 trace(mode) {
                     let trace = traces.get(mode);
                     if (trace === undefined) {
-                        trace = compiler.tracePlayground(compiled, mode);
-                        traces.set(mode, trace);
+                        const started = compiler.tracePlayground(compiled, mode);
+                        traces.set(mode, started);
+                        // A failed run is not kept, so the debugger can try again.
+                        started.catch(() => {
+                            if (traces.get(mode) === started) traces.delete(mode);
+                        });
+                        trace = started;
                     }
                     return trace;
                 },
@@ -132,17 +142,25 @@ export function Playground() {
         });
     }, [linesOf, prepare]);
 
-    // Code from a link must compile at the start.
+    // Code from a link does not start by itself: anybody can make a link. The page loads only the highlighter and the compiler.
     useEffect(() => {
-        if (linked !== undefined) void start(linked);
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        if (linked !== undefined) prepare();
+    }, [linked, prepare]);
+
+    const loadScenario = (scenario : DebuggerScenario) => {
+        setCode(scenario.source);
+        // The code from the link is gone, so the notice about it goes too. A scenario of the build is safe to start.
+        if (run.kind === "linked") setRun({ kind : "ready", source : scenarioSource(scenario) });
+    };
 
     const copyLink = () => {
-        const address = `${location.origin}${location.pathname}#${HASH_KEY}${encode(code)}`;
-        history.replaceState(null, "", address);
+        const address = `${location.origin}${location.pathname}${location.search}#${HASH_KEY}${encode(code)}`;
+        // Keep the state of the history entry: React Router keeps its data there.
+        history.replaceState(history.state, "", address);
         navigator.clipboard?.writeText(address).then(() => {
             setCopied(true);
-            window.setTimeout(() => setCopied(false), 1800);
+            window.clearTimeout(copiedTimer.current);
+            copiedTimer.current = window.setTimeout(() => setCopied(false), 1800);
         }, () => undefined);
     };
 
@@ -152,7 +170,8 @@ export function Playground() {
             <div className={styles.toolbar}>
                 <label className={styles.field} htmlFor={exampleId}>
                     Start from
-                    <select id={exampleId} defaultValue="" onChange={(event) => { if (event.target.value) setCode(scenarioById(event.target.value).source); }}>
+                    {/* The value stays empty, so a second selection of the same scenario loads its code again. */}
+                    <select id={exampleId} value="" onChange={(event) => { if (event.target.value) loadScenario(scenarioById(event.target.value)); }}>
                         <option value="" disabled>a scenario</option>
                         {scenarios.map(scenario => <option key={scenario.id} value={scenario.id}>{scenario.title}</option>)}
                     </select>
@@ -162,6 +181,11 @@ export function Playground() {
                     <button type="button" className="button" data-variant="primary" onClick={() => void start(code)}>Run the code</button>
                 </span>
             </div>
+            {run.kind === "linked" ? (
+                <p className={styles.notice} role="status">
+                    This code comes from a link. The page did not start it. Read the code, then select &quot;Run the code&quot; to start it in this page.
+                </p>
+            ) : null}
             <CodeEditor value={code} onChange={setCode} onRun={() => void start(code)} lines={lines} errorLine={problem?.line} label="The code of the playground" describedBy={helpId} />
             <p id={helpId} className={styles.help}>
                 Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to start the code. The Tab key indents: press <kbd>Esc</kbd> and then <kbd>Tab</kbd> to move out of the editor.

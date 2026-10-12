@@ -194,10 +194,15 @@ table {
     font-size: var(--text-base);
 }
 
-.prose p,
-.prose ul,
-.prose ol,
-.prose dl,
+/*
+ * The rules for text and lists use :where(), so they have the specificity of
+ * one class. Thus a component in an MDX page keeps the margins and the
+ * padding of its own classes.
+ */
+.prose :where(p, ul, ol, dl, blockquote) {
+    margin: 0 0 var(--space-4);
+}
+
 /* Code blocks that Shiki highlighted. Each token has a light and a dark color. */
 .shiki span {
     color: var(--shiki-light);
@@ -213,16 +218,12 @@ table {
     }
 }
 
-.prose blockquote {
-    margin: 0 0 var(--space-4);
-}
-
-.prose ul,
-.prose ol {
+.prose :where(ul, ol) {
     padding-left: 1.4em;
 }
 
-.prose li + li {
+/* Only the lists of the text, not the lists of a component (they have a class). */
+.prose :where(ul:not([class]), ol:not([class])) > :where(li + li) {
     margin-top: var(--space-1);
 }
 

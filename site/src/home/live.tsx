@@ -6,17 +6,41 @@ import type { FrameInfo, Lane, Trace } from "../debugger/trace";
 import { FrameGraph } from "../debugger/views";
 import styles from "./Home.module.css";
 
+type TracesState = {
+    traces : Trace[] | undefined;
+    /** The message of the error, if a run did not start. */
+    error : string | undefined;
+    /** This function starts the runs again after an error. */
+    retry() : void;
+};
+
 /** This hook starts one scenario with each mode and gives the traces when all are ready. */
-function useTraces(id : string, modes : readonly ContextMode[]) : Trace[] | undefined {
+function useTraces(id : string, modes : readonly ContextMode[]) : TracesState {
     const [traces, setTraces] = useState<Trace[]>();
+    const [error, setError] = useState<string>();
+    const [attempt, setAttempt] = useState(0);
     const key = modes.join(",");
     useEffect(() => {
         let live = true;
+        setError(undefined);
         const scenario = scenarioById(id);
-        Promise.all(key.split(",").map(mode => traceScenario(scenario, mode as ContextMode))).then((result) => { if (live) setTraces(result); }, () => undefined);
+        Promise.all(key.split(",").map(mode => traceScenario(scenario, mode as ContextMode))).then(
+            (result) => { if (live) setTraces(result); },
+            (reason : unknown) => { if (live) setError(reason instanceof Error ? reason.message : String(reason)); },
+        );
         return () => { live = false; };
-    }, [id, key]);
-    return traces;
+    }, [id, key, attempt]);
+    return { traces, error, retry : () => setAttempt(value => value + 1) };
+}
+
+/** The message after a failed run, with a button that starts the run again. */
+function RunFailed({ error, retry, className } : { error : string; retry() : void; className : string | undefined }) {
+    return (
+        <div className={className}>
+            <p role="alert">The example did not start: {error}</p>
+            <button type="button" className="button" onClick={retry}>Try again</button>
+        </div>
+    );
 }
 
 const laneStyle = (lanes : ReadonlyMap<string, Lane>, id : string) => ({ "--lane" : laneColor(lanes.get(id)) } as CSSProperties);
@@ -27,7 +51,8 @@ const laneStyle = (lanes : ReadonlyMap<string, Lane>, id : string) => ({ "--lane
  * not static text.
  */
 export function CompareConsoles() {
-    const traces = useTraces("two-requests", ["global-kept", "library"]);
+    const { traces, error, retry } = useTraces("two-requests", ["global-kept", "library"]);
+    if (traces === undefined && error !== undefined) return <RunFailed error={error} retry={retry} className={styles.compareLoading} />;
     if (traces === undefined) return <div className={styles.compareLoading} data-loading="true">The two runs start.</div>;
     const [global, library] = traces as [Trace, Trace];
     const lanes = new Map(library.lanes.map(lane => [lane.id, lane]));
@@ -44,7 +69,7 @@ export function CompareConsoles() {
                         const correct = log.text === library.logs[index]?.text;
                         return (
                             <li key={index} data-status={correct ? "correct" : "wrong"}>
-                                <span className={styles.consoleIcon} aria-label={correct ? "Correct" : "Wrong"}>{correct ? "✓" : "✗"}</span>
+                                <span className={styles.consoleIcon} role="img" aria-label={correct ? "Correct" : "Wrong"}>{correct ? "✓" : "✗"}</span>
                                 <code>{log.text}</code>
                             </li>
                         );
@@ -59,7 +84,7 @@ export function CompareConsoles() {
                 <ol>
                     {library.logs.map((log, index) => (
                         <li key={index} data-status="correct" style={laneStyle(lanes, log.lane)}>
-                            <span className={styles.consoleIcon} aria-label="Correct">✓</span>
+                            <span className={styles.consoleIcon} role="img" aria-label="Correct">✓</span>
                             <code><i aria-hidden="true" />{log.text}</code>
                         </li>
                     ))}
@@ -71,7 +96,7 @@ export function CompareConsoles() {
 
 /** The frame graph of the scenario "Nested contexts" at the read with the longest search. */
 export function FrameSnapshot() {
-    const traces = useTraces("nested", ["library"]);
+    const { traces, error, retry } = useTraces("nested", ["library"]);
     const trace = traces?.[0];
     const view = useMemo(() => {
         if (trace === undefined) return undefined;
@@ -85,6 +110,7 @@ export function FrameSnapshot() {
         }
         return { lanes, frames, index : best?.index ?? 0, lookup : best?.lookups.find(lookup => lookup.path.length > 1) };
     }, [trace]);
+    if (trace === undefined && error !== undefined) return <RunFailed error={error} retry={retry} className={styles.snapshotLoading} />;
     if (trace === undefined || view === undefined) return <div className={styles.snapshotLoading} data-loading="true">The scenario starts.</div>;
     return (
         <figure className={styles.snapshot}>

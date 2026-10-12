@@ -34,6 +34,12 @@ function statusColor(theme : ThemeColors, status : ReadStatus) : string {
     return theme.ink;
 }
 
+/** The counts of one run in one sentence, for the live region. */
+function countsText(run : ScenarioRun) : string {
+    const counts = summarize(run.reads);
+    return `${run.implementation.label}: ${counts.total} reads, ${counts.correct} correct, ${counts.lost} lost, ${counts.wrong} wrong.`;
+}
+
 function shortLabel(value : string) : string {
     return value === ROOT ? "–" : value.slice(0, 1);
 }
@@ -114,8 +120,8 @@ function Legend() {
                     {value === ROOT ? "Root context (no value)" : `Context ${value}`}
                 </li>
             ))}
-            <li style={{ color : theme.status.warning }}><span className={styles.ring} aria-hidden="true" />Lost</li>
-            <li style={{ color : theme.status.critical }}><span className={styles.ring} aria-hidden="true" />Wrong context</li>
+            <li style={{ color : theme.status.warningInk }}><span className={styles.ring} style={{ color : theme.status.warning }} aria-hidden="true" />Lost</li>
+            <li style={{ color : theme.status.criticalInk }}><span className={styles.ring} style={{ color : theme.status.critical }} aria-hidden="true" />Wrong context</li>
         </ul>
     );
 }
@@ -138,6 +144,8 @@ export function ContextTimeline({ scenario : initialScenario = SCENARIOS[0]!.id,
     const [runs, setRuns] = useState<ScenarioRun[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string>();
+    // The live region tells the counts only after a choice of the reader, not at the first load.
+    const [announce, setAnnounce] = useState(false);
     const generation = useRef(0);
     const compareId = useId();
     const scenario = scenarioById(scenarioId);
@@ -164,6 +172,8 @@ export function ContextTimeline({ scenario : initialScenario = SCENARIOS[0]!.id,
         void start(scenarioId, comparison);
     }, [start, scenarioId, comparison]);
 
+    const shown = runs.filter(run => run.scenario.id === scenarioId);
+
     return (
         <div className={styles.widget}>
             <ul className={styles.choices} aria-label="Scenario">
@@ -173,7 +183,10 @@ export function ContextTimeline({ scenario : initialScenario = SCENARIOS[0]!.id,
                             type="button"
                             className={styles.choice}
                             aria-pressed={candidate.id === scenarioId}
-                            onClick={() => setScenarioId(candidate.id)}
+                            onClick={() => {
+                                setAnnounce(true);
+                                setScenarioId(candidate.id);
+                            }}
                         >
                             {candidate.title}
                         </button>
@@ -190,7 +203,10 @@ export function ContextTimeline({ scenario : initialScenario = SCENARIOS[0]!.id,
                         id={compareId}
                         className="control"
                         value={comparison}
-                        onChange={(event) => setComparison(event.target.value as ImplementationId | "none")}
+                        onChange={(event) => {
+                            setAnnounce(true);
+                            setComparison(event.target.value as ImplementationId | "none");
+                        }}
                     >
                         <option value="none">No comparison</option>
                         {IMPLEMENTATIONS.filter(implementation => implementation.id !== "library").map(implementation => (
@@ -198,13 +214,26 @@ export function ContextTimeline({ scenario : initialScenario = SCENARIOS[0]!.id,
                         ))}
                     </select>
                 </label>
-                <button type="button" className="button" data-variant="primary" disabled={busy} onClick={() => void start(scenarioId, comparison)}>
+                <button
+                    type="button"
+                    className="button"
+                    data-variant="primary"
+                    disabled={busy}
+                    onClick={() => {
+                        setAnnounce(true);
+                        void start(scenarioId, comparison);
+                    }}
+                >
                     Start the scenario again
                 </button>
             </div>
             {error ? <p className={styles.error} role="alert">The scenario stopped with an error: {error}</p> : null}
-            <div className={styles.panels} aria-live="polite" aria-busy={busy && runs.length === 0 ? true : undefined} data-loading={busy && runs.length === 0 ? "" : undefined}>
-                {runs.filter(run => run.scenario.id === scenarioId).map(run => (
+            {/* One live region for the widget. It tells only the counts of each run. */}
+            <p className="visually-hidden" aria-live="polite" aria-atomic="true">
+                {announce && !busy ? shown.map(run => countsText(run)).join(" ") : ""}
+            </p>
+            <div className={styles.panels} aria-busy={busy && runs.length === 0 ? true : undefined} data-loading={busy && runs.length === 0 ? "" : undefined}>
+                {shown.map(run => (
                     <Swimlanes key={run.implementation.id} run={run} scenario={scenario} />
                 ))}
             </div>

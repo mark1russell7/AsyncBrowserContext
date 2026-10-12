@@ -74,6 +74,18 @@ function withDefaults(options : PlotOptions, context : PlotContext, title : stri
 }
 
 /**
+ * A text that is the same for the same chart options. A function gives its
+ * source text. The function gives undefined if JSON cannot write the options.
+ */
+function signatureOf(options : PlotOptions) : string | undefined {
+    try {
+        return JSON.stringify(options, (_key, value : unknown) => (typeof value === "function" ? `function ${value.toString()}` : value));
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * The one wrapper for Observable Plot charts. It does these steps:
  * - It loads Plot when a page needs it.
  * - It fits the chart to the width of its container.
@@ -106,26 +118,45 @@ export function PlotFigure(props : PlotFigureProps) {
         return () => { current = false; };
     }, [module]);
 
-    // The props have no stable identity, so the chart is made again after every render.
-    useLayoutEffect(() => {
-        const host = hostRef.current;
-        if (!host || !module || width === 0) return;
+    // The props have no stable identity. Thus each render resolves the options, and the
+    // chart is made again only when the resolved options change. A new chart closes an
+    // open tooltip, so a render of the parent without a change keeps the chart.
+    let chartOptions : PlotOptions | undefined;
+    let buildError : string | undefined;
+    if (module && width > 0) {
         try {
             const context : PlotContext = { width, theme, Plot : module };
             const resolved = typeof options === "function" ? options(context) : (options ?? {});
             const extraMarks = typeof marks === "function" ? marks(context) : (marks ?? []);
-            const chart = module.plot(withDefaults({
+            chartOptions = withDefaults({
                 ...layout,
                 ...resolved,
                 marks : [...extraMarks, ...(resolved.marks ?? [])],
-            }, context, title, description));
-            host.replaceChildren(chart);
+            }, context, title, description);
+        } catch (error) {
+            buildError = error instanceof Error ? error.message : String(error);
+        }
+    }
+    // Without a signature (for example data that JSON cannot write), a new symbol makes the chart again at each render.
+    const chartKey = chartOptions === undefined ? buildError : signatureOf(chartOptions) ?? Symbol("chart");
+
+    useLayoutEffect(() => {
+        const host = hostRef.current;
+        if (!host || !module) return;
+        if (buildError !== undefined) {
+            host.replaceChildren();
+            reportRenderError(buildError);
+            return;
+        }
+        if (chartOptions === undefined) return;
+        try {
+            host.replaceChildren(module.plot(chartOptions));
             reportRenderError(undefined);
         } catch (error) {
             host.replaceChildren();
             reportRenderError(error instanceof Error ? error.message : String(error));
         }
-    });
+    }, [module, chartKey, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const loading = !module && !loadError;
     return (

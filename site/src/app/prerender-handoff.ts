@@ -78,6 +78,66 @@ export function routePathOf(pathname : string, baseUrl : string) : string {
 }
 
 /**
+ * The state of the handoff in this document:
+ * - "none": the page has no HTML from the build, so the app renders into the visible root.
+ * - "pending": the app renders into the hidden element, and the HTML from the build shows.
+ * - "done": the app shows, and the HTML from the build is gone.
+ */
+export type HandoffState = "none" | "pending" | "done";
+
+let handoffState : HandoffState = "none";
+const handoffListeners = new Set<() => void>();
+
+function setHandoffState(next : HandoffState) : void {
+    handoffState = next;
+    for (const listener of [...handoffListeners]) listener();
+}
+
+/** The state of the handoff. Use it with `useSyncExternalStore` and `subscribeHandoff`. */
+export function getHandoffState() : HandoffState {
+    return handoffState;
+}
+
+/** This function starts `listener` after each change of the handoff state. It gives a function that stops this. */
+export function subscribeHandoff(listener : () => void) : () => void {
+    handoffListeners.add(listener);
+    return () => handoffListeners.delete(listener);
+}
+
+/** A short text that identifies an element, for the comparison of the two trees. */
+function signatureOf(element : Element) : string {
+    return [
+        element.tagName,
+        element.getAttribute("href") ?? "",
+        element.getAttribute("name") ?? "",
+        element.getAttribute("aria-label") ?? "",
+        (element.textContent ?? "").trim().slice(0, 200),
+    ].join("\u0000");
+}
+
+/**
+ * This function finds the element of `to` that has the place of `element`
+ * in `from`. First it follows the same child positions. If that element is
+ * different, it uses the element with the same signature and the same
+ * position among the elements with that signature.
+ */
+export function findCounterpart(from : Element, to : Element, element : Element) : HTMLElement | undefined {
+    const signature = signatureOf(element);
+    const positions : number[] = [];
+    for (let node : Element | null = element; node !== null && node !== from; node = node.parentElement) {
+        const parent : Element | null = node.parentElement;
+        if (parent === null) return undefined;
+        positions.unshift(Array.prototype.indexOf.call(parent.children, node));
+    }
+    let candidate : Element | undefined = to;
+    for (const position of positions) candidate = candidate?.children[position];
+    if (candidate instanceof HTMLElement && signatureOf(candidate) === signature) return candidate;
+    const same = (root : Element) : Element[] => [...root.querySelectorAll(element.tagName)].filter(item => signatureOf(item) === signature);
+    const match = same(to)[same(from).indexOf(element)];
+    return match instanceof HTMLElement ? match : undefined;
+}
+
+/**
  * This function gives the element that the app renders into.
  *
  * Without HTML from the build, the function gives `container`. With HTML
@@ -90,6 +150,9 @@ export function routePathOf(pathname : string, baseUrl : string) : string {
  * The root element tells the route of its HTML. If a server gives the HTML
  * of a different route (for example, index.html for each path), the function
  * removes that HTML and gives `container`.
+ *
+ * If an element of the HTML from the build has the focus at the swap, the
+ * same element of the app gets the focus.
  */
 export function mountApp(container : HTMLElement, routePath : string, times? : HandoffTimes) : AppMount {
     const prerendered = container.getAttribute(PRERENDERED_ATTRIBUTE);
@@ -104,12 +167,17 @@ export function mountApp(container : HTMLElement, routePath : string, times? : H
     live.setAttribute("style", HIDDEN_STYLE);
     live.inert = true;
     container.after(live);
+    setHandoffState("pending");
     whenReady(live, () => {
+        const focused = document.activeElement;
+        const target = focused !== null && focused !== container && container.contains(focused) ? findCounterpart(container, live, focused) : undefined;
         const id = container.id;
         container.remove();
         live.removeAttribute("style");
         live.inert = false;
         live.id = id;
+        target?.focus({ preventScroll : true });
+        setHandoffState("done");
     }, times);
     return { element : live, options : { identifierPrefix : HANDOFF_ID_PREFIX } };
 }

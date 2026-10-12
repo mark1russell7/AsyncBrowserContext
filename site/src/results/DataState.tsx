@@ -24,7 +24,7 @@ export function DataState<K extends SiteDataName>({ name, children } : { name : 
             {state.value.sample ? (
                 <Callout type="note" title="Sample values">
                     <p>
-                        The file <code>data/{name}.json</code> contains sample values from the review of 2026-10-08. The test
+                        The file <code>data/{name}.json</code> contains sample values, not measured results. The test
                         tools replace it with measured results.
                     </p>
                 </Callout>

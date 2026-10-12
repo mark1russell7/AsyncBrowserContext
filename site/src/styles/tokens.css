@@ -73,8 +73,17 @@
     --radius-small: 3px;
     --measure: 68ch;
     --page-width: 82rem;
+    /* The height of one line of the header. The header sets --header-height to its real height (it can wrap). */
+    --header-min-height: 3.5rem;
     --header-height: 3.5rem;
     --gutter: clamp(1rem, 3vw, 2rem);
+}
+
+/* Before the header measures itself, a narrow screen uses the height of a header with two lines. */
+@media (max-width: 34rem) {
+    :root {
+        --header-height: 6.25rem;
+    }
 }
 
 :root[data-theme="dark"] {

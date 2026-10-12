@@ -14,10 +14,15 @@ export type ContextMode = "library" | "global-restored" | "global-kept";
 type Session = { tracer : Tracer; mode : ContextMode };
 let session : Session | undefined;
 
-/** This function sets the tracer and the mode of the next start of a scenario. */
+/**
+ * This function sets the tracer and the mode of the next start of a scenario.
+ * It also removes the sleepers of the clock. Thus code of an earlier start,
+ * for example a start after its time limit, does not continue in the new session.
+ */
 export function setSession(next : Session | undefined) : void {
     session = next;
     clock.now = 0;
+    clock.sleepers.length = 0;
 }
 
 /**
@@ -223,12 +228,17 @@ export class PlaygroundStop extends Error {
 /**
  * This function makes a trace object for one run of the playground. The trace
  * object stops the code after `limit` steps, and also after the run: thus a
- * loop without an end cannot stop the page.
+ * loop without an end cannot stop the page. The trace object records only
+ * into the session of its first step. If a different session starts, the
+ * trace object stops the code.
  */
 export function createGuardedTrace(limit : number) : { trace : TraceApi; stop() : void } {
     let steps = 0;
     let stopped = false;
+    let owner : { session : Session | undefined } | undefined;
     const check = () : void => {
+        owner ??= { session };
+        if (owner.session !== session) stopped = true;
         if (stopped) throw new PlaygroundStop("The run is complete. The playground stopped this code.");
         steps++;
         if (steps > limit) {

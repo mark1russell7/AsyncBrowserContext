@@ -81,6 +81,27 @@ describe("site routes", () => {
         expect(problems).toEqual([]);
     });
 
+    it("closes the menu with the Escape key and with a click outside, and writes the height of the header", async () => {
+        await renderPath("/");
+        const header = container.querySelector("header");
+        const menu = container.querySelector<HTMLButtonElement>("header nav button[aria-expanded]");
+        if (!header || !menu) throw new Error("No header or no menu button");
+        expect(document.documentElement.style.getPropertyValue("--header-height")).toBe(`${Math.ceil(header.getBoundingClientRect().height)}px`);
+
+        menu.click();
+        await vi.waitFor(() => expect(menu.getAttribute("aria-expanded")).toBe("true"));
+        container.querySelector<HTMLAnchorElement>("header nav a")?.focus();
+        document.dispatchEvent(new KeyboardEvent("keydown", { key : "Escape", bubbles : true }));
+        await vi.waitFor(() => expect(menu.getAttribute("aria-expanded")).toBe("false"));
+        expect(document.activeElement).toBe(menu);
+
+        menu.click();
+        await vi.waitFor(() => expect(menu.getAttribute("aria-expanded")).toBe("true"));
+        container.querySelector("main")?.dispatchEvent(new PointerEvent("pointerdown", { bubbles : true }));
+        await vi.waitFor(() => expect(menu.getAttribute("aria-expanded")).toBe("false"));
+        expect(problems).toEqual([]);
+    });
+
     it("shows the reads of the default scenario in the context timeline", async () => {
         await renderPath("/explore/timeline");
         await vi.waitFor(() => {

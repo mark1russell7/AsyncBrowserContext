@@ -16,13 +16,14 @@ export function CodeBlock(props : ComponentProps<"pre">) {
             <button
                 type="button"
                 className={styles.copy}
-                aria-label={copied ? "The code is on the clipboard" : "Copy the code"}
+                aria-label="Copy the code"
                 onClick={() => {
                     navigator.clipboard?.writeText(code.current?.innerText ?? "").then(() => setCopied(true), () => undefined);
                 }}
             >
                 {copied ? "Copied" : "Copy"}
             </button>
+            <span className="visually-hidden" aria-live="polite">{copied ? "The code is on the clipboard." : ""}</span>
         </div>
     );
 }

@@ -15,7 +15,7 @@ export type HighlightedCodeProps = {
 /** Code with the colors of the build. The light and the dark theme each have their colors. */
 export function HighlightedCode({ lines, label, className } : HighlightedCodeProps) {
     return (
-        <pre className={`${styles.code} ${className ?? ""}`} aria-label={label}>
+        <pre className={`${styles.code} ${className ?? ""}`} role={label === undefined ? undefined : "group"} aria-label={label}>
             <code>
                 {lines.map((line, index) => (
                     <span key={index}>

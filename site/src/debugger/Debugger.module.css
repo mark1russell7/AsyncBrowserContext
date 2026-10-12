@@ -177,11 +177,13 @@
     background: var(--color-surface);
 }
 
+/* The head wraps on a narrow screen, so a control in the aside (for example "Compare with") stays visible. */
 .panelHead {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--space-1) var(--space-3);
     min-height: 2rem;
     padding: 0.3rem 0.7rem;
     border-bottom: 1px solid var(--color-rule);
@@ -202,6 +204,7 @@
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
+    max-width: 100%;
 }
 
 .panelBody {
@@ -519,9 +522,14 @@
     fill: var(--color-ink-muted);
 }
 
+/*
+ * The chips "current" and "found" have the color of the lane, mixed with the
+ * ink color. The text has the surface color. Thus the contrast is at least
+ * 4.5:1 for each lane color, in the light and the dark theme.
+ */
 .chip rect,
 .found g rect {
-    fill: var(--lane);
+    fill: color-mix(in srgb, var(--lane) 55%, var(--color-ink));
 }
 
 .chip text,
@@ -754,8 +762,14 @@
     margin-left: auto;
 }
 
+.compareSelect {
+    flex-wrap: wrap;
+    max-width: 100%;
+}
+
 .speed select,
 .compareSelect select {
+    max-width: 100%;
     padding: 0.1rem 0.3rem;
     border: 1px solid var(--color-control-border);
     border-radius: var(--radius-small);
@@ -913,6 +927,25 @@
 .error {
     margin: var(--space-3) 0 0;
     color: var(--status-critical-ink);
+}
+
+/* A run that did not start: the message and a button that starts it again. */
+.failed {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-2);
+    padding: 0.7rem 0.9rem;
+}
+
+.failed p {
+    margin: 0;
+    color: var(--status-critical-ink);
+}
+
+.loading.failed {
+    justify-items: center;
+    align-content: center;
+    text-align: center;
 }
 
 @keyframes draw {

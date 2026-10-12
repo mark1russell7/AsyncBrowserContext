@@ -1,4 +1,4 @@
-import { bindGenerator, coroutine } from "async-browser-context/runtime";
+import { asyncGenerator, bindGenerator, coroutine, OverloadYield } from "async-browser-context/runtime";
 import {
     AsyncContext,
     AsyncLocalStorage,
@@ -25,6 +25,48 @@ if (typeof window !== "undefined") {
     window.addEventListener("unhandledrejection", (event) => {
         if (event.reason instanceof PlaygroundStop) event.preventDefault();
     });
+    window.addEventListener("error", (event) => {
+        if (event.error instanceof PlaygroundStop) event.preventDefault();
+    });
+}
+
+type TimerId = number;
+
+/**
+ * The timer functions of one run. The code of the playground gets these
+ * functions instead of the global functions (refer to `PLAYGROUND_TIMERS`).
+ * They record each timer, and `clear()` stops the timers that remain after
+ * the run. Thus an interval of the code does not continue after its run.
+ */
+export function createRunTimers() {
+    const timers = new Set<TimerId>();
+    return {
+        globals : {
+            setTimeout(handler : TimerHandler, timeout? : number, ...args : unknown[]) : TimerId {
+                const id = window.setTimeout(handler, timeout, ...args);
+                timers.add(id);
+                return id;
+            },
+            setInterval(handler : TimerHandler, timeout? : number, ...args : unknown[]) : TimerId {
+                const id = window.setInterval(handler, timeout, ...args);
+                timers.add(id);
+                return id;
+            },
+            clearTimeout(id? : TimerId) : void {
+                if (id !== undefined) timers.delete(id);
+                window.clearTimeout(id);
+            },
+            clearInterval(id? : TimerId) : void {
+                if (id !== undefined) timers.delete(id);
+                window.clearInterval(id);
+            },
+        },
+        clear() : void {
+            // In a browser, clearInterval also stops a timeout: the two types of timers use one list.
+            for (const id of timers) window.clearInterval(id);
+            timers.clear();
+        },
+    };
 }
 
 /**
@@ -35,14 +77,16 @@ if (typeof window !== "undefined") {
  */
 export function tracePlayground(code : string, mode : ContextMode) : Promise<Trace> {
     let stop = () : void => undefined;
+    const timers = createRunTimers();
     const trace = traceCode(async () => {
         const guard = createGuardedTrace(STEP_LIMIT);
         stop = guard.stop;
         (globalThis as unknown as Record<string, unknown>)[PLAYGROUND_GLOBAL] = {
             AsyncLocalStorage, AsyncContext, Variable, Snapshot,
             log, sleep, fetchUser, save, untransformedLoad,
+            ...timers.globals,
             __trace : guard.trace,
-            coroutine, bindGenerator,
+            coroutine, bindGenerator, asyncGenerator, OverloadYield,
         };
         const url = URL.createObjectURL(new Blob([code], { type : "text/javascript" }));
         try {
@@ -51,5 +95,8 @@ export function tracePlayground(code : string, mode : ContextMode) : Promise<Tra
             URL.revokeObjectURL(url);
         }
     }, mode);
-    return trace.finally(() => stop());
+    return trace.finally(() => {
+        stop();
+        timers.clear();
+    });
 }
