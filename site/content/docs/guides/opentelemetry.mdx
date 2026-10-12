@@ -56,10 +56,21 @@ Without the library, the code after the first `await` can get the root context. 
 | --- | --- |
 | `active()` | Gives the active context, or the root context outside `with()`. |
 | `with(context, fn, thisArg, ...args)` | Starts `fn` with the context as the active context. The context stays after each `await` in transformed code, and in the callbacks of the patched APIs. |
-| `bind(context, target)` | Gives a function that starts `target` in the context. The function keeps the `this` value, the arguments and the length. Other values stay as they are. |
-| `disable()` | `active()` gives the root context until the next `with()`. |
+| `bind(context, target)` | For a function, gives a function that starts `target` in the context. The function keeps the `this` value, the arguments and the length. For an `EventTarget` or a Node.js `EventEmitter`, patches the methods that add and remove listeners. Other values stay as they are. Without a context, `bind()` uses the active context. |
+| `disable()` | `active()` gives the root context until the next `with()`. The next section tells where. |
+
+`bind(context, target)` for an `EventTarget` or a Node.js `EventEmitter` operates as in the context managers of OpenTelemetry. Each listener function that the program adds later operates with the context. The remove methods find the bound listener. For an emitter, the patch replaces `on`, `addListener`, `once`, `prependListener`, `prependOnceListener`, `off`, `removeListener` and `removeAllListeners`.
 
 On Node.js, the `node` export condition selects an entry with the native `AsyncLocalStorage`. Thus, code that runs on the server and in the browser can use one import.
+
+### disable()
+
+`disable()` disables the `AsyncLocalStorage` of the context manager. The result depends on the runtime:
+
+| Runtime | Effect of `disable()` |
+| --- | --- |
+| The browser runtime, Node.js 22, and Node.js 24 with `--no-async-context-frame` | `active()` gives the root context in all code, until the next `with()`. |
+| Node.js 24, with `AsyncContextFrame` (the default) | `active()` gives the root context in the current context, also in the callbacks that this context registered. Other contexts keep their active context. |
 
 ## Events
 
@@ -85,4 +96,4 @@ context.with(ROOT_CONTEXT, () => target.dispatchEvent(new Event("refresh")));
 
 ## Tests
 
-The tests in `test/api/opentelemetry.test.ts` use the context manager through the API of OpenTelemetry. They examine `await`, timers, `then` callbacks, two operations at the same time, `bind()` and the active span. The tests operate on Node.js and in Chromium, Firefox and WebKit. The tests in `test/browser/opentelemetry-events.test.ts` examine three dispatches in the browsers: in the root context, in a span, and in `context.with(ROOT_CONTEXT, ...)`.
+The tests in `test/api/opentelemetry.test.ts` use the context manager through the API of OpenTelemetry. They examine `await`, timers, `then` callbacks, two operations at the same time, the active span and `disable()`. They also examine `bind()` for a function, without a context, for an event emitter and for an event target. The tests operate on Node.js and in Chromium, Firefox and WebKit. The tests in `test/browser/opentelemetry-events.test.ts` examine three dispatches in the browsers: in the root context, in a span, and in `context.with(ROOT_CONTEXT, ...)`.

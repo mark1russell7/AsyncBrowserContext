@@ -37,9 +37,11 @@ addCallbackHook({
 
 A callback can start other callbacks synchronously, for example with `dispatchEvent()`. The hooks of these callbacks operate between the hooks of the first callback. Thus, the stack gives the correct start time to each callback. The time of a callback includes the time of the callbacks that it starts synchronously.
 
+A hook can schedule work, for example a timer that sends the reports. The callbacks that a hook schedules do not start the hooks, so the hook does not measure its own work.
+
 ## Start the operations
 
-Start each operation in `run()`. Give a name to the async function, so that the steps after each `await` show the name.
+Start each operation in `run()`. Give a name to the async function, so that the steps after each `await` show the name. The steps of an async generator show the name of the async generator.
 
 ```ts
 async function checkout() : Promise<void> {
@@ -79,8 +81,9 @@ The hook operates in the same way in Firefox and Safari, which do not have LoAF.
 
 - Work of the browser, for example style and layout, is not a callback. Use LoAF for this work where LoAF is available.
 - A script that starts before the library, or that keeps a reference to a native function, does not use the wrappers of the library.
-- A minifier can change the names of functions. If the reports must show the names, set the minifier to keep them.
+- The patches of a copy of version 0.1 of the library do not start the hooks. If such a copy installed patches first, `addCallbackHook()` writes a warning on the console.
+- A minifier can change the names of functions. If the reports must show the names, set the minifier to keep them. The names of async functions and async generators are strings in the output of the preset, so a minifier does not change them.
 
 ## Tests
 
-The tests in `test/api/callback-hooks.test.ts` examine the hooks for timers, promises, the steps after an `await`, events, `on...` properties, observers and streams. They also examine the order of the hooks, errors in hooks, and the removal of a hook. The tests operate in Node.js and in Chromium, Firefox and WebKit.
+The tests in `test/api/callback-hooks.test.ts` examine the hooks for timers, promises, events, `on...` properties, observers and streams. They examine the steps after an `await` in async functions and async generators. They also examine the order of the hooks, errors in hooks and in `reportError()`, callbacks that a hook schedules, and the removal of a hook. The tests operate in Node.js and in Chromium, Firefox and WebKit.

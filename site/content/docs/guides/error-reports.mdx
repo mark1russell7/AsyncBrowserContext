@@ -30,8 +30,9 @@ export function traced<R>(action : string, fn : () => Promise<R>) : Promise<R> {
         try {
             return await fn();
         } catch (error) {
-            if (typeof error === "object" && error !== null) {
-                Object.defineProperty(error, CONTEXT, { value : traceStorage.getStore() });
+            // Keep the context of the inner traced() call, and accept a frozen error object
+            if (typeof error === "object" && error !== null && !(CONTEXT in error) && Object.isExtensible(error)) {
+                Object.defineProperty(error, CONTEXT, { value : traceStorage.getStore(), configurable : true });
             }
             throw error;
         }
@@ -44,3 +45,5 @@ window.addEventListener("unhandledrejection", (event) => {
     report(reason, { trace });
 });
 ```
+
+An error can go through two `traced()` calls. The inner call records its context first, and the outer call does not replace it. `Object.defineProperty()` throws for a property that is not configurable, or for an object that is not extensible. The checks prevent these errors, so the original error goes to the caller.

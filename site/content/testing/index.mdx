@@ -34,16 +34,30 @@ The old tests used one context at a time, so a leaked value was the same as the 
 
 ## The projects
 
-One Vitest configuration starts the same rule tests on each runtime:
+One Vitest configuration, `vitest.config.ts`, starts the same rule tests on each runtime. The shared tests are in `test/rules/`, `test/regression/`, `test/api/`, `test/interleave/` and `test/legacy/`.
 
-| Project | Runtime | Transform |
-| --- | --- | --- |
-| `rules (browser runtime, Node.js)` | The browser runtime, on Node.js | Yes |
-| `rules (node runtime)` | The Node.js entry with the native `AsyncLocalStorage` | Yes |
-| `rules (node runtime, no transform)` | The Node.js entry | No |
-| `browser (chromium)`, `browser (firefox)`, `browser (webkit)` | The browser runtime, in a real browser | Yes |
+| Project | Runtime | Transform | Files |
+| --- | --- | --- | --- |
+| `unit` | The browser runtime, on Node.js | The preset | `src/**/*.test.ts` and `test/vitest/` |
+| `rules (browser runtime, Node.js)` | The browser runtime, on Node.js | The preset | The shared tests |
+| `rules (browser runtime, SWC ES2016)` | The browser runtime, on Node.js | SWC with the target ES2016 | The shared tests |
+| `rules (browser runtime, esbuild ES2016)` | The browser runtime, on Node.js | esbuild with the target ES2016 | The shared tests, without the test file of probe P10 |
+| `rules (node runtime)` | The Node.js entry with the native `AsyncLocalStorage` | The preset | The shared tests |
+| `rules (node runtime, no transform)` | The Node.js entry | No | The shared tests |
+| `memory` | The browser runtime, on Node.js with `--expose-gc` | The preset | `test/memory/` |
+| `browser (chromium)`, `browser (firefox)`, `browser (webkit)` | The browser runtime, in a real browser | The preset | The shared tests and `test/browser/` |
 
-The test files import the package by its name, as your code does. The Vite plugin of the library transforms the test files.
+The test files import the package by its name, as your code does. Each project maps the name to the source of one runtime. The Vite plugin of the library transforms the test files, and the projects with SWC and esbuild use these compilers in its place.
+
+`pnpm test` starts all projects. These commands start the other tests:
+
+| Command | What it examines |
+| --- | --- |
+| `pnpm smoke` | The packed package in a new Vite application: the build and the dev server, in Chromium. |
+| `pnpm test:babel` | The preset with Babel 7.22, the newest Babel 7 and Babel 8. |
+| `pnpm test:bundlers` | A page that webpack, Rspack, Rollup, esbuild and Next.js build, in Chromium. |
+| `pnpm test:ste-lint` | The STE linter of the documentation (`tools/ste-lint`). |
+| `pnpm --filter ./site test` | The tests of this site. |
 
 ## The leak check
 

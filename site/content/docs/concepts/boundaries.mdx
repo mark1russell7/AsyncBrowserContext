@@ -23,7 +23,19 @@ Thus, a value cannot go from one request to another request. Where your code mee
 | Keeps your callback in a list, and starts it from other code later | The callback gets the context of the code that starts the list. | Bind the callback |
 | Reads the context itself after its own native `await`, for example a logger | These reads get no value. | Give the values as arguments, or transform the code |
 
-The tests in `test/rules/c07-boundaries.test.ts` and `test/rules/c07-compiled-dependencies.test.ts` examine each row on Node.js and in the browsers.
+These test files examine the rows, on Node.js and in the browsers. The files are in `test/rules/`, except the files of `test/browser/`.
+
+| Row | Test files |
+| --- | --- |
+| Gives a promise | `c07-boundaries.test.ts` and `c07-untransformed.test.ts` |
+| Compiled async code | `c07-compiled-dependencies.test.ts`, with the helpers of TypeScript (ES2015 and ES5) and of Babel |
+| Starts your callback before its first `await` | `c07-boundaries.test.ts`, and the tests of the patched APIs: `c04-then.test.ts`, `c06-timers.test.ts` and `test/browser/patched-apis.test.ts` |
+| Adds your callback as an event listener | `test/browser/c13-events.test.ts`, only in the browsers |
+| Starts your callback after its own native `await` | `c07-boundaries.test.ts`: `bind()`, `Snapshot.wrap()` and `AsyncLocalStorage.snapshot()`. `c07-untransformed.test.ts` shows the root context without these tools. |
+| Keeps your callback in a list | `c07-boundaries.test.ts` |
+| Reads the context itself after its own native `await` | `c07-untransformed.test.ts`: the read gets no value in the browser runtime |
+
+No test examines workers and iframes.
 
 ## Bind a callback
 
