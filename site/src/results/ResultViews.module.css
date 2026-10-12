@@ -28,7 +28,8 @@
     color: var(--color-ink-secondary);
 }
 
-.table td:nth-child(3) {
+/* The Scenario column of the probe table has long text, so it gets a minimum width. */
+.scenario {
     min-width: 14rem;
 }
 

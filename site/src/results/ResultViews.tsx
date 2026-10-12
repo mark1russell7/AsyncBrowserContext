@@ -6,6 +6,21 @@ import { formatMs, formatNumber, formatPercent } from "../lib/format";
 import { DataState } from "./DataState";
 import styles from "./ResultViews.module.css";
 
+/** An estimate of the width of a text in the charts (12 px font), in pixels. */
+function textWidth(text : string) : number {
+    return Math.ceil(text.length * 6.6);
+}
+
+/** The number of lines of a text that wraps at `width` pixels. */
+function lineCount(text : string, width : number) : number {
+    return Math.max(1, Math.ceil(textWidth(text) / Math.max(width, 1)));
+}
+
+/** Below this width of a chart, the labels go above the bars, so the bars keep the full width. */
+const NARROW_CHART = 560;
+/** The height of one line of text in the charts, in pixels. */
+const LINE_PX = 14;
+
 const PROBE_STATUS : Readonly<Record<ProbeResult["status"], { kind : StatusKind; text : string }>> = {
     fixed : { kind : "passed", text : "Corrected" },
     correct : { kind : "passed", text : "Correct" },
@@ -35,7 +50,7 @@ export function ProbeTable() {
                                 <tr key={probe.id}>
                                     <th scope="row"><code>{probe.id}</code></th>
                                     <td>{probe.rule ?? "–"}</td>
-                                    <td>{probe.scenario}</td>
+                                    <td className={styles.scenario}>{probe.scenario}</td>
                                     <td><code>{probe.before}</code></td>
                                     <td><code>{probe.after}</code></td>
                                     <td><StatusIcon kind={PROBE_STATUS[probe.status].kind} showLabel={false} /> {PROBE_STATUS[probe.status].text}</td>
@@ -59,24 +74,42 @@ export function MutationChart() {
         <DataState name="mutation">
             {(file) => {
                 const rows = file.rows.map(row => ({ ...row, label : mutantLabel(row), percent : (100 * row.passed) / Math.max(row.total, 1), suiteLabel : row.suite === "old" ? "Old tests" : "New tests" }));
+                const key = (row : (typeof rows)[number]) : string => `${row.label} (${row.suiteLabel})`;
                 return (
                     <>
                     <PlotFigure
                         title="Tests that pass with each mutant of the runtime"
                         description="A bar for each mutant. The length of the bar is the percentage of the tests that pass with that mutant. A good test suite fails with each mutant, so a short bar is good for a mutant and a full bar is correct only for the runtime without a mutant."
-                        options={({ Plot, theme }) => ({
-                            height : 50 + rows.length * 34,
-                            marginLeft : 330,
-                            marginRight : 60,
-                            x : { label : "Tests that pass (%)", domain : [0, 100], grid : true },
-                            y : { label : null, domain : rows.map(row => `${row.label} (${row.suiteLabel})`) },
-                            color : { domain : ["Old tests", "New tests"], range : [theme.status.critical, theme.status.good], legend : true },
-                            marks : [
-                                Plot.barX(rows, { x : "percent", y : (row) => `${row.label} (${row.suiteLabel})`, fill : "suiteLabel" }),
-                                Plot.text(rows, { x : "percent", y : (row) => `${row.label} (${row.suiteLabel})`, text : (row) => `${row.passed}/${row.total}`, dx : 6, textAnchor : "start", fill : theme.ink }),
-                                Plot.ruleX([0]),
-                            ],
-                        })}
+                        options={({ Plot, theme, width }) => {
+                            const narrow = width < NARROW_CHART;
+                            // A narrow chart puts each label above its bar. A wide chart puts the labels at the left, and they wrap.
+                            const marginLeft = narrow ? 8 : Math.min(330, Math.round(width * 0.4));
+                            const labelWidth = narrow ? width - marginLeft - 12 : marginLeft - 14;
+                            const lines = Math.max(...rows.map(row => lineCount(key(row), labelWidth)));
+                            const step = narrow ? 32 + lines * LINE_PX : Math.max(34, lines * LINE_PX + 10);
+                            const padding = narrow ? 0.1 : 0.2;
+                            const [marginTop, marginBottom] = [20, 46];
+                            // The band of each row (refer to the band scale of Plot), so a label can stand just above its bar.
+                            const bandwidth = ((rows.length * step) / (rows.length + padding)) * (1 - padding);
+                            const labelSpace = narrow ? lines * LINE_PX + 8 : 0;
+                            return {
+                                height : marginTop + marginBottom + rows.length * step,
+                                marginTop,
+                                marginBottom,
+                                marginLeft,
+                                marginRight : 56,
+                                x : { label : "Tests that pass (%)", labelAnchor : "center", labelOffset : 40, domain : [0, 100], grid : true },
+                                y : { label : null, domain : rows.map(key), padding, axis : null },
+                                color : { domain : ["Old tests", "New tests"], range : [theme.status.critical, theme.status.good], legend : true },
+                                marks : [
+                                    Plot.ruleX([0]),
+                                    narrow ? null : Plot.axisY({ label : null, tickSize : 0, lineWidth : labelWidth / 12 }),
+                                    Plot.barX(rows, { x : "percent", y : key, fill : "suiteLabel", insetTop : labelSpace }),
+                                    Plot.text(rows, { x : "percent", y : key, text : (row) => `${row.passed}/${row.total}`, dx : 6, dy : labelSpace / 2, textAnchor : "start", fill : theme.ink }),
+                                    narrow ? Plot.text(rows, { x : 0, y : key, text : key, dx : 4, textAnchor : "start", lineAnchor : "bottom", lineWidth : labelWidth / 12, dy : -bandwidth / 2 + labelSpace - 4, fill : theme.inkSecondary }) : null,
+                                ],
+                            };
+                        }}
                         table={{
                             columns : [
                                 { key : "label", label : "Mutant" },
@@ -190,20 +223,27 @@ export function BenchChart() {
                         <PlotFigure
                             title="The mean time of each benchmark"
                             description="Grouped bars: one group for each benchmark, one bar for each case. The label of each bar is the time as a multiple of the time of plain JavaScript."
-                            options={({ Plot, theme }) => ({
-                                height : 70 + file.rows.length * 96,
-                                marginLeft : 230,
-                                marginRight : 70,
-                                x : { label : "Mean time (ms)", grid : true },
-                                y : { axis : null, domain : BENCH_CASES.map(([, label]) => label) },
-                                fy : { label : null, axis : "left", domain : file.rows.map(row => row.benchmark) },
-                                color : { domain : BENCH_CASES.map(([, label]) => label), range : [theme.status.neutral, theme.series[1] ?? theme.accent, theme.series[0] ?? theme.accent], legend : true },
-                                marks : [
-                                    Plot.barX(points, { x : "ms", y : "case", fy : "benchmark", fill : "case" }),
-                                    Plot.text(points, { x : "ms", y : "case", fy : "benchmark", text : (point : BenchPoint) => `${formatNumber(point.factor, 2)}×`, dx : 6, textAnchor : "start", fill : theme.ink }),
-                                    Plot.ruleX([0]),
-                                ],
-                            })}
+                            options={({ Plot, theme, width }) => {
+                                // A narrow chart puts the name of each benchmark above its group of bars.
+                                const narrow = width < NARROW_CHART;
+                                const longest = Math.max(...file.rows.map(row => textWidth(row.benchmark)));
+                                return {
+                                    height : 70 + file.rows.length * (narrow ? 112 : 96),
+                                    marginTop : narrow ? 34 : 20,
+                                    marginLeft : narrow ? 8 : Math.min(230, longest + 20),
+                                    marginRight : 56,
+                                    x : { label : "Mean time (ms)", grid : true },
+                                    y : { axis : null, domain : BENCH_CASES.map(([, label]) => label) },
+                                    fy : { label : null, axis : narrow ? null : "left", domain : file.rows.map(row => row.benchmark), padding : narrow ? 0.3 : 0.1 },
+                                    color : { domain : BENCH_CASES.map(([, label]) => label), range : [theme.status.neutral, theme.series[1] ?? theme.accent, theme.series[0] ?? theme.accent], legend : true },
+                                    marks : [
+                                        Plot.barX(points, { x : "ms", y : "case", fy : "benchmark", fill : "case" }),
+                                        Plot.text(points, { x : "ms", y : "case", fy : "benchmark", text : (point : BenchPoint) => `${formatNumber(point.factor, 2)}×`, dx : 6, textAnchor : "start", fill : theme.ink }),
+                                        narrow ? Plot.text(file.rows, { fy : "benchmark", text : "benchmark", frameAnchor : "top-left", lineAnchor : "bottom", dy : -6, fontWeight : 700, fill : theme.ink }) : null,
+                                        Plot.ruleX([0]),
+                                    ],
+                                };
+                            }}
                             table={{
                                 columns : [
                                     { key : "benchmark", label : "Benchmark" },
