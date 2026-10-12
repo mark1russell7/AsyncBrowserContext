@@ -167,3 +167,15 @@
     place-items: center;
     color: var(--color-ink-muted);
 }
+
+.notice {
+    max-width: var(--measure);
+    margin: var(--space-3) 0 0;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--status-warning);
+    border-left-width: 4px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--status-warning) 10%, var(--color-surface));
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+}

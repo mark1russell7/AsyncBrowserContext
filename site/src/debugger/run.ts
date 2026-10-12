@@ -57,14 +57,19 @@ export function traceCode(load : () => Promise<{ default : () => Promise<void> }
 /**
  * This function starts `scenario` with the context implementation `mode` and
  * gives the trace. The function keeps each trace, because a scenario gives
- * the same steps each time.
+ * the same steps each time. It does not keep a failed load, so a second
+ * request tries again.
  */
 export function traceScenario(scenario : DebuggerScenario, mode : ContextMode = "library") : Promise<Trace> {
     const key = `${scenario.id}:${mode}`;
     let trace = cache.get(key);
     if (trace === undefined) {
-        trace = traceCode(() => scenario.load(), mode);
-        cache.set(key, trace);
+        const started = traceCode(() => scenario.load(), mode);
+        cache.set(key, started);
+        started.catch(() => {
+            if (cache.get(key) === started) cache.delete(key);
+        });
+        trace = started;
     }
     return trace;
 }

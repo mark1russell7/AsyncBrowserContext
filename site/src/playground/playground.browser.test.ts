@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compilePlayground } from "./compile";
+import { PlaygroundStop } from "../debugger/instrumented";
 import { tracePlayground } from "./run";
 
 const TWO_REQUESTS = [
@@ -35,5 +36,50 @@ describe("the playground", () => {
     it("gives the error of the code in the trace", async () => {
         const trace = await tracePlayground(compilePlayground("throw new Error(\"no\");\n"), "library");
         expect(trace.error).toBe("no");
+    });
+
+    it("starts an async generator with the runtime of the library", async () => {
+        const code = [
+            "import { AsyncLocalStorage } from \"async-browser-context\";",
+            "const requestId = new AsyncLocalStorage();",
+            "async function* ticks() {",
+            "    await sleep(1);",
+            "    yield requestId.getStore();",
+            "    await sleep(1);",
+            "    yield requestId.getStore();",
+            "}",
+            "await requestId.run(\"r-1\", async () => {",
+            "    for await (const tick of ticks()) log(tick);",
+            "});",
+        ].join("\n");
+        const trace = await tracePlayground(compilePlayground(code), "library");
+        expect(trace.error).toBeUndefined();
+        expect(trace.logs.map(log => log.text)).toEqual(["r-1", "r-1"]);
+    });
+
+    it("gives the context to a timer callback, and stops the timers of the code after the run", async () => {
+        const stops : unknown[] = [];
+        const onError = (event : ErrorEvent) : void => {
+            if (event.error instanceof PlaygroundStop) stops.push(event.error);
+        };
+        window.addEventListener("error", onError);
+        try {
+            const code = [
+                "import { AsyncLocalStorage } from \"async-browser-context\";",
+                "const requestId = new AsyncLocalStorage();",
+                "requestId.run(\"r-1\", () => {",
+                "    setTimeout(() => log(requestId.getStore()), 1);",
+                "});",
+                "setInterval(() => { requestId.getStore(); }, 1);",
+                "await new Promise(resolve => setTimeout(resolve, 20));",
+            ].join("\n");
+            const trace = await tracePlayground(compilePlayground(code), "library");
+            expect(trace.error).toBeUndefined();
+            expect(trace.logs.map(log => log.text)).toEqual(["r-1"]);
+            await new Promise(resolve => setTimeout(resolve, 100));
+            expect(stops).toEqual([]);
+        } finally {
+            window.removeEventListener("error", onError);
+        }
     });
 });

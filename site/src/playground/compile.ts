@@ -6,6 +6,13 @@ import { HELPER_NAMES } from "../debugger/helper-names";
 /** The property of `globalThis` that gives the classes, the helpers and the runtime to the code of the playground. */
 export const PLAYGROUND_GLOBAL = "__abcPlayground";
 
+/**
+ * The timer functions that the code of the playground gets from the playground,
+ * not from `globalThis`. The playground records these timers and stops them
+ * after the run (refer to `createRunTimers`).
+ */
+export const PLAYGROUND_TIMERS = ["setTimeout", "setInterval", "clearTimeout", "clearInterval"] as const;
+
 const LIBRARY = "async-browser-context";
 const TRACED_LIBRARY = "abc:library";
 const RUNTIME = "abc:runtime";
@@ -77,7 +84,7 @@ function globalImportsPlugin() : PluginObject<PluginPass> {
 export function compilePlayground(source : string) : string {
     try {
         checkModuleSyntax(source);
-        const instrumented = instrumentScenario(source, { library : TRACED_LIBRARY, helpers : HELPER_NAMES });
+        const instrumented = instrumentScenario(source, { library : TRACED_LIBRARY, helpers : [...HELPER_NAMES, ...PLAYGROUND_TIMERS] });
         const transformed = transformSync(instrumented, { ...BABEL_OPTIONS, presets : [[preset, { runtime : RUNTIME }]] })?.code ?? "";
         return transformSync(transformed, { ...BABEL_OPTIONS, plugins : [() => globalImportsPlugin()] })?.code ?? "";
     } catch (error) {
