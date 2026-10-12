@@ -35,7 +35,7 @@ These test files examine the rows, on Node.js and in the browsers. The files are
 | Keeps your callback in a list | `c07-boundaries.test.ts` |
 | Reads the context itself after its own native `await` | `c07-untransformed.test.ts`: the read gets no value in the browser runtime |
 
-No test examines workers and iframes.
+`test/browser/realms.test.ts` examines workers and iframes, only in the browsers. An iframe has its own global object without the patches. A worker gets the value in the message.
 
 ## Bind a callback
 
