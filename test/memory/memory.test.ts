@@ -130,6 +130,22 @@ describe("rule C12: the library does not keep objects in memory", () => {
         expect(controller.signal.aborted).toBe(false);
     });
 
+    it("keeps no entry for an event type after the last listener of the type is removed", async () => {
+        const target = new EventTarget();
+        await collect();
+        const before = process.memoryUsage().heapUsed;
+        for (let id = 0; id < 50_000; id++) {
+            const type = `type-${id}`;
+            const listener = () : void => undefined;
+            target.addEventListener(type, listener);
+            target.removeEventListener(type, listener);
+        }
+        await collect();
+        // An empty entry for each type took approximately 200 bytes, 10 MB for these types
+        expect(process.memoryUsage().heapUsed - before).toBeLessThan(2_000_000);
+        expect(target).toBeInstanceOf(EventTarget);
+    });
+
     it("runs a FinalizationRegistry callback in the context of the construction", async () => {
         const variable = new Variable<string>();
         const seen : unknown[] = [];

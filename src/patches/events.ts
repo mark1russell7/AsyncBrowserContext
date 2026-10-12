@@ -30,12 +30,36 @@ interface Registration {
 }
 
 /**
- * The registrations of each target: type and capture flag, then listener. The map of the listeners
- * is weak. On Node.js, the native addEventListener with a signal adds an abort listener to the
- * signal through the patched method, and keeps that listener only weakly. A strong map of a signal
- * that lives long kept that listener, its target and the context in memory.
+ * The registrations of one type and capture flag of a target. The map of the listeners is weak.
+ * On Node.js, the native addEventListener with a signal adds an abort listener to the signal
+ * through the patched method, and keeps that listener only weakly. A strong map of a signal that
+ * lives long kept that listener, its target and the context in memory.
  */
-const registrations = new WeakMap<object, Map<string, WeakMap<Listener, Registration>>>();
+interface TypeEntry {
+    readonly listeners : WeakMap<Listener, Registration>;
+    /** The number of registrations in `listeners`. At 0, the target drops the entry, so many types do not fill the memory. */
+    size : number;
+}
+
+/** The registrations of each target: type and capture flag, then listener. */
+const registrations = new WeakMap<object, Map<string, TypeEntry>>();
+
+/** This function removes the entry of a type when it has no registration. */
+function dropIfEmpty(byKey : Map<string, TypeEntry>, key : string, entry : TypeEntry) : void {
+    if (entry.size <= 0 && byKey.get(key) === entry) {
+        byKey.delete(key);
+    }
+}
+
+/** This function removes `registration`, if it is the registration of `listener`, and the entry of its type when it is empty. */
+function forget(byKey : Map<string, TypeEntry>, key : string, entry : TypeEntry, listener : Listener, registration : Registration) : void {
+    if (entry.listeners.get(listener) !== registration) {
+        return;
+    }
+    entry.listeners.delete(listener);
+    entry.size--;
+    dropIfEmpty(byKey, key, entry);
+}
 
 /** The options of an `addEventListener()` or `removeEventListener()` call, as the DOM reads them (WebIDL). */
 interface ListenerOptions {
@@ -106,37 +130,47 @@ function weak<T extends object>(value : T) : { deref() : T | undefined } {
     return typeof WeakRef === "function" ? new WeakRef(value) : { deref : () => value };
 }
 
+/** The place of a registration: the map of its target, its key, and the entry of its type. */
+interface Place {
+    readonly byKey : Map<string, TypeEntry>;
+    readonly key : string;
+    readonly entry : TypeEntry;
+}
+
 /**
- * This function removes `registration` from `listeners` when its signal aborts, as the DOM removes
- * the listener. The abort listener keeps only weak references. Thus a signal that lives long
- * does not keep the target, the listener or the context in memory.
+ * This function removes `registration` when its signal aborts, as the DOM removes the listener.
+ * The abort listener keeps only weak references. Thus a signal that lives long does not keep the
+ * target, the listener or the context in memory.
  */
 function watchSignal(
     signal : AbortSignal,
-    listeners : WeakMap<Listener, Registration>,
+    place : Place,
     listener : Listener,
     registration : Registration,
     nativeAdd : AddEventListener,
     nativeRemove : RemoveEventListener,
 ) : void {
-    const listenersRef = weak(listeners);
+    const byKeyRef = weak(place.byKey);
+    const entryRef = weak(place.entry);
+    const key = place.key;
     const listenerRef = weak(listener);
     const registrationRef = weak(registration);
-    const forget = () : void => {
+    const onAbort = () : void => {
         const current = registrationRef.deref();
-        const key = listenerRef.deref();
-        if (current === undefined || key === undefined) {
+        const registered = listenerRef.deref();
+        if (current === undefined || registered === undefined) {
             return;
         }
         current.gone = true;
-        const map = listenersRef.deref();
-        if (map !== undefined && map.get(key) === current) {
-            map.delete(key);
+        const byKey = byKeyRef.deref();
+        const entry = entryRef.deref();
+        if (byKey !== undefined && entry !== undefined) {
+            forget(byKey, key, entry, registered, current);
         }
     };
-    Reflect.apply(nativeAdd, signal, ["abort", forget, { once : true }]);
+    Reflect.apply(nativeAdd, signal, ["abort", onAbort, { once : true }]);
     registration.stopWatching = () : void => {
-        Reflect.apply(nativeRemove, signal, ["abort", forget]);
+        Reflect.apply(nativeRemove, signal, ["abort", onAbort]);
     };
 }
 
@@ -169,13 +203,13 @@ function installListenerPatch() : void {
                 byKey = new Map();
                 registrations.set(target, byKey);
             }
-            let byListener = byKey.get(key);
-            if (byListener === undefined) {
-                byListener = new WeakMap();
-                byKey.set(key, byListener);
+            let entry = byKey.get(key);
+            if (entry === undefined) {
+                entry = { listeners : new WeakMap(), size : 0 };
+                byKey.set(key, entry);
             }
-            const listeners = byListener;
-            const existing = listeners.get(listener);
+            const place : Place = { byKey, key, entry };
+            const existing = entry.listeners.get(listener);
             if (existing !== undefined && !existing.gone && existing.signal?.aborted !== true) {
                 // The DOM ignores a second registration of the same listener, so the first context stays
                 Reflect.apply(nativeAdd, target, withListener(arguments, existing.wrapper));
@@ -184,28 +218,34 @@ function installListenerPatch() : void {
             if (existing !== undefined) {
                 // The DOM removed the old registration: a once listener operated, or its signal aborted
                 existing.stopWatching?.();
-                listeners.delete(listener);
+                entry.listeners.delete(listener);
+                entry.size--;
             }
             const registration : Registration = { wrapper : undefined as unknown as EventListener, signal, gone : false, stopWatching : undefined };
             const onCall = once
                 ? () : void => {
                     registration.gone = true;
                     registration.stopWatching?.();
-                    if (listeners.get(listener) === registration) {
-                        listeners.delete(listener);
-                    }
+                    forget(place.byKey, place.key, place.entry, listener, registration);
                 }
                 : undefined;
             (registration as { wrapper : EventListener }).wrapper = createWrapper(listener, store.current, onCall, `addEventListener:${String(type)}`);
-            // The native method examines the options, and throws for an incorrect signal
-            Reflect.apply(nativeAdd, target, withListener(arguments, registration.wrapper));
+            try {
+                // The native method examines the options, and throws for an incorrect signal
+                Reflect.apply(nativeAdd, target, withListener(arguments, registration.wrapper));
+            } catch (error) {
+                dropIfEmpty(byKey, key, entry);
+                throw error;
+            }
             if (signal?.aborted === true) {
                 // The DOM does not add a listener with an aborted signal
+                dropIfEmpty(byKey, key, entry);
                 return;
             }
-            listeners.set(listener, registration);
+            entry.listeners.set(listener, registration);
+            entry.size++;
             if (signal !== undefined) {
-                watchSignal(signal, listeners, listener, registration, nativeAdd, nativeRemove);
+                watchSignal(signal, place, listener, registration, nativeAdd, nativeRemove);
             }
         },
     }).addEventListener as AddEventListener);
@@ -216,11 +256,11 @@ function installListenerPatch() : void {
             if (arguments.length >= 2 && listener !== null && (typeof listener === "function" || typeof listener === "object")) {
                 const key = keyOf(type, readOptions(options).capture);
                 const byKey = registrations.get(target);
-                const byListener = byKey?.get(key);
-                const registration = byListener?.get(listener);
-                if (registration !== undefined && byListener !== undefined) {
-                    byListener.delete(listener);
+                const entry = byKey?.get(key);
+                const registration = entry?.listeners.get(listener);
+                if (registration !== undefined && byKey !== undefined && entry !== undefined) {
                     registration.stopWatching?.();
+                    forget(byKey, key, entry, listener, registration);
                     Reflect.apply(native, target, withListener(arguments, registration.wrapper));
                     return;
                 }
