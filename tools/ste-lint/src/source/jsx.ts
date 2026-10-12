@@ -16,7 +16,7 @@
 import ts from "typescript";
 import type { ExtractedBlock, BlockOrigin } from "../units.js";
 import type { ProseBlock } from "./blocks.js";
-import { splitLines, type Line } from "./lines.js";
+import { isBlank, splitLines, type Line } from "./lines.js";
 import type { Extraction } from "./markdown.js";
 
 /** Elements whose text stays in the text of the parent element. */
@@ -61,7 +61,14 @@ export function extractJsxText(text : string, fileName : string) : Extraction {
     const sourceFile = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const blocks : ExtractedBlock[] = [];
 
-    const push = (kind : ProseBlock["kind"], lines : readonly Line[], depth : number) : void => {
+    const push = (kind : ProseBlock["kind"], all : readonly Line[], depth : number) : void => {
+        // Without the blank lines at the start and the end, the block starts at its first word. Then a directive comment before that word applies to the block.
+        let first = 0;
+        let last = all.length;
+        while (first < last && isBlank(all[first]!.text)) first++;
+        while (last > first && isBlank(all[last - 1]!.text)) last--;
+        const lines = all.slice(first, last);
+        if (lines.length === 0) return;
         blocks.push({ block : { kind, lines, list : null, quote : false, headingDepth : depth, tableHeader : false }, origin : ORIGIN });
     };
 
@@ -143,5 +150,5 @@ export function extractJsxText(text : string, fileName : string) : Extraction {
     }
 
     visit(sourceFile);
-    return { blocks, suppressions : [] };
+    return { blocks, suppressions : [], problems : [] };
 }

@@ -22,6 +22,16 @@ export const RULE_IDS = [
 
 export type RuleId = (typeof RULE_IDS)[number];
 
+/**
+ * The ID of the findings about the directive comments, for example a rule ID
+ * that is not known. It is not a rule: the configuration cannot change it,
+ * and a directive cannot stop it.
+ */
+export const DIRECTIVE_ID = "directive";
+
+/** The ID of a finding: a rule ID, or `directive`. */
+export type FindingId = RuleId | typeof DIRECTIVE_ID;
+
 /** One problem that the linter found. Lines and columns start at 1. */
 export type Finding = {
     readonly file : string;
@@ -29,7 +39,7 @@ export type Finding = {
     readonly column : number;
     readonly endLine : number;
     readonly endColumn : number;
-    readonly ruleId : RuleId;
+    readonly ruleId : FindingId;
     readonly severity : Severity;
     readonly message : string;
 };

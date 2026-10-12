@@ -9,7 +9,10 @@
  * - `{a,b}` matches one of the alternatives
  * - `[abc]` or `[!abc]` matches one character of a set.
  *
- * Patterns use `/` on all platforms.
+ * Patterns use `/` on all platforms. In an include pattern, `*`, `**` and
+ * `?` do not match a dot at the start of a segment, so `*.md` does not
+ * match `.notes.md`. Write the dot to match these names, for example
+ * `.github/*.md`. In an ignore pattern, they also match a dot.
  */
 
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -21,6 +24,11 @@ const GLOB_CHARS = /[*?[\]{}]/;
 export function isGlob(pattern : string) : boolean {
     return GLOB_CHARS.test(pattern);
 }
+
+export type GlobOptions = {
+    /** True when `*`, `**` and `?` also match a dot at the start of a segment. The default is false. */
+    readonly dot? : boolean;
+};
 
 function escape(char : string) : string {
     return /[.+^$()|\\[\]{}]/.test(char) ? `\\${char}` : char;
@@ -53,33 +61,36 @@ function splitAlternatives(body : string) : string[] {
     return parts;
 }
 
-function globSource(glob : string) : string {
+/** The regular expression source of `glob`. `startsSegment` is true when the glob starts at the start of a path segment. */
+function globSource(glob : string, dot : boolean, startsSegment : boolean) : string {
+    // A segment that `*`, `**` or `?` matches must not start with a dot.
+    const noDot = dot ? "" : "(?!\\.)";
     let source = "";
     let i = 0;
     while (i < glob.length) {
         const char = glob[i]!;
+        const atSegmentStart = i === 0 ? startsSegment : glob[i - 1] === "/";
         if (char === "*") {
             if (glob[i + 1] === "*") {
-                const atStart = i === 0 || glob[i - 1] === "/";
                 const atEnd = i + 2 === glob.length || glob[i + 2] === "/";
-                if (atStart && atEnd) {
+                if (atSegmentStart && atEnd) {
                     if (glob[i + 2] === "/") {
-                        source += "(?:.*/)?";
+                        source += dot ? "(?:.*/)?" : "(?:(?!\\.)[^/]*/)*";
                         i += 3;
                     } else {
-                        source += ".*";
+                        source += dot ? ".*" : "(?:(?!\\.)[^/]*(?:/(?!\\.)[^/]*)*)?";
                         i += 2;
                     }
                     continue;
                 }
             }
-            source += "[^/]*";
+            source += `${atSegmentStart ? noDot : ""}[^/]*`;
             i++;
             while (glob[i] === "*") i++;
             continue;
         }
         if (char === "?") {
-            source += "[^/]";
+            source += atSegmentStart && !dot ? "[^/.]" : "[^/]";
             i++;
             continue;
         }
@@ -96,7 +107,8 @@ function globSource(glob : string) : string {
         if (char === "{") {
             const close = closingBrace(glob, i);
             if (close !== -1) {
-                source += `(?:${splitAlternatives(glob.slice(i + 1, close)).map(globSource).join("|")})`;
+                const alternatives = splitAlternatives(glob.slice(i + 1, close)).map((alternative) => globSource(alternative, dot, atSegmentStart));
+                source += `(?:${alternatives.join("|")})`;
                 i = close + 1;
                 continue;
             }
@@ -108,9 +120,9 @@ function globSource(glob : string) : string {
 }
 
 /** This function converts a glob pattern to a regular expression that matches a whole relative path. */
-export function globToRegExp(glob : string) : RegExp {
+export function globToRegExp(glob : string, options : GlobOptions = {}) : RegExp {
     const normalized = glob.replace(/\\/g, "/").replace(/^\.\//, "");
-    return new RegExp(`^${globSource(normalized)}$`);
+    return new RegExp(`^${globSource(normalized, options.dot ?? false, true)}$`);
 }
 
 /** The part of a pattern before the first segment with glob characters. The walk starts in that directory. */
@@ -121,7 +133,9 @@ export function globBase(glob : string) : string {
         if (isGlob(segment)) break;
         base.push(segment);
     }
-    return base.join("/");
+    const joined = base.join("/");
+    // The base of "/*.md" is the root directory.
+    return joined === "" && glob.startsWith("/") ? "/" : joined;
 }
 
 function toPosix(path : string) : string {
@@ -132,48 +146,66 @@ function toPosix(path : string) : string {
 const SKIPPED_DIRECTORIES = new Set(["node_modules", ".git"]);
 
 export type FindOptions = {
-    /** The directory that the patterns are relative to. */
+    /** The directory that the include patterns are relative to. */
     readonly root : string;
     readonly include : readonly string[];
     readonly ignore : readonly string[];
+    /** The directory that the ignore patterns are relative to. The default is `root`. */
+    readonly ignoreRoot? : string;
 };
 
 /**
  * This function finds the files that match the include patterns and no
- * ignore pattern. A pattern without glob characters is a file name, and
- * the ignore patterns do not apply to it. The result has absolute paths,
- * in sorted order, without duplicates.
+ * ignore pattern. An include pattern can be relative to `root`, or
+ * absolute. A pattern without glob characters is a file name or a
+ * directory. The ignore patterns do not apply to a file name. A directory
+ * gives all files in it and in its subdirectories, as the pattern
+ * `directory/**` does. The result has absolute paths, in sorted order,
+ * without duplicates.
  */
 export function findFiles(options : FindOptions) : string[] {
     const root = resolve(options.root);
-    const ignore = options.ignore.map(globToRegExp);
-    const isIgnored = (relativePath : string) : boolean => ignore.some((pattern) => pattern.test(relativePath));
+    const ignoreRoot = resolve(options.ignoreRoot ?? options.root);
+    const ignore = options.ignore.map((pattern) => globToRegExp(pattern, { dot : true }));
+    const isIgnored = (path : string, directory : boolean) : boolean => {
+        const relativePath = toPosix(relative(ignoreRoot, path));
+        // A pattern such as "**/dist/**" matches the files in a directory, so test the directory with a "/" after it.
+        return ignore.some((pattern) => pattern.test(relativePath) || (directory && pattern.test(`${relativePath}/`)));
+    };
     const found = new Set<string>();
+
+    /** This function adds the files under `base` whose path relative to `base` matches `matcher`. */
+    const walk = (base : string, matcher : RegExp) : void => {
+        const visit = (directory : string) : void => {
+            for (const entry of readdirSync(directory, { withFileTypes : true })) {
+                const path = join(directory, entry.name);
+                if (entry.isDirectory()) {
+                    if (SKIPPED_DIRECTORIES.has(entry.name) || isIgnored(path, true)) continue;
+                    visit(path);
+                } else if (entry.isFile() && matcher.test(toPosix(relative(base, path))) && !isIgnored(path, false)) {
+                    found.add(path);
+                }
+            }
+        };
+        visit(base);
+    };
 
     for (const pattern of options.include) {
         const normalized = pattern.replace(/\\/g, "/").replace(/^\.\//, "");
         if (!isGlob(normalized)) {
             const path = resolve(root, normalized);
-            if (existsSync(path) && statSync(path).isFile()) found.add(path);
+            if (!existsSync(path)) continue;
+            const stats = statSync(path);
+            if (stats.isFile()) found.add(path);
+            else if (stats.isDirectory()) walk(path, globToRegExp("**/*"));
             continue;
         }
-        const matcher = globToRegExp(normalized);
-        const base = resolve(root, globBase(normalized));
-        if (!existsSync(base)) continue;
-        const walk = (directory : string) : void => {
-            for (const entry of readdirSync(directory, { withFileTypes : true })) {
-                const path = join(directory, entry.name);
-                const relativePath = toPosix(relative(root, path));
-                if (entry.isDirectory()) {
-                    // A pattern such as "**/dist/**" matches the files in a directory, so test the directory with a "/" after it.
-                    if (SKIPPED_DIRECTORIES.has(entry.name) || isIgnored(relativePath) || isIgnored(`${relativePath}/`)) continue;
-                    walk(path);
-                } else if (entry.isFile() && matcher.test(relativePath) && !isIgnored(relativePath)) {
-                    found.add(path);
-                }
-            }
-        };
-        walk(base);
+        // The matcher gets the path relative to the base directory. Thus a relative pattern and an absolute pattern work the same way.
+        const base = globBase(normalized);
+        const rest = base === "" ? normalized : normalized.slice(base.endsWith("/") ? base.length : base.length + 1);
+        const baseDirectory = resolve(root, base);
+        if (!existsSync(baseDirectory) || !statSync(baseDirectory).isDirectory()) continue;
+        walk(baseDirectory, globToRegExp(rest));
     }
     return [...found].sort();
 }

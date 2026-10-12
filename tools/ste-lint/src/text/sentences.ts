@@ -3,8 +3,11 @@
  */
 
 import type { PhraseMatcher } from "./phrases.js";
-import { isCapitalized, isCounted, isNumber, isWord, type Token } from "./tokens.js";
-import { NO_BREAK_ABBREVIATIONS, NUMBER_ABBREVIATIONS, UNITS } from "./words.js";
+import { isCapitalized, isCounted, isIdentifierLike, isNumber, isWord, type Token } from "./tokens.js";
+import {
+    BE_FORMS, CLAUSE_STARTERS, COMMON_VERBS, CONJUNCTIONS, DETERMINERS, DO_FORMS, HAVE_FORMS, LEADING_ADVERBS, MODALS,
+    NO_BREAK_ABBREVIATIONS, NUMBER_ABBREVIATIONS, OBJECT_PRONOUNS, PREPOSITIONS, SUBJECT_PRONOUNS, UNITS,
+} from "./words.js";
 
 /** A range of tokens: `from` is the first token, `to` is the token after the last one. */
 export type TokenRange = {
@@ -12,14 +15,32 @@ export type TokenRange = {
     readonly to : number;
 };
 
+export type SentenceOptions = {
+    /** Names that start with a lower-case letter, for example "npm" and "zone.js". Such a name can start a sentence. */
+    readonly lowercaseNames? : ReadonlySet<string>;
+};
+
 const TERMINALS = new Set([".", "!", "?", "...", "…"]);
 const CLOSERS = new Set([")", "]", "}", "\"", "”", "’", "'"]);
 const OPENERS = new Set(["(", "[", "\"", "“", "‘", "'"]);
 
-function startsSentence(token : Token) : boolean {
+/** Words that can start a sentence but are not a name. After a single capital letter and a period, such a word starts a new sentence. */
+const NOT_NAMES : ReadonlySet<string> = new Set([
+    ...DETERMINERS, ...SUBJECT_PRONOUNS, ...OBJECT_PRONOUNS, ...PREPOSITIONS, ...CONJUNCTIONS, ...CLAUSE_STARTERS,
+    ...LEADING_ADVERBS, ...BE_FORMS, ...HAVE_FORMS, ...DO_FORMS, ...MODALS, ...COMMON_VERBS,
+]);
+
+/**
+ * True when the token can be the first word of a sentence: a word with a
+ * capital letter or a digit, a placeholder, an opening bracket or quote, a
+ * name from the glossary that starts with a lower-case letter, or a word
+ * that looks like code, for example `package.json`.
+ */
+function startsSentence(token : Token, options : SentenceOptions) : boolean {
     if (token.kind === "code") return true;
     if (token.kind === "punct") return OPENERS.has(token.text);
-    return /^[\p{Lu}\p{N}]/u.test(token.text);
+    if (/^[\p{Lu}\p{N}]/u.test(token.text)) return true;
+    return options.lowercaseNames?.has(token.text) === true || isIdentifierLike(token);
 }
 
 /** True when the period at `index` comes after an abbreviation, so it does not end the sentence. */
@@ -31,19 +52,21 @@ function isAbbreviationPeriod(tokens : readonly Token[], index : number) : boole
     // "Ms." is a title. In technical text, "ms" is the unit millisecond, and it can end a sentence.
     if (previous.text === "Ms") return true;
     if (NUMBER_ABBREVIATIONS.has(previous.lower) && isNumber(tokens[index + 1])) return true;
-    // An initial, for example "J. Smith".
-    return /^\p{Lu}$/u.test(previous.text) && isCapitalized(tokens[index + 1]);
+    // An initial, for example "J. Smith". In "option A. The other option", the letter is not an initial.
+    const next = tokens[index + 1];
+    return /^\p{Lu}$/u.test(previous.text) && isWord(next) && isCapitalized(next) && !NOT_NAMES.has(next.lower);
 }
 
 /**
  * This function divides tokens into sentences. A sentence stops at `.`,
  * `!`, `?` or an ellipsis, when white space comes next. After the white
- * space, there must be a capital letter, a digit, a placeholder, or an
- * opening bracket or quote. Closing brackets and quotes after the stop stay
- * in the sentence. A period after an abbreviation, for example `e.g.`, does
- * not stop a sentence.
+ * space, there must be a capital letter, a digit, a placeholder, an opening
+ * bracket or quote, a lower-case name of the glossary, or a word that looks
+ * like code. Closing brackets and quotes after the stop stay in the
+ * sentence. A period after an abbreviation, for example `e.g.`, does not stop
+ * a sentence.
  */
-export function splitSentences(tokens : readonly Token[]) : TokenRange[] {
+export function splitSentences(tokens : readonly Token[], options : SentenceOptions = {}) : TokenRange[] {
     const ranges : TokenRange[] = [];
     let start = 0;
     for (let i = 0; i < tokens.length; i++) {
@@ -57,7 +80,7 @@ export function splitSentences(tokens : readonly Token[]) : TokenRange[] {
             else break;
         }
         const next = tokens[end];
-        if (next === undefined || (next.spaceBefore && startsSentence(next))) {
+        if (next === undefined || (next.spaceBefore && startsSentence(next, options))) {
             ranges.push({ from : start, to : end });
             start = end;
             i = end - 1;

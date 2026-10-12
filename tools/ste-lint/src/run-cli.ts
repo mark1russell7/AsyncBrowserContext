@@ -41,7 +41,10 @@ Simplified Technical English. The tool is an automated approximation of
 these rules. It does not certify that a text obeys the standard.
 
 Without patterns, ste-lint uses the "include" patterns of ste.config.json,
-or the default patterns. Patterns are relative to the working directory.
+or the default patterns. Patterns are relative to the working directory. A
+pattern can also be an absolute path or a directory. The "ignore" patterns
+of the configuration apply to all files, but not to a file name without
+glob characters.
 
 Options:
   --format <text|json>  The output format. The default is "text".
@@ -152,14 +155,15 @@ export function runCli(argv : readonly string[], io : CliIo) : number {
         throw error;
     }
 
+    // The patterns of the command line are relative to the working directory. The ignore patterns are relative to the configuration file.
     const explicit = options.patterns.length > 0;
     const files = (explicit
-        ? findFiles({ root : io.cwd, include : options.patterns, ignore : config.ignore })
+        ? findFiles({ root : io.cwd, include : options.patterns, ignore : config.ignore, ignoreRoot : config.root })
         : findFiles({ root : config.root, include : config.include, ignore : config.ignore })
     ).filter((file) => fileKind(file) !== null);
     if (files.length === 0) {
-        io.stderr(explicit ? "ste-lint: no files match the patterns.\n" : "ste-lint: no files to examine.\n");
-        return explicit ? 2 : 0;
+        io.stderr(explicit ? "ste-lint: no files match the patterns.\n" : "ste-lint: no files match the include patterns of the configuration.\n");
+        return 2;
     }
 
     const linter = new Linter(config, buildLexicon(config, dictionary));

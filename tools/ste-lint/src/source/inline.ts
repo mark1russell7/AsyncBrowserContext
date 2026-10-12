@@ -15,6 +15,7 @@
  */
 
 import { findBacktickRun } from "./blocks.js";
+import { expressionEnd } from "./expression.js";
 import type { Line } from "./lines.js";
 
 /** The character that holds the place of a code span, link tag, URL or quoted text. */
@@ -59,6 +60,24 @@ const CODE_ELEMENTS = new Set(["code", "kbd", "samp", "var", "tt"]);
 
 const ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/;
 const ALPHANUMERIC = /[\p{L}\p{N}]/u;
+
+/**
+ * The maximum lengths of the inline constructs, in characters. The scanner
+ * does not look farther for the end of a construct. Thus the time for a long
+ * block with many `[`, `<`, `{` or `&` characters stays linear.
+ */
+const MAX_LINK_TEXT = 1000;
+const MAX_LINK_DESTINATION = 2000;
+const MAX_TAG = 2000;
+const MAX_EXPRESSION = 2000;
+const MAX_URL = 2000;
+const MAX_FOOTNOTE = 200;
+const MAX_ENTITY = 40;
+
+/** The text from `i`, but not after `to` and not longer than `length`. */
+function bounded(raw : string, i : number, to : number, length : number) : string {
+    return raw.slice(i, Math.min(to, i + length));
+}
 
 class Builder {
     clean = "";
@@ -129,7 +148,7 @@ function scan(raw : string, from : number, to : number, out : Builder, options :
         if (char === "`") {
             let run = 1;
             while (raw[i + run] === "`") run++;
-            const close = findBacktickRun(raw, i + run, run);
+            const close = findBacktickRun(raw, i + run, run, to);
             if (close !== -1 && close + run <= to) {
                 out.placeholder("code", raw.slice(i + run, close).trim(), i, close + run);
                 i = close + run;
@@ -165,7 +184,7 @@ function scan(raw : string, from : number, to : number, out : Builder, options :
         }
 
         if (char === "[") {
-            if (/^\[\^[^\]\s]+\]/.test(raw.slice(i, to))) {
+            if (/^\[\^[^\]\s]+\]/.test(bounded(raw, i, to, MAX_FOOTNOTE))) {
                 i = raw.indexOf("]", i) + 1;
                 continue;
             }
@@ -177,8 +196,8 @@ function scan(raw : string, from : number, to : number, out : Builder, options :
             }
         }
 
-        if ((char === "h" || char === "w") && !isAlphanumeric(raw[i - 1])) {
-            const url = /^(?:https?:\/\/|www\.)[^\s<>"`]*[^\s<>"`.,;:!?')\]]/.exec(raw.slice(i, to));
+        if ((raw.startsWith("http", i) || raw.startsWith("www.", i)) && !isAlphanumeric(raw[i - 1])) {
+            const url = /^(?:https?:\/\/|www\.)[^\s<>"`]*[^\s<>"`.,;:!?')\]]/.exec(bounded(raw, i, to, MAX_URL));
             if (url) {
                 let text = url[0];
                 // A ")" after the URL is part of it only when the URL has a "(" without a partner.
@@ -211,7 +230,7 @@ function scan(raw : string, from : number, to : number, out : Builder, options :
         }
 
         if (char === "&") {
-            const entity = /^&(#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/.exec(raw.slice(i, to));
+            const entity = /^&(#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/.exec(bounded(raw, i, to, MAX_ENTITY));
             const decoded = entity ? decodeEntity(entity[1]!) : null;
             if (entity && decoded !== null) {
                 out.emit(decoded, i);
@@ -245,7 +264,7 @@ function safeCodePoint(value : number) : string | null {
 
 /** This function handles `<...>`: autolinks, comments, HTML tags and JSX tags. The result is the index after it, or -1. */
 function scanAngle(raw : string, i : number, to : number, out : Builder) : number {
-    const rest = raw.slice(i, to);
+    const rest = bounded(raw, i, to, MAX_URL);
     const autolink = /^<((?:https?|mailto|ftp):[^\s<>]*|[^\s<>@]+@[^\s<>]+\.[^\s<>]+)>/.exec(rest);
     if (autolink) {
         out.placeholder("url", autolink[1]!, i, i + autolink[0].length);
@@ -257,12 +276,13 @@ function scanAngle(raw : string, i : number, to : number, out : Builder) : numbe
     }
     const tag = /^<(\/?)([A-Za-z][A-Za-z0-9.:_-]*)?/.exec(rest);
     if (!tag || (tag[2] === undefined && !/^<\/?>/.test(rest))) return -1;
-    const tagEnd = findAngleClose(raw, i + 1, to);
+    const tagEnd = findAngleClose(raw, i + 1, Math.min(to, i + MAX_TAG));
     if (tagEnd === -1) return -1;
     const name = (tag[2] ?? "").toLowerCase();
     if (tag[1] === "" && CODE_ELEMENTS.has(name)) {
-        const closeTag = raw.toLowerCase().indexOf(`</${name}>`, tagEnd);
-        if (closeTag !== -1 && closeTag + name.length + 3 <= to) {
+        const found = bounded(raw, tagEnd, to, MAX_EXPRESSION).toLowerCase().indexOf(`</${name}>`);
+        if (found !== -1) {
+            const closeTag = tagEnd + found;
             out.placeholder("code", raw.slice(tagEnd, closeTag).trim(), i, closeTag + name.length + 3);
             return closeTag + name.length + 3;
         }
@@ -271,24 +291,25 @@ function scanAngle(raw : string, i : number, to : number, out : Builder) : numbe
     return tagEnd;
 }
 
-/** The index after the `>` that closes a tag. Quotes and `{...}` can contain `>`. */
+/** The index after the `>` that closes a tag, or -1. Quotes and `{...}` can contain `>`. */
 function findAngleClose(raw : string, from : number, to : number) : number {
-    let quote : string | null = null;
-    let depth = 0;
-    for (let i = from; i < to; i++) {
+    let i = from;
+    while (i < to) {
         const char = raw[i]!;
-        if (quote !== null) {
-            if (char === quote) quote = null;
-        } else if (char === "\"" || char === "'") {
-            quote = char;
+        if (char === "\"" || char === "'") {
+            const close = raw.indexOf(char, i + 1);
+            if (close === -1 || close >= to) return -1;
+            i = close + 1;
         } else if (char === "{") {
-            depth++;
-        } else if (char === "}") {
-            depth = Math.max(0, depth - 1);
-        } else if (char === "<" && depth === 0) {
+            const close = expressionEnd(raw, i, to);
+            if (close === -1) return -1;
+            i = close + 1;
+        } else if (char === "<") {
             return -1;
-        } else if (char === ">" && depth === 0) {
+        } else if (char === ">") {
             return i + 1;
+        } else {
+            i++;
         }
     }
     return -1;
@@ -298,29 +319,23 @@ function findAngleClose(raw : string, from : number, to : number) : number {
 function scanBrace(raw : string, i : number, to : number, out : Builder, options : InlineOptions) : number {
     const isTag = options.tsdoc && raw[i + 1] === "@";
     if (!isTag && !options.mdx) return -1;
-    let depth = 0;
-    let quote : string | null = null;
-    for (let k = i; k < to; k++) {
-        const char = raw[k]!;
-        if (quote !== null) {
-            if (char === quote) quote = null;
-            continue;
+    const limit = Math.min(to, i + MAX_EXPRESSION);
+    let close = -1;
+    if (isTag) {
+        // An inline tag has no strings, so a quote in it is text.
+        let depth = 0;
+        for (let k = i; k < limit && close === -1; k++) {
+            if (raw[k] === "{") depth++;
+            if (raw[k] === "}" && --depth === 0) close = k;
         }
-        if (!isTag && (char === "\"" || char === "'" || char === "`")) {
-            quote = char;
-        } else if (char === "{") {
-            depth++;
-        } else if (char === "}") {
-            depth--;
-            if (depth === 0) {
-                const inner = raw.slice(i + 1, k).trim();
-                if (!isTag && inner.startsWith("/*") && inner.endsWith("*/")) return k + 1;
-                out.placeholder(isTag ? "link" : "expr", inner, i, k + 1);
-                return k + 1;
-            }
-        }
+    } else {
+        close = expressionEnd(raw, i, limit);
     }
-    return -1;
+    if (close === -1) return -1;
+    const inner = raw.slice(i + 1, close).trim();
+    if (!isTag && inner.startsWith("/*") && inner.endsWith("*/")) return close + 1;
+    out.placeholder(isTag ? "link" : "expr", inner, i, close + 1);
+    return close + 1;
 }
 
 type LinkEnd = {
@@ -330,12 +345,17 @@ type LinkEnd = {
     readonly end : number;
 };
 
-/** The end of an inline link `[text](url)` or a reference link `[text][ref]` that starts at `start`, or null. */
+/**
+ * The end of an inline link `[text](url)` or a reference link `[text][ref]`
+ * that starts at `start`, or null. The link text and the destination have a
+ * maximum length, so each `[` costs a limited time.
+ */
 function linkEnd(raw : string, start : number, to : number) : LinkEnd | null {
+    const textLimit = Math.min(to, start + MAX_LINK_TEXT);
     let depth = 0;
     let i = start;
     let textEnd = -1;
-    while (i < to) {
+    while (i < textLimit) {
         const char = raw[i]!;
         if (char === "\\") {
             i += 2;
@@ -344,7 +364,7 @@ function linkEnd(raw : string, start : number, to : number) : LinkEnd | null {
         if (char === "`") {
             let run = 1;
             while (raw[i + run] === "`") run++;
-            const close = findBacktickRun(raw, i + run, run);
+            const close = findBacktickRun(raw, i + run, run, textLimit);
             i = close === -1 ? i + run : close + run;
             continue;
         }
@@ -360,10 +380,11 @@ function linkEnd(raw : string, start : number, to : number) : LinkEnd | null {
     }
     if (textEnd === -1) return null;
     const after = raw[textEnd + 1];
+    const destinationLimit = Math.min(to, textEnd + 1 + MAX_LINK_DESTINATION);
     if (after === "(") {
         let parens = 0;
         let quote : string | null = null;
-        for (let k = textEnd + 1; k < to; k++) {
+        for (let k = textEnd + 1; k < destinationLimit; k++) {
             const char = raw[k]!;
             if (quote !== null) {
                 if (char === quote) quote = null;
@@ -380,7 +401,7 @@ function linkEnd(raw : string, start : number, to : number) : LinkEnd | null {
     }
     if (after === "[") {
         const close = raw.indexOf("]", textEnd + 2);
-        if (close !== -1 && close < to) return { textEnd, end : close + 1 };
+        if (close !== -1 && close < destinationLimit) return { textEnd, end : close + 1 };
     }
     return null;
 }

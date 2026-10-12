@@ -61,7 +61,7 @@ export function buildUnit(extracted : ExtractedBlock, lexicon : Lexicon) : Prose
 /** This function makes a prose unit from the tokens of a block. */
 export function unitFromTokens(tokens : readonly Token[], block : Pick<ProseBlock, "kind" | "list">, origin : BlockOrigin, lexicon : Lexicon) : ProseUnit | null {
     if (!tokens.some(isCounted)) return null;
-    const ranges = block.kind === "paragraph" ? splitSentences(tokens) : [{ from : 0, to : tokens.length }];
+    const ranges = block.kind === "paragraph" ? splitSentences(tokens, { lowercaseNames : lexicon.lowercaseNames }) : [{ from : 0, to : tokens.length }];
     const sentences : Sentence[] = ranges.map((range) => {
         const sentenceTokens = tokens.slice(range.from, range.to);
         const count = countWords(sentenceTokens, { properNouns : lexicon.properNounPhrases });
