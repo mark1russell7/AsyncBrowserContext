@@ -42,7 +42,7 @@ export const DEFAULT_RUNTIME = "async-browser-context/runtime";
  *    `coroutine`, for the callback hooks. The option `names: false` removes
  *    this step.
  * 4. A plugin of this library moves the static class members with async arrow
- *    functions into static private methods, so that `this` and `super` stay
+ *    functions into static private methods. Thus `this` and `super` stay
  *    correct (static-members.ts).
  * 5. A plugin of this library gives the async generators to the helpers of the
  *    runtime, in place of the Babel helpers.

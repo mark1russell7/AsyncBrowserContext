@@ -10,8 +10,8 @@ export interface AsyncGeneratorHelpersOptions {
 /**
  * The Babel helpers of async generators, and the export of the runtime for each one. The
  * runtime gives all four, so the markers of the body (`OverloadYield`) are always the class of
- * the runtime. Another plugin, for example `@babel/plugin-transform-runtime`, could else give
- * `awaitAsyncGenerator` with the class of `@babel/runtime`, and the driver would treat each
+ * the runtime. Without this, another plugin (for example `@babel/plugin-transform-runtime`) can
+ * give `awaitAsyncGenerator` with the class of `@babel/runtime`. Then the driver operates each
  * `await` as a `yield`.
  */
 const REPLACED_HELPERS : Readonly<Record<string, string>> = {

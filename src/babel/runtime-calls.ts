@@ -16,7 +16,7 @@ export function isRuntimeFunction(node : types.Node) : boolean {
         && node.body.directives.some((directive) => directive.value.value === RUNTIME_DIRECTIVE);
 }
 
-/** This function gives `true` if `node` is `require(runtime)`, also inside a helper such as `_interopRequireWildcard(require(runtime))`. */
+/** This function gives `true` if `node` is `require(runtime)`, also inside a helper, for example `_interopRequireWildcard(require(runtime))`. */
 function containsRequireOf(node : types.Node | null | undefined, runtime : string, depth = 0) : boolean {
     if (node === null || node === undefined || depth > 3) {
         return false;
@@ -43,9 +43,9 @@ function initOf(identifier : NodePath<types.Identifier>) : types.Node | null | u
  * This function gives `true` if `callee` is the function `name` of the runtime. It accepts the
  * forms of the output of the preset:
  *
- * - an import: `_coroutine` from `import { coroutine as _coroutine } from runtime`;
- * - CommonJS: `_runtime.coroutine` or `(0, _runtime.coroutine)` with `_runtime = require(runtime)`;
- * - CommonJS of a script: `_coroutine` with `var _coroutine = require(runtime).coroutine`;
+ * - an import: `_coroutine` from `import { coroutine as _coroutine } from runtime`
+ * - CommonJS: `_runtime.coroutine` or `(0, _runtime.coroutine)` with `_runtime = require(runtime)`
+ * - CommonJS of a script: `_coroutine` with `var _coroutine = require(runtime).coroutine`
  * - the local name that Babel gives, `_coroutine` and `_coroutine2`, for the output of another tool.
  */
 export function isRuntimeCallee(callee : NodePath, runtime : string, name : string) : boolean {

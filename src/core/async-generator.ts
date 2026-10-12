@@ -31,7 +31,7 @@ export class OverloadYield {
 
 /**
  * The helper `awaitAsyncGenerator` of Babel: the body gives its value for an `await`. The preset
- * gives this function in place of the helper of Babel, so the marker is always the class of this
+ * gives this function in place of the helper of Babel. Thus the marker is always the class of this
  * module, also when `@babel/plugin-transform-runtime` gives the other helpers.
  */
 export function awaitAsyncGenerator(value : unknown) : OverloadYield {

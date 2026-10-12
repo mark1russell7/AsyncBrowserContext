@@ -156,7 +156,7 @@ export function coroutine<T, A extends unknown[], R>(
 /**
  * This function gives a function that makes an async generator object, which operates
  * `generatorFunction`. The preset gives this function in place of the helper
- * `wrapAsyncGenerator` of `@babel/plugin-transform-async-generator-functions`, and adds `name`,
+ * `wrapAsyncGenerator` of `@babel/plugin-transform-async-generator-functions`. It adds `name`,
  * the name of the async generator, if it has one.
  *
  * Each step of the body operates in the context of the call that made the generator
