@@ -77,12 +77,11 @@ export function functionName(path : NodePath<types.Function>) : string | undefin
  * ```
  *
  * This function gives that wrapper the name of the source, so `fn.name` stays the same. The
- * wrapper uses only `_ref`, `this` and `arguments`, so its new name hides no other binding.
+ * wrapper uses only `_ref`, `this` and `arguments`. The name of the function hides a `_ref` with
+ * the same name, for example for a field named `_ref`. Thus `_ref` then gets a new name first. A name that a function expression cannot have, for example `eval`,
+ * `arguments` or `"my-handler"`, goes to the `name` property with `Object.defineProperty`.
  */
 function nameReturnedWrapper(call : NodePath<types.CallExpression>, name : string) : void {
-    if (!types.isValidIdentifier(name)) {
-        return;
-    }
     const declarator = call.parentPath;
     const declaration = declarator?.parentPath;
     if (declarator?.isVariableDeclarator() !== true || declaration?.isVariableDeclaration() !== true || !declaration.inList) {
@@ -92,10 +91,47 @@ function nameReturnedWrapper(call : NodePath<types.CallExpression>, name : strin
     if (!next.isReturnStatement()) {
         return;
     }
-    const returned = next.node.argument;
-    if (types.isFunctionExpression(returned) && (returned.id === null || returned.id === undefined)) {
-        returned.id = types.identifier(name);
+    const returnedPath = next.get("argument");
+    if (!returnedPath.isFunctionExpression() || (returnedPath.node.id !== null && returnedPath.node.id !== undefined)) {
+        return;
     }
+    const returned = returnedPath.node;
+    // A class body and a module are strict code, where a function cannot have the name eval or arguments
+    if (types.isValidIdentifier(name) && !STRICT_BIND_ONLY.has(name)) {
+        const reference = declarator.node.id;
+        if (types.isIdentifier(reference, { name })) {
+            // `_ref` is a new name of Babel, so only its declaration and the wrapper use it
+            const renamed = declaration.scope.generateUidIdentifier(name).name;
+            reference.name = renamed;
+            renameIdentifiers(returned, name, renamed);
+        }
+        returned.id = types.identifier(name);
+        return;
+    }
+    if (next.scope.getBinding("Object") !== undefined) {
+        // The code has its own Object, so the global function is not available
+        return;
+    }
+    const descriptor = types.objectExpression([
+        types.objectProperty(types.identifier("value"), types.stringLiteral(name)),
+        types.objectProperty(types.identifier("configurable"), types.booleanLiteral(true)),
+    ]);
+    returnedPath.replaceWith(types.callExpression(
+        types.memberExpression(types.identifier("Object"), types.identifier("defineProperty")),
+        [returned, types.stringLiteral("name"), descriptor],
+    ));
+}
+
+/** The names that strict code cannot bind, also as the name of a function expression. */
+const STRICT_BIND_ONLY = new Set(["eval", "arguments"]);
+
+/** This function gives each identifier `from` in `node` the name `to`. */
+function renameIdentifiers(node : types.Node, from : string, to : string) : void {
+    types.traverseFast(node, (child) => {
+        if (types.isIdentifier(child) && child.name === from) {
+            child.name = to;
+        }
+    });
 }
 
 /** The key of the names of one file in the plugin state. */

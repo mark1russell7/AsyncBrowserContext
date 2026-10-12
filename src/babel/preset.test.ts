@@ -274,6 +274,16 @@ describe("the Babel preset", () => {
         }
     });
 
+    it("gives the wrapper of a field named _ref the name, and its reference a new name, so the wrapper does not start itself", async () => {
+        const output = await transform("class A { _ref = async (x) => x + 1; eval = async (y) => y; }");
+        const wrapper = /return function _ref\((\w+)\) \{\s*return (\w+)\.apply\(this, arguments\);/.exec(output.code);
+        expect(wrapper?.[2]).toBeDefined();
+        expect(wrapper?.[2]).not.toBe("_ref");
+        // A function expression cannot have the name eval in strict code: the name goes to the name property
+        expect(output.code).not.toContain("function eval(");
+        expect(output.code).toMatch(/Object\.defineProperty\(function \(\w+\) \{[\s\S]*?\}, "name", \{\s*value: "eval",\s*configurable: true\s*\}\)/);
+    });
+
     it("does not change an async generator or a for await loop in a function with the directive of the runtime", async () => {
         const output = await transform([
             "const prototype = async function* () { \"async-browser-context runtime\"; };",

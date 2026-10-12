@@ -284,4 +284,18 @@ describe("rule C3 in static class members", () => {
         const service = new Service();
         expect([service.save.name, service.save.length]).toEqual(["save", 1]);
     });
+
+    it.skipIf(lowered)("keeps the result and the name of class fields with the names _ref, eval, arguments and a string key (not with SWC or esbuild)", async () => {
+        class Fields {
+            _ref = async (value : number) : Promise<number> => value + 1;
+            eval = async (value : number) : Promise<number> => value * 2;
+            arguments = async function (value : number) : Promise<number> {
+                return value * 3;
+            };
+            "my-handler" = async (value : number) : Promise<number> => value * 4;
+        }
+        const fields = new Fields();
+        expect([await fields._ref(1), await fields.eval(1), await fields.arguments(1), await fields["my-handler"](1)]).toEqual([2, 2, 3, 4]);
+        expect([fields._ref.name, fields.eval.name, fields.arguments.name, fields["my-handler"].name]).toEqual(["_ref", "eval", "arguments", "my-handler"]);
+    });
 });
