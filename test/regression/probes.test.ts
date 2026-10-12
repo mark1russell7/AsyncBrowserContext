@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
 // @ts-expect-error The fixture is plain JavaScript without types
 import { libraryCall } from "../fixtures/untransformed.js";
-import { inBrowser, runtime, transformed } from "../helpers.js";
+import { inBrowser, preset, runtime } from "../helpers.js";
 
 /**
  * The probes of the review of 2026-10-08 (docs/remediation-plan.md,
@@ -21,8 +21,6 @@ const topLevel : number[] = [];
 for await (const value of numbers()) {
     topLevel.push(value);
 }
-
-const needsTransform = runtime === "node" && !transformed;
 
 describe("regression probes of the review", () => {
     it("P01: a task that starts after request A ends does not see request A", async () => {
@@ -209,7 +207,7 @@ describe("regression probes of the review", () => {
         expect(seen).toBeUndefined();
     });
 
-    it.skipIf(needsTransform)("P18 and P23: generators keep the context of their creation", async () => {
+    it.skipIf(!preset)("P18 and P23: generators keep the context of their creation", async () => {
         const variable = new Variable<string>();
         function* sync() : Generator<string | undefined> {
             yield variable.get();

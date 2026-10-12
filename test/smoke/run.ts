@@ -19,6 +19,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
+import { BROWSER_HOST, freePort } from "../vitest/free-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
@@ -96,17 +97,20 @@ async function main() : Promise<void> {
     let passed = true;
 
     await vite.build({ root : app, logLevel : "warn" });
-    const preview = await vite.preview({ root : app, logLevel : "warn", preview : { port : 4317, strictPort : true } });
+    // Free ports on 127.0.0.1: another program can use a fixed port (test/vitest/free-port.ts)
+    const previewPort = await freePort();
+    const preview = await vite.preview({ root : app, logLevel : "warn", preview : { host : BROWSER_HOST, port : previewPort, strictPort : true } });
     try {
-        passed = check("build + preview", await resultsOf("http://localhost:4317/")) && passed;
+        passed = check("build + preview", await resultsOf(`http://${BROWSER_HOST}:${previewPort}/`)) && passed;
     } finally {
         await preview.close();
     }
 
-    const server = await vite.createServer({ root : app, logLevel : "warn", server : { port : 4318, strictPort : true } });
+    const serverPort = await freePort();
+    const server = await vite.createServer({ root : app, logLevel : "warn", server : { host : BROWSER_HOST, port : serverPort, strictPort : true } });
     await server.listen();
     try {
-        passed = check("dev server", await resultsOf("http://localhost:4318/")) && passed;
+        passed = check("dev server", await resultsOf(`http://${BROWSER_HOST}:${serverPort}/`)) && passed;
     } finally {
         await server.close();
     }

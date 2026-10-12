@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { addCallbackHook, AsyncLocalStorage, Variable, type CallbackHook } from "async-browser-context";
-import { deferred, inBrowser, runtime, transformed } from "../helpers.js";
+import { deferred, inBrowser, preset, runtime } from "../helpers.js";
 
 /** The removers of the hooks of the current test. */
 const removers : (() => void)[] = [];
@@ -92,7 +92,7 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         ]);
     });
 
-    it.skipIf(!transformed)("calls the hooks for each step of an async function after an await, with the name of the async function", async () => {
+    it.skipIf(!preset)("calls the hooks for each step of an async function after an await, with the name of the async function", async () => {
         const variable = new Variable<string>();
         const calls = record(variable);
         async function loadUser() : Promise<string | undefined> {
@@ -111,7 +111,7 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         ]);
     });
 
-    it.skipIf(!transformed)("gives the name of an async method and of an async arrow function in a variable", async () => {
+    it.skipIf(!preset)("gives the name of an async method and of an async arrow function in a variable", async () => {
         const variable = new Variable<string>();
         const calls = record(variable);
         const fetchPrice = async () : Promise<void> => { await null; };

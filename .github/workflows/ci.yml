@@ -77,6 +77,22 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm smoke
 
+  bundlers:
+    name: Build tools (webpack, Rspack, Rollup, esbuild and Next.js, with the packed package)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium and its system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:bundlers
+
   site:
     name: Site (types, tests and the prerendered build)
     runs-on: ubuntu-latest

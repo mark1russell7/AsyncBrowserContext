@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
-import { runtime, transformed } from "../helpers.js";
+import { compiler, preset } from "../helpers.js";
 
 /**
  * Native generators run in the context of the caller of `next()`. The rule
- * needs the Babel preset, so the tests skip the Node.js project without the
- * transform.
+ * needs the Babel preset. Thus the tests of the rule skip the projects without
+ * the preset: the Node.js project without a transform, and the projects of
+ * SWC and esbuild.
  */
-const needsTransform = runtime === "node" && !transformed;
+const needsPreset = !preset;
 
 const variable = new Variable<string>();
 
@@ -68,7 +69,7 @@ class Reader extends Base {
     }
 }
 
-describe.skipIf(needsTransform)("rule C5: a generator body runs in the context of the call that made the generator", () => {
+describe.skipIf(needsPreset)("rule C5: a generator body runs in the context of the call that made the generator", () => {
     it("keeps the creation context when another context calls next()", () => {
         const generator = variable.run("created", () => readTwice());
         expect(variable.run("b", () => generator.next().value)).toBe("created");
@@ -168,5 +169,14 @@ describe.skipIf(needsTransform)("rule C5: a generator body runs in the context o
             yield id;
         }
         expect(() => needsObject(undefined as unknown as { id : number })).toThrow(TypeError);
+    });
+});
+
+describe.skipIf(preset)(`rule C5 without the preset (${compiler}): a generator body runs in the context of the next() call`, () => {
+    it("gives the context of the caller of next() to a sync generator and to an async generator", async () => {
+        const generator = variable.run("created", () => readTwice());
+        expect(variable.run("b", () => generator.next().value)).toBe("b");
+        const asyncGenerator = variable.run("created", () => readTwiceAsync());
+        expect((await variable.run("b", () => asyncGenerator.next())).value).toBe("b");
     });
 });

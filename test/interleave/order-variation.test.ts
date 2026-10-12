@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Snapshot, Variable } from "async-browser-context";
-import { delay, runtime, transformed } from "../helpers.js";
+import { delay, preset } from "../helpers.js";
 
 /**
  * Order variation. Many tasks run at the same time. Each task has its own
@@ -21,7 +21,7 @@ function random(seed : number) : () => number {
     };
 }
 
-const generatorsBound = !(runtime === "node" && !transformed);
+const generatorsBound = preset;
 
 type Operation = (variable : Variable<string>, other : Variable<string>, next : () => number) => Promise<unknown>;
 

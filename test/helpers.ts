@@ -2,8 +2,16 @@ import type { Variable } from "async-browser-context";
 
 /** The runtime under test (a `define` constant of the Vitest project). */
 export const runtime : "browser" | "node" = __TEST_RUNTIME__;
-/** `true` if the Babel preset transformed the test files. */
-export const transformed : boolean = __TEST_TRANSFORMED__;
+/** The compiler of the test files: the Babel preset, SWC or esbuild with the target ES2016, or none. */
+export const compiler : "babel-preset" | "swc-es2016" | "esbuild-es2016" | "none" = __TEST_COMPILER__;
+/** `true` if a compiler changed the async functions of the test files into generators. */
+export const transformed : boolean = compiler !== "none";
+/**
+ * `true` if the Babel preset transformed the test files. Only the preset binds
+ * generators to the context of their creation (rule C5), and gives the names
+ * of the async functions to the callback hooks.
+ */
+export const preset : boolean = compiler === "babel-preset";
 /** `true` in a real browser (Vitest browser mode). */
 export const inBrowser : boolean = typeof window !== "undefined" && typeof document !== "undefined";
 

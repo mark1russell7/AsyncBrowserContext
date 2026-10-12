@@ -12,7 +12,7 @@ import { aliases, constants, here, SHARED, transformTests } from "./vitest.confi
 export default defineConfig({
     plugins : [transformTests],
     resolve : { alias : aliases("browser") },
-    define : constants("browser", true),
+    define : constants("browser", "babel-preset"),
     test : {
         globals : true,
         environment : "node",

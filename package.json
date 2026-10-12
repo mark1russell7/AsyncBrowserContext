@@ -106,7 +106,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:node": "vitest run --project unit --project \"rules (browser runtime, Node.js)\" --project \"rules (node runtime)\" --project \"rules (node runtime, no transform)\"",
+    "test:node": "vitest run --project unit --project \"rules (browser runtime, Node.js)\" --project \"rules (browser runtime, SWC ES2016)\" --project \"rules (browser runtime, esbuild ES2016)\" --project \"rules (node runtime)\" --project \"rules (node runtime, no transform)\"",
     "test:browser": "vitest run --project \"browser (chromium)\" --project \"browser (firefox)\" --project \"browser (webkit)\"",
     "coverage": "vitest run --coverage --project unit --project \"rules (browser runtime, Node.js)\" --project \"rules (node runtime)\"",
     "mutation": "stryker run",
@@ -118,7 +118,9 @@
     "site:build": "pnpm --filter ./site build",
     "prepublishOnly": "pnpm build && pnpm test",
     "site:data": "tsx scripts/site-data.ts",
-    "readme:media": "tsx scripts/readme-media.ts"
+    "readme:media": "tsx scripts/readme-media.ts",
+    "test:bundlers": "pnpm build && tsx test/bundlers/run.ts",
+    "bench:size": "tsx bench/size.ts"
   },
   "dependencies": {
     "@babel/core": "^8.0.7",
@@ -141,10 +143,12 @@
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@stryker-mutator/core": "^10.0.0",
+    "@swc/core": "^1.16.18",
     "@types/node": "^25.3.0",
     "@vitest/browser": "^5.0.3",
     "@vitest/browser-playwright": "^5.0.3",
     "@vitest/coverage-v8": "^5.0.3",
+    "esbuild": "^0.28.2",
     "playwright": "^1.64.0",
     "tinybench": "^6.2.1",
     "tsx": "^4.23.15",
