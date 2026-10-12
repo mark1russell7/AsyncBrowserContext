@@ -1,5 +1,6 @@
-import { memoizePromise } from "../lib/memoize-promise";
-import { parsePageMeta } from "./frontmatter";
+// The build also imports this module (refer to build/content-files.ts), so its imports have file extensions.
+import { memoizePromise } from "../lib/memoize-promise.ts";
+import { parsePageMeta } from "./frontmatter.ts";
 import type {
     ContentEntry,
     ContentPage,
@@ -7,7 +8,7 @@ import type {
     ContentRegistry,
     PageNeighbors,
     SidebarItem,
-} from "./types";
+} from "./types.ts";
 
 export type RegistryOptions = {
     /** The content folder, from the repository root. It starts the "edit this page" path. */
@@ -34,6 +35,17 @@ export function slugOf(file : string) : string {
     return file.endsWith("/index") ? file.slice(0, -"/index".length) : file;
 }
 
+/**
+ * The first page in reading order below a folder of a section. For example,
+ * the folder "concepts" gives the first page of the group "concepts", and the
+ * folder "" gives the first page of the section. A folder without a page of
+ * its own sends the reader to this page.
+ */
+export function firstPageBelow(registry : ContentRegistry, section : string, folder : string) : ContentPage | undefined {
+    const prefix = folder === "" ? "" : `${folder}/`;
+    return registry.pages(section).find(page => page.slug !== folder && page.slug.startsWith(prefix));
+}
+
 /** "getting-started" → "Getting started". */
 export function folderLabel(folder : string) : string {
     const words = folder.replace(/[-_]+/g, " ").trim();
@@ -44,6 +56,11 @@ function lastSegment(file : string) : string {
     const segments = file.split("/");
     const last = segments[segments.length - 1] ?? file;
     return last === "index" ? (segments[segments.length - 2] ?? last) : last;
+}
+
+/** The title of a page without a valid title: "concepts/event-loop" → "Event loop", "monitors/index" → "Monitors". */
+export function fallbackTitle(file : string) : string {
+    return folderLabel(lastSegment(file));
 }
 
 function comparePages(a : ContentPage, b : ContentPage) : number {
@@ -103,7 +120,7 @@ export function createContentRegistry(entries : readonly ContentEntry[], options
             continue;
         }
         const sourcePath = `${sourceRoot}/${parsed.section}/${parsed.file}.mdx`;
-        const { meta, errors } = parsePageMeta(entry.frontmatter, folderLabel(lastSegment(parsed.file)));
+        const { meta, errors } = parsePageMeta(entry.frontmatter, fallbackTitle(parsed.file));
         for (const message of errors) problems.push({ sourcePath, message });
 
         const slug = slugOf(parsed.file);

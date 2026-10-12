@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createContentRegistry, folderLabel, parseContentKey, slugOf } from "./registry";
+import { createContentRegistry, fallbackTitle, firstPageBelow, folderLabel, parseContentKey, slugOf } from "./registry";
 import type { ContentEntry, ContentModule } from "./types";
 
 const module : ContentModule = { default : () => null, toc : [] };
@@ -45,6 +45,25 @@ describe("slugOf and folderLabel", () => {
     it("makes a label from a folder name", () => {
         expect(folderLabel("getting-started")).toBe("Getting started");
         expect(folderLabel("concepts")).toBe("Concepts");
+    });
+
+    it("makes a title from the file name for a page without a valid title", () => {
+        expect(fallbackTitle("concepts/event-loop")).toBe("Event loop");
+        expect(fallbackTitle("monitors/index")).toBe("Monitors");
+        expect(fallbackTitle("index")).toBe("Index");
+    });
+});
+
+describe("firstPageBelow", () => {
+    const registry = createContentRegistry(entries, { sourceRoot : "content" });
+
+    it("gives the first page of a folder and of a section, in reading order", () => {
+        expect(firstPageBelow(registry, "docs", "concepts")?.path).toBe("/docs/concepts/event-loop");
+        expect(firstPageBelow(registry, "docs", "operations")?.path).toBe("/docs/operations/grafana-stack");
+        expect(firstPageBelow(registry, "docs", "monitors")?.path).toBe("/docs/monitors/drift-lag");
+        expect(firstPageBelow(registry, "docs", "")?.path).toBe("/docs/getting-started");
+        expect(firstPageBelow(registry, "docs", "concept")).toBeUndefined();
+        expect(firstPageBelow(registry, "research", "")).toBeUndefined();
     });
 });
 
