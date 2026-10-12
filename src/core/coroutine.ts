@@ -14,7 +14,7 @@ import { applyWithHooks, store, type Frame } from "./store.js";
 
 /**
  * This function gives the generator function to the callback hooks, with the name of the
- * async function. The preset gives the name, because the generator function
+ * async function or the async generator. The preset gives the name, because the generator function
  * of Babel has no name. The function sets the name only when a hook operates.
  */
 function namedForHooks(generatorFunction : Function, name : string | undefined) : Function {
