@@ -26,14 +26,20 @@ export type StepPlayer = {
 export function useStepPlayer(count : number, options : { loop? : boolean; resetKey? : string; startAt? : "first" | "last" } = {}) : StepPlayer {
     const { loop = false, resetKey = "", startAt = "first" } = options;
     const last = Math.max(0, count - 1);
-    const [index, setIndexState] = useState(0);
+    const start = startAt === "last" ? last : 0;
+    const [index, setIndexState] = useState(start);
     const [playing, setPlaying] = useState(false);
     const [speed, setSpeed] = useState(1);
 
-    useEffect(() => {
-        setIndexState(startAt === "last" ? last : 0);
+    // The reset occurs in the render, not in an effect. An effect operates after the commit. Thus it
+    // undid a move of the reader between the commit of the new steps and the effect.
+    const key = `${resetKey}\u0000${startAt}\u0000${last}`;
+    const [appliedKey, setAppliedKey] = useState(key);
+    if (appliedKey !== key) {
+        setAppliedKey(key);
+        setIndexState(start);
         setPlaying(false);
-    }, [resetKey, startAt, last]);
+    }
 
     useEffect(() => {
         if (!playing || count === 0) return undefined;
