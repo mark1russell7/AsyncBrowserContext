@@ -63,7 +63,7 @@ describe("the patch helpers", () => {
         const previous = enter(frame);
         let args : unknown[];
         try {
-            args = wrapFunctionArguments([1, () => store.current, "x"]);
+            args = wrapFunctionArguments([1, () => store.current, "x"], "test");
         } finally {
             enter(previous);
         }
@@ -71,7 +71,7 @@ describe("the patch helpers", () => {
         expect(args[2]).toBe("x");
         expect((args[1] as () => unknown)()).toBe(frame);
         const unchanged = [1, 2];
-        expect(wrapFunctionArguments(unchanged)).toBe(unchanged);
+        expect(wrapFunctionArguments(unchanged, "test")).toBe(unchanged);
     });
 
     it("keeps the own prototype object of the replacement", () => {

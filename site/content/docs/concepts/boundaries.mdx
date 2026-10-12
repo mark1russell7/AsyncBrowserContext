@@ -82,6 +82,10 @@ self.onmessage = ({ data }) => {
 };
 ```
 
+## Profilers and long tasks
+
+A profiler, a stack trace and the Long Animation Frames API of Chromium show the wrapper `asyncBrowserContextWrapper` between the browser and each callback of a patched API. The browser shows the static name of the function that it starts, so the wrapper cannot show the name of your callback. Use `addCallbackHook()` to get the callback, its source and its context. The guide [Find the operation of a long task](/docs/guides/long-tasks) shows how.
+
 ## zone.js is not a boundary
 
 zone.js also patches `Promise.prototype.then`, with different rules. Do not use the library and zone.js in the same page. For OpenTelemetry, use [`AsyncContextManager`](/docs/guides/opentelemetry) in place of the `ZoneContextManager`.

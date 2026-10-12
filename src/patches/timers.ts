@@ -25,9 +25,10 @@ const PROTOTYPE_SCHEDULERS : readonly (readonly [string, string])[] = [
 ];
 // Stryker restore all
 
-function wrapFirstArgument(original : Scheduler) : Scheduler {
-    return function (this : unknown, callback : unknown, ...rest : unknown[]) : unknown {
-        const wrapped = typeof callback === "function" ? bindToFrame(store.current, callback as (...args : unknown[]) => unknown) : callback;
+/** `source` is the name of the scheduler, for the callback hooks. */
+function wrapFirstArgument(source : string) : (original : Scheduler) => Scheduler {
+    return (original) => function (this : unknown, callback : unknown, ...rest : unknown[]) : unknown {
+        const wrapped = typeof callback === "function" ? bindToFrame(store.current, callback as (...args : unknown[]) => unknown, source) : callback;
         return original.call(this, wrapped, ...rest);
     };
 }
@@ -42,13 +43,13 @@ export function installTimerPatches() : void {
         return;
     }
     for (const name of GLOBAL_SCHEDULERS) {
-        replaceFunction<Scheduler>(globalThis, name, wrapFirstArgument);
+        replaceFunction<Scheduler>(globalThis, name, wrapFirstArgument(name));
     }
     // Stryker disable all: Node.js has none of these classes. The browser tests examine them.
     for (const [constructorName, method] of PROTOTYPE_SCHEDULERS) {
         const prototype = globalPrototype(constructorName);
         if (prototype !== undefined) {
-            replaceFunction<Scheduler>(prototype, method, wrapFirstArgument);
+            replaceFunction<Scheduler>(prototype, method, wrapFirstArgument(`${constructorName}.${method}`));
         }
     }
     // Stryker restore all

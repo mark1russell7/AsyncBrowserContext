@@ -47,10 +47,10 @@ describe("the context store", () => {
         const frame = createFrame(store.root, {}, 0);
         const many = bindToFrame(frame, function (this : { id : number }, a : number, b : number) : string {
             return `${this.id}:${a + b}:${store.current === frame ? "frame" : "other"}`;
-        });
+        }, "test");
         const one = bindOneArgument(frame, function (this : { id : number }, a : number) : string {
             return `${this.id}:${a}:${store.current === frame ? "frame" : "other"}`;
-        });
+        }, "test");
         expect(many.call({ id : 1 }, 2, 3)).toBe("1:5:frame");
         expect(one.call({ id : 4 }, 5)).toBe("4:5:frame");
         expect(store.current).toBe(store.root);

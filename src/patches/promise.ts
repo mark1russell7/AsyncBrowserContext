@@ -27,8 +27,8 @@ export function installPromisePatch() : void {
         const frame = store.current;
         return nativeThen.call(
             this,
-            typeof onFulfilled === "function" ? bindOneArgument(frame, onFulfilled) : onFulfilled,
-            typeof onRejected === "function" ? bindOneArgument(frame, onRejected) : onRejected,
+            typeof onFulfilled === "function" ? bindOneArgument(frame, onFulfilled, "Promise.then") : onFulfilled,
+            typeof onRejected === "function" ? bindOneArgument(frame, onRejected, "Promise.then") : onRejected,
         ) as Promise<R1 | R2>;
     } as Then);
 }

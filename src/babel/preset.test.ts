@@ -163,4 +163,68 @@ describe("the Babel preset", () => {
         const output = await transform("use(g()); function* g() { yield 1; }");
         expect(output.code).toMatch(/function g\(/);
     });
+
+    it("names its second plugin, which names the coroutines", () => {
+        const config = preset({ assertVersion : () => undefined } as never);
+        const [, second] = config.plugins ?? [];
+        const [plugin, options] = second as [(api : unknown, options : object) => { name : string }, object];
+        expect(plugin({}, options).name).toBe("async-browser-context/name-coroutines");
+    });
+});
+
+/** The names that the output gives to the coroutine calls, in the order of the output: `_coroutine(function* () {...}, "name")`. */
+function coroutineNames(code : string) : string[] {
+    return [...code.matchAll(/\}, "([^"]*)"\)/g)].map((match) => match[1] as string);
+}
+
+describe("the names of the async functions (for the callback hooks)", () => {
+    const CASES : readonly (readonly [string, string, readonly string[]])[] = [
+        ["a declaration", "async function load() { await null; }", ["load"]],
+        ["an arrow function in a variable", "const load = async () => { await null; };", ["load"]],
+        ["an anonymous function expression in a variable", "const load = async function () { await null; };", ["load"]],
+        ["a function expression with its own name", "const x = async function inner() { await null; };", ["inner"]],
+        ["an object method", "const o = { async m() { await null; } };", ["m"]],
+        ["an arrow function in an object property", "const o = { m: async () => { await null; } };", ["m"]],
+        ["a string key", "const o = { 'a b': async () => { await null; } };", ["a b"]],
+        ["a computed string key", "const o = { async ['lit']() { await null; } };", ["lit"]],
+        ["a numeric key", "const o = { async 42() { await null; } };", ["42"]],
+        ["a static class method", "class C { static async s() { await null; } }", ["s"]],
+        ["a private class method", "class C { async #p() { await null; } }", ["#p"]],
+        ["a class field", "class C { f = async () => { await null; }; }", ["f"]],
+        ["a private class field", "class C { #f = async () => { await null; }; }", ["#f"]],
+        ["an assignment", "let a; a = async () => { await null; };", ["a"]],
+        ["a logical assignment", "let a; a ??= async () => { await null; };", ["a"]],
+        ["a default parameter", "function f(cb = async () => { await null; }) { return cb; }", ["cb"]],
+        ["a default export", "export default async function () { await null; }", ["default"]],
+        ["an async function in an async method", "class C { async m() { const inner = async () => { await null; }; await inner(); } }", ["inner", "m"]],
+    ];
+    for (const [name, input, expected] of CASES) {
+        it(`gives the name of ${name}`, async () => {
+            const output = await transform(input);
+            expect(coroutineNames(output.code).toSorted()).toEqual([...expected].toSorted());
+        });
+    }
+
+    it("gives no name to an anonymous async function", async () => {
+        const output = await transform("use(async () => { await null; }); const o = { async [key]() { await null; } };");
+        expect(output.code).toMatch(/_coroutine\(/);
+        expect(coroutineNames(output.code)).toEqual([]);
+    });
+
+    it("gives no name to an async generator", async () => {
+        const output = await transform("async function* numbers() { await null; yield 1; }");
+        expect(coroutineNames(output.code)).toEqual([]);
+    });
+
+    it("gives the name in CommonJS output", async () => {
+        const output = await transform("const x = require('x'); module.exports = async function f() { await x(); };", { sourceType : "unambiguous" });
+        expect(coroutineNames(output.code)).toEqual(["f"]);
+    });
+
+    it("gives the name one time when it transforms its own output again", async () => {
+        const first = await transform("async function load() { await null; }");
+        const second = await transform(first.code);
+        expect(coroutineNames(second.code)).toEqual(["load"]);
+        expect(second.code).not.toMatch(/"load", "load"/);
+    });
 });

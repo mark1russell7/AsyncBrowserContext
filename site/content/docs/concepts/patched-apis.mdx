@@ -77,6 +77,12 @@ Each function argument of these methods gets the context of the method use.
 | `Document` | `startViewTransition`, also with an object that has an `update` callback |
 | `NavigateEvent` | `intercept`, for the `handler` callback |
 
+## The wrappers
+
+Each patch gives a wrapper to the native API in place of your callback. The wrapper sets the context, starts your callback, and sets the previous context again. Each wrapper has the name `asyncBrowserContextWrapper`. Stack traces, profilers and the Long Animation Frames API show this name between the browser and your callback.
+
+The wrapper also starts the methods of the [callback hooks](/docs/api#addcallbackhook). A hook gets your callback and the `source` of the callback. For a patched API, the `source` is the name of the API, for example `"setTimeout"`, `"Promise.then"`, `"addEventListener:click"`, `"onclick"`, `"MutationObserver"` or `"ReadableStream.pull"`.
+
 ## APIs that the runtime does not patch
 
 The library does not patch other callback APIs. For a callback of such an API, use `AsyncContext.Snapshot.wrap(callback)` or `AsyncLocalStorage.bind(callback)`. The [boundaries](/docs/concepts/boundaries) page tells more.

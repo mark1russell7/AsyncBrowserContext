@@ -1,4 +1,4 @@
-import { store, type Frame } from "./store.js";
+import { applyWithHooks, store, type Frame } from "./store.js";
 
 /**
  * The code from the Babel preset uses these runtime functions. Do not use them
@@ -12,24 +12,43 @@ import { store, type Frame } from "./store.js";
  */
 
 /**
+ * This function gives the generator function to the callback hooks, with the name of the
+ * async function. The preset gives the name, because the generator function
+ * of Babel has no name. The function sets the name only when a hook operates.
+ */
+function namedForHooks(generatorFunction : Function, name : string | undefined) : Function {
+    if (name !== undefined && generatorFunction.name !== name) {
+        Object.defineProperty(generatorFunction, "name", { value : name, configurable : true });
+    }
+    return generatorFunction;
+}
+
+/**
  * This function gives an async function that operates `generatorFunction`. The preset gives
  * this function to `@babel/plugin-transform-async-to-generator` as its
- * `method` option.
+ * `method` option, and adds `name`, the name of the async function, if it has one.
  */
-export function coroutine<T, A extends unknown[], R>(generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>) : (this : T, ...args : A) => Promise<R> {
+export function coroutine<T, A extends unknown[], R>(
+    generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>,
+    name? : string,
+) : (this : T, ...args : A) => Promise<R> {
     const { Promise : NativePromise, promiseThen, promiseResolve } = store.intrinsics;
     return function asyncFunction(this : T, ...args : A) : Promise<R> {
         // The context of the call. The body can change it with AsyncLocalStorage.enterWith.
         let frame : Frame = store.current;
         const generator = generatorFunction.apply(this, args);
         return new NativePromise<R>((resolve, reject) => {
-            const step = (resume : (argument : unknown) => IteratorResult<unknown, R>, argument : unknown) : void => {
+            /** `resumed` is `true` for a step after an `await`. Only these steps start the hook methods. */
+            const step = (resume : (argument : unknown) => IteratorResult<unknown, R>, argument : unknown, resumed : boolean) : void => {
                 const previous = store.current;
                 store.current = frame;
                 let result : IteratorResult<unknown, R>;
                 let awaited : Promise<unknown>;
                 try {
-                    result = resume(argument);
+                    const hooks = resumed ? store.hooks : undefined;
+                    result = hooks === undefined
+                        ? resume(argument)
+                        : applyWithHooks(hooks, namedForHooks(generatorFunction, name), "await", resume, undefined, [argument]);
                     if (result.done) {
                         frame = store.current;
                         store.current = previous;
@@ -49,9 +68,9 @@ export function coroutine<T, A extends unknown[], R>(generatorFunction : (this :
             };
             const next = (value : unknown) : IteratorResult<unknown, R> => generator.next(value);
             const throwInto = (error : unknown) : IteratorResult<unknown, R> => generator.throw(error);
-            const onFulfilled = (value : unknown) : void => step(next, value);
-            const onRejected = (error : unknown) : void => step(throwInto, error);
-            step(next, undefined);
+            const onFulfilled = (value : unknown) : void => step(next, value, true);
+            const onRejected = (error : unknown) : void => step(throwInto, error, true);
+            step(next, undefined, false);
         });
     };
 }

@@ -1,4 +1,4 @@
-import { store, type Frame } from "../core/store.js";
+import { applyWithHooks, store, type Frame } from "../core/store.js";
 import { claim, globalPrototype, ownDataValue, rememberOriginal, replaceFunction } from "./patch.js";
 
 /**
@@ -37,16 +37,27 @@ function frameForCall(registered : Frame) : Frame {
     return current === store.root ? registered : current;
 }
 
-function createWrapper(listener : Listener, frame : Frame, onFirstCall : (() => void) | undefined) : EventListener {
-    return function (this : unknown, event : Event) : unknown {
+/** `source` is `addEventListener:` and the event type, for the callback hooks. */
+function createWrapper(listener : Listener, frame : Frame, onFirstCall : (() => void) | undefined, source : string) : EventListener {
+    return function asyncBrowserContextWrapper(this : unknown, event : Event) : unknown {
         onFirstCall?.();
         const previous = store.current;
         store.current = frameForCall(frame);
         try {
+            let fn : Handler;
+            let thisValue : unknown;
             if (typeof listener === "function") {
-                return (listener as Handler).call(this, event);
+                fn = listener as Handler;
+                thisValue = this;
+            } else {
+                fn = listener.handleEvent as Handler;
+                thisValue = listener;
             }
-            return (listener.handleEvent as Handler).call(listener, event);
+            const hooks = store.hooks;
+            if (hooks === undefined || typeof fn !== "function") {
+                return fn.call(thisValue, event);
+            }
+            return applyWithHooks(hooks, fn, source, fn, thisValue, [event]);
         } finally {
             store.current = previous;
         }
@@ -89,7 +100,7 @@ function installListenerPatch() : void {
                 }
             };
             const once = typeof options === "object" && options.once === true;
-            registration = { frame : store.current, wrapper : createWrapper(listener, store.current, once ? forget : undefined) };
+            registration = { frame : store.current, wrapper : createWrapper(listener, store.current, once ? forget : undefined, `addEventListener:${String(type)}`) };
             listeners.set(listener, registration);
             const signal = typeof options === "object" ? options.signal : undefined;
             if (signal !== undefined) {
@@ -127,12 +138,17 @@ function installListenerPatch() : void {
 /** The handler and its wrapper of each `on...` property of each target. */
 const handlers = new WeakMap<object, Map<string, { readonly handler : Handler; readonly wrapper : Handler }>>();
 
-function createHandlerWrapper(handler : Handler, frame : Frame) : Handler {
-    return function (this : unknown, ...args : unknown[]) : unknown {
+/** `source` is the name of the `on...` property, for the callback hooks. */
+function createHandlerWrapper(handler : Handler, frame : Frame, source : string) : Handler {
+    return function asyncBrowserContextWrapper(this : unknown, ...args : unknown[]) : unknown {
         const previous = store.current;
         store.current = frameForCall(frame);
         try {
-            return handler.apply(this, args);
+            const hooks = store.hooks;
+            if (hooks === undefined) {
+                return handler.apply(this, args);
+            }
+            return applyWithHooks(hooks, handler, source, handler, this, args);
         } finally {
             store.current = previous;
         }
@@ -170,7 +186,7 @@ function patchHandlerProperties(owner : object) : void {
                     byName = new Map();
                     handlers.set(target, byName);
                 }
-                const wrapper = createHandlerWrapper(value as Handler, store.current);
+                const wrapper = createHandlerWrapper(value as Handler, store.current, name);
                 byName.set(name, { handler : value as Handler, wrapper });
                 nativeSet.call(target, wrapper);
             },

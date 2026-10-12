@@ -63,6 +63,16 @@ The other patches wrap the callbacks of timers, events, observers, streams and o
 
 Each patch keeps the name, the length and the other properties of the native function. `Function.prototype.toString` gives the source text of the original function.
 
+### Callback hooks
+
+Each wrapper has the name `asyncBrowserContextWrapper`. Browsers show the static name of the function that they start, for example in the Long Animation Frames API. A change of the `name` property does not change this name. Thus, the browser cannot show the name of the callback, and `addCallbackHook()` gives the callback to a tool.
+
+The store keeps the hooks in an array, and each change makes a new array. Each wrapper reads this property after it sets the frame. Without hooks, the property is `undefined`, and the wrapper starts the callback immediately. With hooks, the wrapper starts `before`, the callback and `after`. The coroutine does the same for each step after an `await`.
+
+The hooks get the generator function of an async function, because the coroutine starts it. Babel gives no name to this function. Thus, the preset records the name of each async function before the async transform, and adds it as the second argument of `coroutine`. The coroutine sets the name on the generator function when a hook operates for the first time.
+
+A hook error goes to `reportError()`, because a hook must not stop the callback. While a hook operates, callbacks do not start the hooks. Thus, a hook that dispatches an event cannot start itself again without end.
+
 ### Node.js
 
 On Node.js, the `node` export condition selects an entry that uses the native `AsyncLocalStorage`. It needs no transform and no patch. The runtime of the transform on Node.js has a plain `coroutine` and a `bindGenerator` that uses `AsyncLocalStorage.snapshot()`.

@@ -1,4 +1,4 @@
-import { store, type Frame } from "../core/store.js";
+import { applyWithHooks, store, type Frame } from "../core/store.js";
 import { claim, ownDataValue, rememberOriginal } from "./patch.js";
 
 /**
@@ -20,19 +20,24 @@ type Method = (this : unknown, ...args : unknown[]) => unknown;
  * Each method gets `underlying` as its `this` value, as the specification
  * tells.
  */
-function wrapUnderlying(underlying : object, methods : readonly string[], frame : Frame) : object {
+function wrapUnderlying(underlying : object, methods : readonly string[], frame : Frame, name : string) : object {
     const wrapped = Object.create(underlying) as Record<string, unknown>;
-    const source = underlying as Record<string, unknown>;
+    const properties = underlying as Record<string, unknown>;
     for (const method of methods) {
-        const original = source[method];
+        const original = properties[method];
         if (typeof original !== "function") {
             continue;
         }
-        wrapped[method] = function (...args : unknown[]) : unknown {
+        const source = `${name}.${method}`;
+        wrapped[method] = function asyncBrowserContextWrapper(...args : unknown[]) : unknown {
             const previous = store.current;
             store.current = frame;
             try {
-                return (original as Method).apply(underlying, args);
+                const hooks = store.hooks;
+                if (hooks === undefined) {
+                    return (original as Method).apply(underlying, args);
+                }
+                return applyWithHooks(hooks, original as Method, source, original as Method, underlying, args);
             } finally {
                 store.current = previous;
             }
@@ -57,7 +62,7 @@ export function installStreamPatches() : void {
             construct(target, args : unknown[], newTarget : Function) : object {
                 const underlying = args[0];
                 if (typeof underlying === "object" && underlying !== null) {
-                    args[0] = wrapUnderlying(underlying, methods, store.current);
+                    args[0] = wrapUnderlying(underlying, methods, store.current, name);
                 }
                 return Reflect.construct(target, args, newTarget) as object;
             },

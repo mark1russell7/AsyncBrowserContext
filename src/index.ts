@@ -15,6 +15,7 @@ import { Snapshot } from "./core/snapshot.js";
 import { Variable } from "./core/variable.js";
 
 export { AsyncLocalStorage, type AsyncLocalStorageOptions } from "./core/async-local-storage.js";
+export { addCallbackHook, type CallbackHook } from "./core/hooks.js";
 export { Snapshot } from "./core/snapshot.js";
 export { Variable, type VariableOptions } from "./core/variable.js";
 

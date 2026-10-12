@@ -8,10 +8,12 @@
  * @packageDocumentation
  */
 import { AsyncLocalStorage as NodeAsyncLocalStorage } from "node:async_hooks";
+import { assertCallbackHook, type CallbackHook } from "../core/callback-hook.js";
 import type { VariableOptions } from "../core/variable.js";
 import { createCompatibleStorage } from "./compatible-storage.js";
 
 export type { AsyncLocalStorageOptions } from "../core/async-local-storage.js";
+export type { CallbackHook } from "../core/callback-hook.js";
 export type { VariableOptions } from "../core/variable.js";
 
 /** The value of a `Variable` in one context. The box tells "a value is set" apart from `undefined`. */
@@ -98,3 +100,17 @@ export type AsyncVariable<T> = Variable<T>;
 export const AsyncSnapshot : typeof Snapshot = Snapshot;
 /** Another name for `Snapshot`. */
 export type AsyncSnapshot = Snapshot;
+
+/**
+ * On Node.js, this function does nothing. The library does not wrap callbacks
+ * on Node.js, because the native `AsyncLocalStorage` keeps the context. Use
+ * `node:diagnostics_channel` or `node:async_hooks` to measure callbacks. The
+ * function examines the hook as the browser function does, and gives a
+ * function that does nothing.
+ */
+export function addCallbackHook(hook : CallbackHook) : () => void {
+    assertCallbackHook(hook);
+    return function removeCallbackHook() : void {
+        // There is no hook to remove
+    };
+}

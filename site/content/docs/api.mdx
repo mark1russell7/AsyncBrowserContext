@@ -92,6 +92,58 @@ The class of `node:async_hooks`, for browsers. On Node.js, the package gives the
   Use `run()` if possible. `enterWith()` also changes the store of the code that started the current function, until the end of the current step.
 </Callout>
 
+## addCallbackHook
+
+```ts
+import { addCallbackHook, type CallbackHook } from "async-browser-context";
+
+interface CallbackHook {
+    before?(callback : Function, source : string) : void;
+    after?(callback : Function, source : string) : void;
+}
+
+function addCallbackHook(hook : CallbackHook) : () => void;
+```
+
+Adds a hook. The library starts the hook methods before and after each callback that it starts. The function gives a function that removes the hook. The guide [Find the operation of a long task](/docs/guides/long-tasks) shows a use.
+
+The library starts the hook methods for these callbacks:
+
+- The callbacks of the [patched APIs](/docs/concepts/patched-apis).
+- Each step of a transformed async function after an `await`. The first step is a direct call, thus it does not start the hook methods.
+
+| Argument | Value |
+| --- | --- |
+| `callback` | The function that the library starts. For an event listener object, it is the `handleEvent` method. For a step after an `await`, it is the body of the async function, with the name of the async function. |
+| `source` | The API that got the callback. The next table gives the values. |
+
+| Callback | `source` |
+| --- | --- |
+| Timer and scheduler callbacks | The name of the function, for example `"setTimeout"`, `"requestAnimationFrame"` or `"Scheduler.postTask"` |
+| `then` callbacks, also of `catch`, `finally` and the combinators | `"Promise.then"` |
+| Event listeners | `"addEventListener:"` and the event type, for example `"addEventListener:click"` |
+| `on...` properties | The name of the property, for example `"onclick"` |
+| Observers | The name of the class, for example `"MutationObserver"` |
+| Streams | The class and the method, for example `"ReadableStream.pull"` |
+| Other callback APIs | The class and the method, for example `"LockManager.request"` |
+| Steps after an `await` | `"await"` |
+
+The rules of the hooks:
+
+- `before` and `after` operate in the context of the callback. Thus, `getStore()` and `get()` give the values of the callback.
+- `before` uses the order of registration. `after` uses the opposite order.
+- The library starts `after` also when the callback throws an error.
+- A hook cannot change the context of the callback.
+- An error in a hook goes to `reportError()`. The callback operates as usual.
+- A callback that starts synchronously in a hook does not start the hook methods.
+- `Snapshot.run()`, `Snapshot.wrap()`, `AsyncLocalStorage.bind()` and `AsyncLocalStorage.snapshot()` do not start the hook methods. Your code starts these functions.
+
+On Node.js, `addCallbackHook()` does nothing, because the library does not wrap callbacks there. On Node.js, use `node:diagnostics_channel` or `node:async_hooks`.
+
+<Callout type="note" title="Cost">
+  Without a hook, each callback reads one more property. With hooks, each callback starts each hook method. Keep the hook methods short.
+</Callout>
+
 ## AsyncContextManager
 
 ```ts
@@ -137,6 +189,8 @@ presets : [["async-browser-context/babel-preset", { runtime : "async-browser-con
 | `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. |
 
 The preset operates with Babel 7.22 and later and with Babel 8. Put it last in the `presets` list.
+
+The preset gives the name of each async function to `coroutine`, for example `_coroutine(function* () {...}, "load")`. The callback hooks show this name for the steps after an `await`.
 
 ## The runtime
 

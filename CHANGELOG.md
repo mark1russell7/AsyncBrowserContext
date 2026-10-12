@@ -1,5 +1,17 @@
 # Change history
 
+## 0.2.0
+
+### New functions
+
+- `addCallbackHook(hook)` adds a hook. The library starts `hook.before` and `hook.after` around each callback of a patched API and each step of an async function after an `await`. The hook methods get the callback and its source, for example `"setTimeout"` or `"addEventListener:click"`, and operate in the context of the callback. Thus, a tool can find the operation and the function of a long task in all browsers. On Node.js, the function does nothing.
+- The Babel preset gives the name of each async function to `coroutine`. The callback hooks show this name for the steps after an `await`.
+
+### Changes
+
+- Each wrapper of the library has the name `asyncBrowserContextWrapper`. Before, the wrappers had the name `boundToFrame` or no name. Stack traces, profilers and the Long Animation Frames API show this name between the browser and the callback.
+- The documents tell one more case of rule C13. When code in the root context dispatches an event, the listener gets the context of its registration.
+
 ## 0.1.1
 
 This version changes only the documentation. The code is the same as in 0.1.0.

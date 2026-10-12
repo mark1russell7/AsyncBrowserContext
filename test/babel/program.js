@@ -1,7 +1,8 @@
 // The program of the Babel test (test/babel/run.ts). Each Babel version
 // transforms it with the preset, and the test starts the output on the
-// browser runtime in Node.js. Two requests run at the same time.
-import { AsyncLocalStorage } from "async-browser-context/browser";
+// browser runtime in Node.js. Two requests run at the same time. A callback
+// hook records the names that the steps after an await get.
+import { addCallbackHook, AsyncLocalStorage } from "async-browser-context/browser";
 
 const store = new AsyncLocalStorage();
 
@@ -38,6 +39,14 @@ class Child extends Base {
 }
 
 export async function main() {
+    const awaitNames = new Set();
+    const removeHook = addCallbackHook({
+        before(callback, source) {
+            if (source === "await" && store.getStore() !== undefined) {
+                awaitNames.add(callback.name);
+            }
+        },
+    });
     const request = (id) => store.run(id, async () => {
         const fromAwait = await inner(id);
         const generator = steps();
@@ -50,5 +59,7 @@ export async function main() {
         const fromSuper = await new Child().read();
         return { fromAwait, fromGenerator, fromAsyncGenerator, fromSuper };
     });
-    return Promise.all([request("a"), request("b")]);
+    const requests = await Promise.all([request("a"), request("b")]);
+    removeHook();
+    return { requests, awaitNames : [...awaitNames].sort() };
 }

@@ -1,0 +1,86 @@
+---
+title: Find the operation of a long task
+description: Measure each callback with a callback hook. Name the operation and the function of each long task, also in Firefox and Safari.
+order: 36
+---
+
+## The problem
+
+A long task stops the main thread for 50 ms or more. In Chromium, the Long Animation Frames API (LoAF) tells the script and the function of a long task. Firefox and Safari do not have this API. Also, the API does not know which operation of your application started the task.
+
+With this library, LoAF shows the wrapper of the library, `asyncBrowserContextWrapper`, in place of your function. The browser shows the static name of the function that it starts, and the library starts the wrapper. A change of the `name` property does not change the static name.
+
+## Measure each callback
+
+With `addCallbackHook()`, the library starts `before` and `after` around each callback that it starts. The two methods operate in the context of the callback. Thus, a hook can measure the time of the callback, and read the operation from the context.
+
+```ts
+// long-tasks.ts
+import { addCallbackHook, AsyncLocalStorage } from "async-browser-context";
+
+export const operation = new AsyncLocalStorage<string>();
+
+const starts : number[] = [];
+
+addCallbackHook({
+    before() {
+        starts.push(performance.now());
+    },
+    after(callback, source) {
+        const duration = performance.now() - (starts.pop() ?? 0);
+        if (duration >= 50) {
+            report({ operation : operation.getStore(), callback : callback.name, source, duration });
+        }
+    },
+});
+```
+
+A callback can start other callbacks synchronously, for example with `dispatchEvent()`. The hooks of these callbacks operate between the hooks of the first callback. Thus, the stack gives the correct start time to each callback. The time of a callback includes the time of the callbacks that it starts synchronously.
+
+## Start the operations
+
+Start each operation in `run()`. Give a name to the async function, so that the steps after each `await` show the name.
+
+```ts
+async function checkout() : Promise<void> {
+    const cart = await loadCart();
+    renderSummary(cart); // A long step after the await
+}
+
+button.addEventListener("click", () => operation.run("checkout", checkout));
+```
+
+If `renderSummary()` takes 120 ms, the hook reports the operation `checkout`, the callback `checkout` and the source `"await"`.
+
+## The result
+
+A page in Chromium starts a timer callback of 150 ms in the operation `checkout`:
+
+```ts
+function fixedBlockingTask() : void {
+    const end = performance.now() + 150;
+    while (performance.now() < end) {
+        // The main thread is busy
+    }
+}
+
+operation.run("checkout", () => setTimeout(fixedBlockingTask, 10));
+```
+
+| Report | What it shows |
+| --- | --- |
+| LoAF, `sourceFunctionName` | `asyncBrowserContextWrapper` |
+| LoAF, `invoker` | `TimerHandler:setTimeout` |
+| The hook | The callback `fixedBlockingTask`, the source `setTimeout`, the operation `checkout`, and 150 ms |
+
+The hook operates in the same way in Firefox and Safari, which do not have LoAF.
+
+## What the hook does not see
+
+- Work of the browser, for example style and layout, is not a callback. Use LoAF for this work where LoAF is available.
+- A script that starts before the library, or that keeps a reference to a native function, does not use the wrappers of the library.
+- A minifier can change the names of functions. If the reports must show the names, set the minifier to keep them.
+
+## Tests
+
+The tests in `test/api/callback-hooks.test.ts` examine the hooks for timers, promises, the steps after an `await`, events, `on...` properties, observers and streams. They also examine the order of the hooks, errors in hooks, and the removal of a hook. The tests operate in Node.js and in Chromium, Firefox and WebKit.

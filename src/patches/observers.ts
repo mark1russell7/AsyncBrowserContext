@@ -43,7 +43,7 @@ export function installObserverPatches() : void {
                 construct(target, args : unknown[], newTarget : Function) : object {
                     const callback = args[0];
                     if (typeof callback === "function") {
-                        args[0] = bindToFrame(store.current, callback as (...values : unknown[]) => unknown);
+                        args[0] = bindToFrame(store.current, callback as (...values : unknown[]) => unknown, name);
                     }
                     return Reflect.construct(target, args, newTarget) as object;
                 },

@@ -27,22 +27,24 @@ const STATIC_METHODS : readonly (readonly [string, readonly string[]])[] = [
     ["Array", ["fromAsync"]],
 ];
 
-function wrapArguments(original : Method) : Method {
-    return function (this : unknown, ...args : unknown[]) : unknown {
-        return original.apply(this, wrapFunctionArguments(args));
+/** `source` is the name of the method, for the callback hooks. */
+function wrapArguments(source : string) : (original : Method) => Method {
+    return (original) => function (this : unknown, ...args : unknown[]) : unknown {
+        return original.apply(this, wrapFunctionArguments(args, source));
     };
 }
 
 /** `startViewTransition()` gets a callback, or an object with an `update` callback. */
 function wrapViewTransition(original : Method) : Method {
+    const source = "Document.startViewTransition";
     return function (this : unknown, ...args : unknown[]) : unknown {
         const [first] = args;
         if (typeof first === "object" && first !== null && typeof (first as { update? : unknown }).update === "function") {
             const options = first as { update : Method };
-            args[0] = { ...options, update : bindToFrame(store.current, options.update) };
+            args[0] = { ...options, update : bindToFrame(store.current, options.update, source) };
             return original.apply(this, args);
         }
-        return original.apply(this, wrapFunctionArguments(args));
+        return original.apply(this, wrapFunctionArguments(args, source));
     };
 }
 
@@ -52,7 +54,7 @@ function wrapIntercept(original : Method) : Method {
         const [first] = args;
         if (typeof first === "object" && first !== null && typeof (first as { handler? : unknown }).handler === "function") {
             const options = first as { handler : Method };
-            args[0] = { ...options, handler : bindToFrame(store.current, options.handler) };
+            args[0] = { ...options, handler : bindToFrame(store.current, options.handler, "NavigateEvent.intercept") };
         }
         return original.apply(this, args);
     };
@@ -69,7 +71,7 @@ export function installCallbackPatches() : void {
             continue;
         }
         for (const method of methods) {
-            replaceFunction<Method>(prototype, method, wrapArguments);
+            replaceFunction<Method>(prototype, method, wrapArguments(`${constructorName}.${method}`));
         }
     }
     for (const [constructorName, methods] of STATIC_METHODS) {
@@ -78,7 +80,7 @@ export function installCallbackPatches() : void {
             continue;
         }
         for (const method of methods) {
-            replaceFunction<Method>(constructor, method, wrapArguments);
+            replaceFunction<Method>(constructor, method, wrapArguments(`${constructorName}.${method}`));
         }
     }
     const documentPrototype = globalPrototype("Document");

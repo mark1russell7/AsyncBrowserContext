@@ -46,14 +46,14 @@ The shared files are in `test/rules/`, `test/regression/`, `test/api/`, `test/in
 | Rules | `test/rules/` | The context rules C1 to C13. |
 | Browser APIs | `test/browser/` | The event rule C13 and the patched browser APIs. |
 | Regression | `test/regression/probes.test.ts` | The 23 probes of the review of 2026-10-08. |
-| API | `test/api/` | The `AsyncLocalStorage` tests run against the native class on Node.js and against the browser class. Thus, the two classes agree. |
+| API | `test/api/` | The `AsyncLocalStorage` tests run against the native class on Node.js and against the browser class. Thus, the two classes agree. The tests of `addCallbackHook()` and of the OpenTelemetry context manager are also here. |
 | Order variation | `test/interleave/` | 40 tasks do random operations with 5 fixed seeds. Each task reads its context after each operation. |
 | Memory | `test/memory/` | Rule C12, with `WeakRef` and the garbage collector. |
 | Units and transform | `src/**/*.test.ts` | The runtime parts, the Vite plugin, and output snapshots of the Babel preset. |
 | Test tools | `test/vitest/` | The port of the browser API server and the check for lost test files. |
 | Legacy | `test/legacy/` | The tests of the first test runner that were kept. `legacy-test-triage.md` gives the result for each test. |
 | Smoke | `test/smoke/run.ts` | `pnpm smoke` packs the package, installs it in a new Vite application, and examines the build and the dev server in Chromium. |
-| Babel versions | `test/babel/run.ts` | `pnpm test:babel` packs the package and installs it with Babel 7.22, the newest Babel 7 and Babel 8. Each version transforms `test/babel/program.js` with the preset, and the test starts the output on the browser runtime. |
+| Babel versions | `test/babel/run.ts` | `pnpm test:babel` packs the package and installs it with Babel 7.22, the newest Babel 7 and Babel 8. Each version transforms `test/babel/program.js` with the preset, and the test starts the output on the browser runtime. The test also examines the names that the callback hooks get for the steps after an `await`. |
 | Mutation | `stryker.config.mjs` | `pnpm mutation` changes the source in small ways. The tests must find each change. |
 
 ## Rules for each test

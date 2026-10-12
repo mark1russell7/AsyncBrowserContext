@@ -133,6 +133,24 @@ snapshot.run(() => userId.get()); // "u-1"
 
 The package also exports `Variable`, `Snapshot`, and the other names `AsyncVariable` and `AsyncSnapshot`.
 
+**`addCallbackHook`** adds a hook. The library starts its methods before and after each callback that it starts, in the context of that callback. Use it to measure callbacks, and to find the operation of a long task, also in Firefox and Safari:
+
+```ts
+import { addCallbackHook, AsyncLocalStorage } from "async-browser-context";
+
+const operation = new AsyncLocalStorage<string>(); // Start each operation in operation.run()
+const starts : number[] = [];
+addCallbackHook({
+    before() { starts.push(performance.now()); },
+    after(callback, source) {
+        const duration = performance.now() - (starts.pop() ?? 0);
+        if (duration >= 50) report(operation.getStore(), callback.name, source, duration);
+    },
+});
+```
+
+`source` names the API, for example `"setTimeout"`, `"addEventListener:click"` or `"await"`. For a step after an `await`, `callback.name` is the name of the async function. The guide [Find the operation of a long task](https://mark1russell7.github.io/AsyncBrowserContext/docs/guides/long-tasks) tells more.
+
 ## Entry points
 
 | Import | Function |
@@ -222,6 +240,7 @@ Do not use the library together with zone.js or with another library that patche
 
 - **Generator functions.** A transformed generator function is an ordinary function that gives a generator. `fn.prototype` and `instanceof fn` do not operate as for a native generator function. The generator objects operate as native generator objects.
 - **Stack traces.** In transformed code, a stack trace shows the generator and the `coroutine` function of the runtime.
+- **Profilers.** Between the browser and each callback of a patched API, stack traces and profilers show the wrapper `asyncBrowserContextWrapper`. The Long Animation Frames API of Chromium shows this name in place of your function. `addCallbackHook()` gives the function and the context of each callback.
 
 ## Performance
 

@@ -12,6 +12,6 @@ function _load() {
       data,
       at: yield now()
     };
-  });
+  }, "load");
   return _load.apply(this, arguments);
 }

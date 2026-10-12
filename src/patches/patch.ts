@@ -71,14 +71,17 @@ export function globalPrototype(name : string) : object | undefined {
     return typeof prototype === "object" && prototype !== null ? prototype : undefined;
 }
 
-/** This function wraps each function argument with the current frame. Other arguments do not change. */
-export function wrapFunctionArguments(args : unknown[]) : unknown[] {
+/**
+ * This function wraps each function argument with the current frame. Other arguments do not change.
+ * `source` is the name of the API, for the callback hooks.
+ */
+export function wrapFunctionArguments(args : unknown[], source : string) : unknown[] {
     const frame = store.current;
     let changed : unknown[] | undefined;
     for (const [index, argument] of args.entries()) {
         if (typeof argument === "function") {
             changed ??= [...args];
-            changed[index] = bindToFrame(frame, argument as (...values : unknown[]) => unknown);
+            changed[index] = bindToFrame(frame, argument as (...values : unknown[]) => unknown, source);
         }
     }
     return changed ?? args;

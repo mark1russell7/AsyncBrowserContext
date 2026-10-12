@@ -34,6 +34,25 @@ export interface ContextStore {
     /** The original function of each patched function. `Function.prototype.toString` shows the original. */
     readonly originals : WeakMap<object, object>;
     readonly intrinsics : Intrinsics;
+    /**
+     * The callback hooks (`addCallbackHook`), or `undefined` if there are none. Each change
+     * makes a new array. The store of an older copy of the library does not
+     * have this property.
+     */
+    hooks? : readonly HookEntry[] | undefined;
+    /** `true` while a hook operates. Callbacks that start in a hook do not start the hook methods. */
+    inHook? : boolean | undefined;
+}
+
+/** The methods of a callback hook. The public type is `CallbackHook` in `hooks.ts`. */
+export interface HookMethods {
+    before?(callback : Function, source : string) : void;
+    after?(callback : Function, source : string) : void;
+}
+
+/** One registration of a hook. Each `addCallbackHook` call makes a new entry. */
+export interface HookEntry {
+    readonly hook : HookMethods;
 }
 
 /** The key of the store on `globalThis`. The version changes when the store format changes. */
@@ -53,6 +72,9 @@ function createStore() : ContextStore {
             promiseResolve : NativePromise.resolve.bind(NativePromise) as Intrinsics["promiseResolve"],
             functionToString : Function.prototype.toString,
         }),
+        // Own properties from the start: each callback reads `hooks`, and the read of an own property is faster
+        hooks : undefined,
+        inHook : false,
     };
 }
 
@@ -143,17 +165,92 @@ export function findValue(frame : Frame, variable : object) : unknown {
     return ValueFrame.find(frame, variable);
 }
 
+/** This function gives the error of a hook to the host. A hook error does not stop the callback. */
+function reportHookError(error : unknown) : void {
+    const report = (globalThis as { reportError? : unknown }).reportError;
+    if (typeof report === "function") {
+        (report as (error : unknown) => void)(error);
+        return;
+    }
+    console.error(error);
+}
+
+/**
+ * This function starts one method of each hook. `before` uses the order of
+ * registration, and `after` uses the opposite order. Each hook operates in
+ * the current frame, and a hook cannot change the frame of the callback.
+ */
+function callHooks(hooks : readonly HookEntry[], phase : "before" | "after", callback : Function, source : string) : void {
+    const frame = store.current;
+    store.inHook = true;
+    try {
+        const count = hooks.length;
+        for (let step = 0; step < count; step++) {
+            const { hook } = hooks[phase === "before" ? step : count - 1 - step] as HookEntry;
+            const method = hook[phase];
+            if (typeof method !== "function") {
+                continue;
+            }
+            try {
+                method.call(hook, callback, source);
+            } catch (error) {
+                reportHookError(error);
+            }
+            store.current = frame;
+        }
+    } finally {
+        store.inHook = false;
+    }
+}
+
+/**
+ * This function starts `fn` between the `before` and the `after` methods of
+ * the hooks. The current frame must be the frame of the callback. The hooks
+ * get `callback` and `source`. A callback that starts in a hook does not start
+ * the hooks again.
+ */
+export function applyWithHooks<T, A extends unknown[], R>(
+    hooks : readonly HookEntry[],
+    callback : Function,
+    source : string,
+    fn : (this : T, ...args : A) => R,
+    thisValue : T,
+    args : A,
+) : R {
+    if (store.inHook === true) {
+        return fn.apply(thisValue, args);
+    }
+    callHooks(hooks, "before", callback, source);
+    try {
+        return fn.apply(thisValue, args);
+    } finally {
+        callHooks(hooks, "after", callback, source);
+    }
+}
+
+/*
+ * Each wrapper has the name `asyncBrowserContextWrapper`. Profilers, stack
+ * traces and the Long Animation Frames API show the static name of a
+ * function, so they show this name in place of the name of the callback. The
+ * name tells the reader that the next frame is the callback.
+ */
+
 /**
  * This function wraps `fn`. The wrapper starts `fn` in `frame`, with the `this`
  * value and the arguments of the call. After `fn` ends, also with an error, the
- * previous frame is current again.
+ * previous frame is current again. `source` is the name of the API that got
+ * `fn`, for the callback hooks.
  */
-export function bindToFrame<T, A extends unknown[], R>(frame : Frame, fn : (this : T, ...args : A) => R) : (this : T, ...args : A) => R {
-    return function boundToFrame(this : T, ...args : A) : R {
+export function bindToFrame<T, A extends unknown[], R>(frame : Frame, fn : (this : T, ...args : A) => R, source : string) : (this : T, ...args : A) => R {
+    return function asyncBrowserContextWrapper(this : T, ...args : A) : R {
         const previous = store.current;
         store.current = frame;
         try {
-            return fn.apply(this, args);
+            const hooks = store.hooks;
+            if (hooks === undefined) {
+                return fn.apply(this, args);
+            }
+            return applyWithHooks(hooks, fn, source, fn, this, args);
         } finally {
             store.current = previous;
         }
@@ -165,12 +262,16 @@ export function bindToFrame<T, A extends unknown[], R>(frame : Frame, fn : (this
  * wrapper does not make an array of the arguments, so it is faster than
  * `bindToFrame` on the hot path.
  */
-export function bindOneArgument<T, A, R>(frame : Frame, fn : (this : T, argument : A) => R) : (this : T, argument : A) => R {
-    return function boundToFrame(this : T, argument : A) : R {
+export function bindOneArgument<T, A, R>(frame : Frame, fn : (this : T, argument : A) => R, source : string) : (this : T, argument : A) => R {
+    return function asyncBrowserContextWrapper(this : T, argument : A) : R {
         const previous = store.current;
         store.current = frame;
         try {
-            return fn.call(this, argument);
+            const hooks = store.hooks;
+            if (hooks === undefined) {
+                return fn.call(this, argument);
+            }
+            return applyWithHooks(hooks, fn, source, fn, this, [argument]);
         } finally {
             store.current = previous;
         }
