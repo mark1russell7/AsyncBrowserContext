@@ -93,4 +93,48 @@ describe(`AsyncContextManager (${runtime} runtime)`, () => {
         });
         expect(other.enable()).toBe(other);
     });
+
+    it("binds a function to the active context when bind() gets no context", () => {
+        const bound = context.with(ROOT_CONTEXT.setValue(REQUEST, "active"), () => context.bind(undefined as unknown as typeof ROOT_CONTEXT, () => valueOf()));
+        expect(bound()).toBe("active");
+    });
+
+    it("binds the listeners of an event emitter, and removes them with the remove methods", () => {
+        // A small emitter with the methods of the Node.js EventEmitter
+        class Emitter {
+            readonly #listeners = new Map<string, ((...args : unknown[]) => void)[]>();
+            on(event : string, listener : (...args : unknown[]) => void) : this {
+                this.#listeners.set(event, [...this.#listeners.get(event) ?? [], listener]);
+                return this;
+            }
+            removeListener(event : string, listener : (...args : unknown[]) => void) : this {
+                this.#listeners.set(event, (this.#listeners.get(event) ?? []).filter((other) => other !== listener));
+                return this;
+            }
+            emit(event : string, ...args : unknown[]) : void {
+                for (const listener of this.#listeners.get(event) ?? []) {
+                    listener(...args);
+                }
+            }
+        }
+        const emitter = context.bind(ROOT_CONTEXT.setValue(REQUEST, "request"), new Emitter());
+        const seen : unknown[] = [];
+        const listener = (chunk : unknown) : void => { seen.push(`${String(chunk)} ${String(valueOf())}`); };
+        emitter.on("data", listener);
+        context.with(ROOT_CONTEXT.setValue(REQUEST, "emit-time"), () => emitter.emit("data", "a"));
+        emitter.removeListener("data", listener);
+        emitter.emit("data", "b");
+        expect(seen).toEqual(["a request"]);
+    });
+
+    it("binds the listeners of an event target, and removes them with removeEventListener", () => {
+        const target = context.bind(ROOT_CONTEXT.setValue(REQUEST, "target"), new EventTarget());
+        const seen : unknown[] = [];
+        const listener = () : void => { seen.push(valueOf()); };
+        target.addEventListener("ping", listener);
+        context.with(ROOT_CONTEXT.setValue(REQUEST, "dispatch"), () => target.dispatchEvent(new Event("ping")));
+        target.removeEventListener("ping", listener);
+        target.dispatchEvent(new Event("ping"));
+        expect(seen).toEqual(["target"]);
+    });
 });
