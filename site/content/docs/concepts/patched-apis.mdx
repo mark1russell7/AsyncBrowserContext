@@ -38,6 +38,8 @@ A `setTimeout` callback in text form does not change.
 
 The patch keeps the rules of the DOM: a second registration of the same listener has no effect, and `once` and `signal` remove the listener.
 
+The patch of the `on...` properties reads only the interfaces in `src/patches/handler-interfaces.ts`. When code reads a global for the first time, the browser makes its interface object. A page has approximately 1,000 interfaces. The list contains the 138 interfaces that have `on...` properties. A browser test reads all globals of Chromium, Firefox and WebKit, and fails if an `on...` property does not have the patch.
+
 ## Observers and registries
 
 These constructors get a callback. The callback gets the context of the construction. The runtime replaces each constructor with a `Proxy`, so `instanceof`, subclasses and static members do not change.

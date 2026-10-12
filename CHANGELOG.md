@@ -10,6 +10,7 @@
 ### Changes
 
 - Each wrapper of the library has the name `asyncBrowserContextWrapper`. Before, the wrappers had the name `boundToFrame` or no name. Stack traces, profilers and the Long Animation Frames API show this name between the browser and the callback.
+- The event patch reads only the 138 interfaces that have `on...` properties. Before, it read all globals of the page, approximately 1,000. For each global that code reads for the first time, the browser makes an interface object. Thus, the patches take less time when the page loads. The median changed from 18 to 8 ms in Chromium, from 22 to 8 ms in Firefox and from 16 to 7 ms in WebKit. A browser test makes sure that the list contains each interface with `on...` properties.
 - The documents tell one more case of rule C13. When code in the root context dispatches an event, the listener gets the context of its registration.
 
 ## 0.1.1

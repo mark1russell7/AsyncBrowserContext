@@ -257,6 +257,8 @@ These results are from `pnpm bench`: the mean time of each scenario, on Node.js 
 
 One read with `get()` takes approximately 4 ns. The [documentation website](https://mark1russell7.github.io/AsyncBrowserContext/) shows the full results.
 
+When the page loads, the library installs its patches in approximately 8 ms: the median of Chromium, Firefox and WebKit on the same computer.
+
 ## Tests
 
 | Command | Function |

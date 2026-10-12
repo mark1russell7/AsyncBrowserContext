@@ -1,4 +1,5 @@
 import { applyWithHooks, store, type Frame } from "../core/store.js";
+import { HANDLER_INTERFACES } from "./handler-interfaces.js";
 import { claim, globalPrototype, ownDataValue, rememberOriginal, replaceFunction } from "./patch.js";
 
 /**
@@ -201,7 +202,11 @@ function patchHandlerProperties(owner : object) : void {
     }
 }
 
-/** This function patches the `on...` properties of the global object and of each prototype of an `EventTarget` class. */
+/**
+ * This function patches the `on...` properties of the global object and of the prototypes of
+ * the `EventTarget` classes in `HANDLER_INTERFACES`. It does not read the
+ * other globals: for each global that code reads for the first time, the browser makes an interface object.
+ */
 function installHandlerPropertyPatch() : void {
     const eventTarget = ownDataValue(globalThis, "EventTarget");
     if (typeof eventTarget !== "function") {
@@ -209,19 +214,14 @@ function installHandlerPropertyPatch() : void {
     }
     const eventTargetPrototype = (eventTarget as { prototype : object }).prototype;
     const done = new Set<object>();
-    for (const name of Object.getOwnPropertyNames(globalThis)) {
-        const value = ownDataValue(globalThis, name);
-        if (typeof value !== "function") {
+    for (const name of HANDLER_INTERFACES) {
+        const prototype = globalPrototype(name);
+        // An alias, for example webkitMediaStream, can give a prototype a second time
+        if (prototype === undefined || done.has(prototype) || !Object.prototype.isPrototypeOf.call(eventTargetPrototype, prototype)) {
             continue;
         }
-        const prototype = (value as { prototype? : unknown }).prototype;
-        if (typeof prototype !== "object" || prototype === null || done.has(prototype)) {
-            continue;
-        }
-        if (prototype === eventTargetPrototype || Object.prototype.isPrototypeOf.call(eventTargetPrototype, prototype)) {
-            done.add(prototype);
-            patchHandlerProperties(prototype);
-        }
+        done.add(prototype);
+        patchHandlerProperties(prototype);
     }
     // In browsers, the `on...` properties of window are own properties of the global object
     patchHandlerProperties(globalThis);

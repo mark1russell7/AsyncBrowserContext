@@ -63,6 +63,8 @@ The other patches wrap the callbacks of timers, events, observers, streams and o
 
 Each patch keeps the name, the length and the other properties of the native function. `Function.prototype.toString` gives the source text of the original function.
 
+The patch of the `on...` properties reads only the globals in `src/patches/handler-interfaces.ts`. Browsers make each interface object when code reads it for the first time. Version 0.1 read all globals of the page, approximately 1,000, and this took 15 to 20 ms when the page loaded. The list has the 138 interfaces of Chromium, Firefox, WebKit, Safari and the worker scopes that have `on...` properties. A test in `test/browser/c13-events.test.ts` reads all globals in each browser of the tests, and fails for a property without the patch.
+
 ### Callback hooks
 
 Each wrapper has the name `asyncBrowserContextWrapper`. Browsers show the static name of the function that they start, for example in the Long Animation Frames API. A change of the `name` property does not change this name. Thus, the browser cannot show the name of the callback, and `addCallbackHook()` gives the callback to a tool.

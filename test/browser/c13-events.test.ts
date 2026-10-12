@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
+import { store } from "../../src/core/store.js";
 import { deferred } from "../helpers.js";
 
 /**
@@ -184,5 +185,46 @@ describe("rule C13: event listeners", () => {
             query.addListener(listener);
             query.removeListener(listener);
         }).not.toThrow();
+    });
+});
+
+describe("rule C13: the patch of the on... properties", () => {
+    /**
+     * The event patch reads only the globals in HANDLER_INTERFACES. This test
+     * reads all globals of the browser, and finds each on... property of each
+     * EventTarget class and of the global object. Each property must have the
+     * patch: the store records the original setter of each patched setter.
+     */
+    it("patches each on... property of each interface of this browser", () => {
+        const eventTargetPrototype = EventTarget.prototype;
+        const owners : [string, object][] = [["globalThis", globalThis]];
+        for (const name of Object.getOwnPropertyNames(globalThis)) {
+            const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
+            const value : unknown = descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
+            if (typeof value !== "function") {
+                continue;
+            }
+            const prototype : unknown = (value as { prototype? : unknown }).prototype;
+            if (typeof prototype === "object" && prototype !== null && Object.prototype.isPrototypeOf.call(eventTargetPrototype, prototype)) {
+                owners.push([name, prototype]);
+            }
+        }
+        const missing : string[] = [];
+        let patched = 0;
+        for (const [name, owner] of owners) {
+            for (const key of Object.getOwnPropertyNames(owner)) {
+                const descriptor = Object.getOwnPropertyDescriptor(owner, key);
+                if (!key.startsWith("on") || descriptor?.set === undefined || descriptor.configurable !== true) {
+                    continue;
+                }
+                if (store.originals.has(descriptor.set)) {
+                    patched++;
+                } else {
+                    missing.push(`${name}.${key}`);
+                }
+            }
+        }
+        expect(missing, "add the interface of each property to src/patches/handler-interfaces.ts").toEqual([]);
+        expect(patched).toBeGreaterThan(100);
     });
 });

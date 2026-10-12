@@ -44,7 +44,7 @@ The shared files are in `test/rules/`, `test/regression/`, `test/api/`, `test/in
 | Layer | Files | What the layer shows |
 | --- | --- | --- |
 | Rules | `test/rules/` | The context rules C1 to C13. |
-| Browser APIs | `test/browser/` | The event rule C13 and the patched browser APIs. |
+| Browser APIs | `test/browser/` | The event rule C13 and the patched browser APIs. A test makes sure that each `on...` property of the browser has the patch. |
 | Regression | `test/regression/probes.test.ts` | The 23 probes of the review of 2026-10-08. |
 | API | `test/api/` | The `AsyncLocalStorage` tests run against the native class on Node.js and against the browser class. Thus, the two classes agree. The tests of `addCallbackHook()` and of the OpenTelemetry context manager are also here. |
 | Order variation | `test/interleave/` | 40 tasks do random operations with 5 fixed seeds. Each task reads its context after each operation. |
