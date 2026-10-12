@@ -8,6 +8,7 @@ import type { Plugin } from "vite";
 import { asyncContext } from "./src/vite/plugin.js";
 import { BROWSER_HOST, freePort } from "./test/vitest/free-port.js";
 import { lostFilesCheck } from "./test/vitest/lost-files.js";
+import { isTestFile, isUntransformedFixture } from "./test/vitest/test-files.js";
 
 export const here : string = path.dirname(fileURLToPath(import.meta.url));
 const source = (file : string) : string => path.resolve(here, "src", file);
@@ -49,12 +50,13 @@ export function aliases(runtime : Runtime) : { find : RegExp; replacement : stri
  * The test files transform with the preset of the library. The source files of
  * the library do not. The fixture of rule C7 stays untransformed, as a
  * dependency that the application does not transform. Vitest runs the Node.js
- * projects through the SSR transform of Vite, so `ssr` is `true`.
+ * projects through the SSR transform of Vite, so `ssr` is `true`. The filters
+ * examine the path relative to `here` (test/vitest/test-files.ts).
  */
-const isTestFile = (id : string) : boolean => id.includes("/test/") || id.endsWith(".test.ts");
-const isUntransformedFixture = (id : string) : boolean => id.includes("/test/fixtures/untransformed");
+const inTests = (id : string) : boolean => isTestFile(id, here);
+const inUntransformedFixtures = (id : string) : boolean => isUntransformedFixture(id, here);
 
-export const transformTests : Plugin = asyncContext({ include : isTestFile, exclude : isUntransformedFixture, ssr : true });
+export const transformTests : Plugin = asyncContext({ include : inTests, exclude : inUntransformedFixtures, ssr : true });
 
 /**
  * A plugin that compiles the test files with SWC or esbuild and the target
@@ -67,7 +69,7 @@ function lowerTests(compiler : "swc-es2016" | "esbuild-es2016") : Plugin {
         enforce : "post",
         async transform(code, id) {
             const file = id.split("?", 1)[0] ?? id;
-            if (!isTestFile(file) || isUntransformedFixture(file) || !/.[cm]?[jt]sx?$/.test(file)) {
+            if (!inTests(file) || inUntransformedFixtures(file) || !/.[cm]?[jt]sx?$/.test(file)) {
                 return null;
             }
             if (compiler === "swc-es2016") {
@@ -110,9 +112,10 @@ export const SHARED : string[] = ["test/rules/**/*.test.ts", "test/regression/**
  * esbuild cannot change a top-level `for await` for the target ES2016: its
  * output has `yield` outside a generator. With this target, esbuild also
  * refuses a top-level `await`. Thus the esbuild project does not run the
- * probes, which have a top-level `for await` (P10).
+ * probe P10, which has a top-level `for await`. The probe has its own file,
+ * so the esbuild project runs the other probes.
  */
-const ESBUILD_EXCLUDE : readonly string[] = ["test/regression/probes.test.ts"];
+const ESBUILD_EXCLUDE : readonly string[] = ["test/regression/probe-p10.test.ts"];
 
 /** The files that no project runs. */
 const EXCLUDE : readonly string[] = [...configDefaults.exclude, "**/.stryker-tmp/**", "test/smoke/fixture/**"];
@@ -152,7 +155,7 @@ export default defineConfig(async () : Promise<ViteUserConfig> => ({
             reportsDirectory : "coverage",
         },
         projects : [
-            nodeProject("unit", "browser", "babel-preset", ["src/**/*.test.ts", "test/vitest/**/*.test.ts"]),
+            nodeProject("unit", "browser", "babel-preset", ["src/**/*.test.ts", "test/vitest/**/*.test.ts", "test/scripts/**/*.test.ts"]),
             nodeProject("rules (browser runtime, Node.js)", "browser", "babel-preset", SHARED),
             nodeProject("rules (browser runtime, SWC ES2016)", "browser", "swc-es2016", SHARED),
             nodeProject("rules (browser runtime, esbuild ES2016)", "browser", "esbuild-es2016", SHARED),

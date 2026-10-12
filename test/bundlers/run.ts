@@ -16,14 +16,21 @@
  * through `await`, but a generator body gets the context of the `next()`
  * call (rule C5). Thus the result of the generator check is "B" for these
  * cases.
+ *
+ * An error on a page, or a Next.js server that ends before it answers, stops
+ * the test immediately with the message. The test removes the work folder and
+ * stops the servers and the browser also when a step fails.
  */
-import { execFileSync, execSync, spawn } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Browser } from "playwright";
+import { removeFolder } from "../scripts/folder.js";
+import { resultsOf, type Results } from "../scripts/page.js";
+import { startProcess, withServer } from "../scripts/process.js";
 import { BROWSER_HOST, freePort } from "../vitest/free-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -43,8 +50,6 @@ const TOOLS : readonly string[] = [
     "react@19.3.0",
     "react-dom@19.3.0",
 ];
-
-type Results = Record<string, unknown>;
 
 /** All checks give "A": the setup keeps each rule. */
 const ALL_RULES : Results = { inExpression : "A", inDependency : "A", generator : "A", browserEvent : "A" };
@@ -87,27 +92,10 @@ function pack(directory : string, destination : string) : string {
     return path.join(destination, output);
 }
 
-/** Opens `url` in Chromium and gives `window.__results`. */
-async function resultsOf(browser : Browser, url : string) : Promise<Results> {
-    const page = await browser.newPage();
-    const errors : string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
-    try {
-        await page.goto(url);
-        await page.waitForFunction(() => (window as unknown as { __results? : unknown }).__results !== undefined, undefined, { timeout : 30_000 });
-        if (errors.length > 0) {
-            throw new Error(`Page errors: ${errors.join("; ")}`);
-        }
-        return await page.evaluate(() => (window as unknown as { __results : Results }).__results);
-    } finally {
-        await page.close();
-    }
-}
-
 const TYPES : Readonly<Record<string, string>> = { ".html" : "text/html", ".js" : "text/javascript", ".mjs" : "text/javascript" };
 
-/** Serves the files of `directory` on a free port of 127.0.0.1. */
-async function serve(directory : string) : Promise<{ url : string; close : () => void }> {
+/** Serves the files of `directory` on a free port of 127.0.0.1. `close()` waits until the server closed. */
+async function serve(directory : string) : Promise<{ url : string; close : () => Promise<void> }> {
     const server = http.createServer((request, response) => {
         const relative = decodeURIComponent((request.url ?? "/").split("?", 1)[0] ?? "/").replace(/\/$/, "/index.html");
         const file = path.join(directory, relative);
@@ -118,29 +106,30 @@ async function serve(directory : string) : Promise<{ url : string; close : () =>
         response.writeHead(200, { "content-type" : TYPES[path.extname(file)] ?? "application/octet-stream" }).end(fs.readFileSync(file));
     });
     const port = await freePort();
-    await new Promise<void>((resolve) => server.listen(port, BROWSER_HOST, resolve));
-    return { url : `http://${BROWSER_HOST}:${port}/`, close : () => server.close() };
+    await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(port, BROWSER_HOST, () => {
+            server.off("error", reject);
+            resolve();
+        });
+    });
+    const close = () : Promise<void> => new Promise((resolve) => {
+        server.close(() => resolve());
+        server.closeAllConnections();
+    });
+    return { url : `http://${BROWSER_HOST}:${port}/`, close };
 }
 
-/** Starts `next start` in `directory`, and stops it after `use`. */
-async function withNextServer<T>(directory : string, next : string, use : (url : string) => Promise<T>) : Promise<T> {
+/**
+ * Starts `next start` in `directory`, and stops it after `use`. If the server
+ * ends before it answers, the function rejects immediately with the output of
+ * the server. After `use`, the function waits until the server ended
+ * (test/scripts/process.ts).
+ */
+async function withNextServer<T>(directory : string, next : string, env : NodeJS.ProcessEnv, use : (url : string) => Promise<T>) : Promise<T> {
     const port = await freePort();
-    const server = spawn(process.execPath, [next, "start", "--port", String(port), "--hostname", BROWSER_HOST], { cwd : directory, stdio : "inherit", env : process.env });
-    try {
-        const url = `http://${BROWSER_HOST}:${port}/`;
-        for (let attempt = 0; ; attempt++) {
-            try {
-                await fetch(url);
-                break;
-            } catch (error) {
-                if (attempt === 60) throw error;
-                await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-        }
-        return await use(url);
-    } finally {
-        server.kill();
-    }
+    const server = startProcess(process.execPath, [next, "start", "--port", String(port), "--hostname", BROWSER_HOST], { cwd : directory, env, echo : true });
+    return await withServer(server, `http://${BROWSER_HOST}:${port}/`, use);
 }
 
 /** Makes the folder of one Next.js case from `fixture/next`. */
@@ -163,8 +152,8 @@ function check(label : string, results : Results, expected : Results) : boolean 
     return pass;
 }
 
-async function main() : Promise<void> {
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-bundlers-"));
+/** Makes the application in `work`, and installs the two tarballs and the build tools. Gives the folder of the application. */
+function install(work : string) : string {
     const app = path.join(work, "app");
     fs.cpSync(path.join(here, "fixture"), app, { recursive : true });
     for (const file of ["checks.js", "main.js"]) {
@@ -172,46 +161,53 @@ async function main() : Promise<void> {
     }
     fs.copyFileSync(path.join(smoke, "checks.js"), path.join(app, "next", "checks.js"));
     fs.writeFileSync(path.join(app, "package.json"), JSON.stringify({ name : "bundlers-app", private : true, type : "module" }));
-    console.log(`Work folder: ${work}`);
 
     const libraryTarball = pack(root, work);
     const dependencyTarball = pack(path.join(smoke, "fake-dependency"), work);
     run("npm", ["install", "--no-audit", "--no-fund", "--loglevel=error", libraryTarball, dependencyTarball, ...TOOLS], app);
     const babel = (JSON.parse(fs.readFileSync(path.join(app, "node_modules", "@babel", "core", "package.json"), "utf8")) as { version : string }).version;
     console.log(`Babel of babel-loader and @rollup/plugin-babel: ${babel}`);
+    return app;
+}
 
-    const browser = await chromium.launch();
+/** Builds each case and opens its page in `browser`. Gives true if each case gives its expected results. */
+async function checkCases(app : string, browser : Browser) : Promise<boolean> {
     let passed = true;
-    try {
-        for (const [name, expected] of STATIC_CASES) {
-            execFileSync(process.execPath, ["build.mjs", name], { cwd : app, stdio : "inherit" });
-            const server = await serve(path.join(app, "out", name));
-            try {
-                passed = check(name, await resultsOf(browser, server.url), expected) && passed;
-            } finally {
-                server.close();
-            }
+    for (const [name, expected] of STATIC_CASES) {
+        execFileSync(process.execPath, ["build.mjs", name], { cwd : app, stdio : "inherit" });
+        const server = await serve(path.join(app, "out", name));
+        try {
+            passed = check(name, await resultsOf(browser, server.url), expected) && passed;
+        } finally {
+            await server.close();
         }
-        const next = path.join(app, "node_modules", "next", "dist", "bin", "next");
-        const env = { ...process.env, NEXT_TELEMETRY_DISABLED : "1" };
-        for (const testCase of NEXT_CASES) {
-            const directory = nextApp(app, testCase);
-            execFileSync(process.execPath, [next, "build", ...testCase.args], { cwd : directory, stdio : ["ignore", "ignore", "inherit"], env });
-            const results = await withNextServer(directory, next, (url) => resultsOf(browser, url));
-            passed = check(testCase.name, results, testCase.expected) && passed;
+    }
+    const next = path.join(app, "node_modules", "next", "dist", "bin", "next");
+    const env = { ...process.env, NEXT_TELEMETRY_DISABLED : "1" };
+    for (const testCase of NEXT_CASES) {
+        const directory = nextApp(app, testCase);
+        execFileSync(process.execPath, [next, "build", ...testCase.args], { cwd : directory, stdio : ["ignore", "ignore", "inherit"], env });
+        const results = await withNextServer(directory, next, env, (url) => resultsOf(browser, url));
+        passed = check(testCase.name, results, testCase.expected) && passed;
+    }
+    return passed;
+}
+
+async function main() : Promise<void> {
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-bundlers-"));
+    console.log(`Work folder: ${work}`);
+    try {
+        const app = install(work);
+        const browser = await chromium.launch();
+        try {
+            if (!await checkCases(app, browser)) {
+                process.exitCode = 1;
+            }
+        } finally {
+            await browser.close();
         }
     } finally {
-        await browser.close();
-    }
-
-    try {
-        // Windows can lock the files of the closed servers for a short time
-        fs.rmSync(work, { recursive : true, force : true, maxRetries : 10, retryDelay : 500 });
-    } catch {
-        console.warn(`Could not remove the work folder ${work}`);
-    }
-    if (!passed) {
-        process.exitCode = 1;
+        removeFolder(work);
     }
 }
 

@@ -30,10 +30,10 @@ Use `pnpm test:node` for the Node.js projects only, and `pnpm test:browser` for 
 
 | Project | Runtime | Transform | Files |
 | --- | --- | --- | --- |
-| `unit` | Browser runtime in Node.js | Yes | `src/**/*.test.ts` and `test/vitest/**/*.test.ts` |
+| `unit` | Browser runtime in Node.js | Yes | `src/**/*.test.ts`, `test/vitest/**/*.test.ts` and `test/scripts/**/*.test.ts` |
 | `rules (browser runtime, Node.js)` | Browser runtime in Node.js | Yes | The shared files |
 | `rules (browser runtime, SWC ES2016)` | Browser runtime in Node.js | SWC with the target ES2016 in place of the preset | The shared files |
-| `rules (browser runtime, esbuild ES2016)` | Browser runtime in Node.js | esbuild with the target ES2016 in place of the preset | The shared files, without the probes |
+| `rules (browser runtime, esbuild ES2016)` | Browser runtime in Node.js | esbuild with the target ES2016 in place of the preset | The shared files, without the probe P10 |
 | `rules (node runtime)` | Node.js runtime | Yes | The shared files |
 | `rules (node runtime, no transform)` | Node.js runtime | No | The shared files |
 | `memory` | Browser runtime in Node.js, with `--expose-gc` | Yes | `test/memory/` |
@@ -41,7 +41,7 @@ Use `pnpm test:node` for the Node.js projects only, and `pnpm test:browser` for 
 
 The shared files are in `test/rules/`, `test/regression/`, `test/api/`, `test/interleave/` and `test/legacy/`. The library's own Vite plugin transforms the test files.
 
-The constant `__TEST_COMPILER__` tells a test file which compiler changed it. Only the preset binds generators to the context of their creation (rule C5), and gives the names of the async functions to the callback hooks. Thus the projects without the preset skip these tests. They start a test of the other behavior in place of the rule C5 tests: a generator body gets the context of each `next()` call. The esbuild project does not start the probes, because esbuild cannot change their top-level `for await` for the target ES2016.
+The constant `__TEST_COMPILER__` tells a test file which compiler changed it. Only the preset binds generators to the context of their creation (rule C5), and gives the names of the async functions to the callback hooks. Thus the projects without the preset skip these tests. They start a test of the other behavior in place of the rule C5 tests: a generator body gets the context of each `next()` call. The esbuild project does not start the probe P10, because esbuild cannot change its top-level `for await` for the target ES2016. Thus P10 has its own file, `test/regression/probe-p10.test.ts`.
 
 ## Test layers
 
@@ -49,12 +49,13 @@ The constant `__TEST_COMPILER__` tells a test file which compiler changed it. On
 | --- | --- | --- |
 | Rules | `test/rules/` | The context rules C1 to C13. |
 | Browser APIs | `test/browser/` | The event rule C13 and the patched browser APIs. A test makes sure that each `on...` property of the browser has the patch. |
-| Regression | `test/regression/probes.test.ts` | The 23 probes of the review of 2026-10-08. |
+| Regression | `test/regression/` | The 23 probes of the review of 2026-10-08. |
 | API | `test/api/` | The `AsyncLocalStorage` tests run against the native class on Node.js and against the browser class. Thus, the two classes agree. The tests of `addCallbackHook()` and of the OpenTelemetry context manager are also here. |
 | Order variation | `test/interleave/` | 40 tasks do random operations with 5 fixed seeds. Each task reads its context after each operation. |
 | Memory | `test/memory/` | Rule C12, with `WeakRef` and the garbage collector. |
 | Units and transform | `src/**/*.test.ts` | The runtime parts, the Vite plugin, and output snapshots of the Babel preset. |
-| Test tools | `test/vitest/` | The port of the browser API server and the check for lost test files. |
+| Test tools | `test/vitest/` | The port of the browser API server, the check for lost test files, and the filter that selects the test files for the transform. |
+| Script tools | `test/scripts/` | The parts of the smoke test, the build tool test and the Babel test: the results of a page, the server processes and the removal of the work folders. |
 | Legacy | `test/legacy/` | The tests of the first test runner that were kept. `legacy-test-triage.md` gives the result for each test. |
 | Smoke | `test/smoke/run.ts` | `pnpm smoke` packs the package, installs it in a new Vite application, and examines the build and the dev server in Chromium. |
 | Babel versions | `test/babel/run.ts` | `pnpm test:babel` packs the package and installs it with Babel 7.22, the newest Babel 7 and Babel 8. Each version transforms `test/babel/program.js` with the preset, and the test starts the output on the browser runtime. The test also examines the names that the callback hooks get for the steps after an `await`. |
@@ -87,7 +88,7 @@ Firefox then loaded the test pages from the wrong server, and its sessions did n
 The fix:
 
 - `vitest.config.ts` gives the browser API server the address `127.0.0.1`. The browsers open `http://127.0.0.1:<port>`, thus a server on `::1` cannot get their connections.
-- `test/vitest/free-port.ts` gets the port from the operating system. No program uses this port on `127.0.0.1`, `::1`, `0.0.0.0` or `::`. Two runs that start at the same time get different ports. On a computer without IPv6, for example a CI container, the IPv6 addresses cannot hold a port.
+- `test/vitest/free-port.ts` gets the port from the operating system. No program uses this port on `127.0.0.1`, `::1`, `0.0.0.0` or `::`. Two runs that start at the same time get different ports. On a computer without IPv6, for example a CI container, the IPv6 addresses cannot hold a port. If `listen(0)` fails, or its server has no TCP port, the search stops with an error that tells the cause. The tests of `test/vitest/free-port.test.ts` replace the sockets with a simulated network.
 - Vitest binds the port with `strictPort`. If a different program takes the port first, the run stops with the error `Port ... is already in use`.
 
 The fix also removes a delay of approximately 2 seconds when a Firefox page connects to the server. Before the fix, Firefox tried `127.0.0.1` first, and Windows refused that connection only after this delay.
@@ -99,6 +100,15 @@ Vitest does not fail a run when a planned test file gives no result. The file is
 The check does not examine a run that stopped early, for example with `--bail` or after a cancel in watch mode. It also does not examine a run with `--shard`: Vitest then plans all files, but runs only a part of them. A plugin adds the reporter, thus the check also operates when the command line selects other reporters, for example `--reporter=json`.
 
 `vitest.stryker.config.ts` does not add the check. Stryker counts a failed run as a found mutant, and a lost file must not count as a found mutant.
+
+## The package test scripts
+
+`pnpm smoke`, `pnpm test:bundlers` and `pnpm test:babel` use the parts in `test/scripts/`:
+
+- An uncaught error or a console error on a test page stops the script immediately, with the message of the error. The script does not wait for the time limit of the page.
+- A server process (`vite preview`, the Vite dev server or `next start`) that ends before it answers stops the script immediately, with the output of the server.
+- After each check, the script stops the server process and waits until the process ended. If the process does not end after SIGTERM, the script sends SIGKILL.
+- The script removes its work folder also when a step fails. Vite operates in a child process, because Windows locks the native modules of a process until the process ends.
 
 ## Mutation testing
 

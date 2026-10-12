@@ -17,6 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { removeFolder } from "../scripts/folder.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
@@ -75,7 +76,8 @@ try {
         console.log(`${pass ? "PASS" : "FAIL"} Babel ${output.babel}: ${actual}`);
     }
 } finally {
-    fs.rmSync(work, { recursive : true, force : true });
+    // removeFolder tries again: Windows can lock the files of the npm processes for a short time
+    removeFolder(work);
 }
 if (failed) {
     console.error(`Expected for each version: ${EXPECTED}`);

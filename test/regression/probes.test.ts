@@ -7,19 +7,14 @@ import { inBrowser, preset, runtime } from "../helpers.js";
 /**
  * The probes of the review of 2026-10-08 (docs/remediation-plan.md,
  * Appendix B). Each test has the name of its probe and states the target
- * result. The old runtime failed each of them.
+ * result. The old runtime failed each of them. The probe P10 is in
+ * probe-p10.test.ts, because the esbuild project cannot run it.
  */
 
 async function* numbers() : AsyncGenerator<number> {
     yield 1;
     yield 2;
     yield 3;
-}
-
-// P10: a top-level for await in a module
-const topLevel : number[] = [];
-for await (const value of numbers()) {
-    topLevel.push(value);
 }
 
 describe("regression probes of the review", () => {
@@ -128,10 +123,6 @@ describe("regression probes of the review", () => {
             }
         }
         expect(seen).toEqual(["11", "21", "31"]);
-    });
-
-    it("P10: a top-level for await in a module completes", () => {
-        expect(topLevel).toEqual([1, 2, 3]);
     });
 
     it("P11 and P12: var keeps its function scope with await", async () => {

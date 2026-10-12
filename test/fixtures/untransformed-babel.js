@@ -14,7 +14,6 @@ function _OverloadYield(e, d) { this.v = e, this.k = d; }
 export function compiledCall(_x2) {
   return _compiledCall.apply(this, arguments);
 }
-/** Awaits a timer, then calls `callback`. */
 function _compiledCall() {
   _compiledCall = _asyncToGenerator(function* (callback) {
     yield null;
@@ -23,10 +22,10 @@ function _compiledCall() {
   });
   return _compiledCall.apply(this, arguments);
 }
+/** Awaits a timer, then calls `callback`. */
 export function compiledAfterTimer(_x3) {
   return _compiledAfterTimer.apply(this, arguments);
 }
-/** Calls `callback` after an await inside an async generator. */
 function _compiledAfterTimer() {
   _compiledAfterTimer = _asyncToGenerator(function* (callback) {
     yield new Promise(resolve => setTimeout(resolve, 1));
@@ -34,6 +33,7 @@ function _compiledAfterTimer() {
   });
   return _compiledAfterTimer.apply(this, arguments);
 }
+/** Calls `callback` after an await inside an async generator. */
 export function compiledGenerator(_x) {
   return _compiledGenerator.apply(this, arguments);
 }

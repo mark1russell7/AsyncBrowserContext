@@ -1,7 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { TestSpecification, Vitest } from "vitest/node";
-import { describeLostFiles, findLostFiles, LostFilesReporter, type PlannedFile } from "./lost-files.js";
+import { describeLostFiles, findLostFiles, lostFilesCheck, LostFilesReporter, type PlannedFile } from "./lost-files.js";
 
 const root = path.resolve("/repo");
 
@@ -79,5 +79,36 @@ describe("lost test files", () => {
         check.onTestRunStart(asSpecifications([planned("b.test.ts", "passed")]));
         check.onTestRunEnd([], [], "passed");
         expect(failures).toEqual([]);
+    });
+});
+
+describe("the plugin of the check", () => {
+    /** The `configureVitest` hook of a new plugin, with the hook context that the plugin reads. */
+    const configure = (reporters : unknown[]) : void => {
+        const hook = lostFilesCheck().configureVitest as unknown as (context : { vitest : { config : { reporters : unknown[] } } }) => void;
+        hook({ vitest : { config : { reporters } } });
+    };
+
+    it("adds the reporter after the reporters of the command line", () => {
+        const reporters : unknown[] = [["json", { outputFile : "report.json" }]];
+        configure(reporters);
+        expect(reporters).toHaveLength(2);
+        expect(reporters[0]).toEqual(["json", { outputFile : "report.json" }]);
+        expect(reporters[1]).toBeInstanceOf(LostFilesReporter);
+    });
+
+    it("adds one reporter, also when Vitest uses the hook for each project and evaluates the configuration again", () => {
+        const reporters : unknown[] = ["default"];
+        configure(reporters);
+        configure(reporters);
+        configure(reporters);
+        expect(reporters.filter((reporter) => reporter instanceof LostFilesReporter)).toHaveLength(1);
+    });
+
+    it("finds the reporter of another evaluation of the configuration by its mark, not by its class", () => {
+        const other = { [Symbol.for("async-browser-context:lost-files-check")] : true };
+        const reporters : unknown[] = [other];
+        configure(reporters);
+        expect(reporters).toEqual([other]);
     });
 });
