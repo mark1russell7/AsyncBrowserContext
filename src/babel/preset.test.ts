@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import vm from "node:vm";
 import { parseSync, transformAsync, traverse, types, type NodePath, type PluginObject } from "@babel/core";
 import { describe, expect, it } from "vitest";
 import preset, { DEFAULT_RUNTIME, METADATA_KEY, supportsResourceManagement } from "./preset.js";
@@ -282,6 +283,15 @@ describe("the Babel preset", () => {
         // A function expression cannot have the name eval in strict code: the name goes to the name property
         expect(output.code).not.toContain("function eval(");
         expect(output.code).toMatch(/Object\.defineProperty\(function \(\w+\) \{[\s\S]*?\}, "name", \{\s*value: "eval",\s*configurable: true\s*\}\)/);
+    });
+
+    it("keeps a parameter that a function declaration in a block of a sloppy script has as its name (Annex B)", async () => {
+        const output = await transform("function* g(x) { yield typeof x; { function x() {} } yield typeof x; } result = [...g(5)];", { sourceType : "script" });
+        const runtime = await import("../runtime.js");
+        const sandbox : { require : () => unknown; result? : unknown } = { require : () => runtime };
+        vm.runInNewContext(output.code, sandbox);
+        // Without the preset, the declaration in the block is not hoisted over the parameter
+        expect(sandbox.result).toEqual(["number", "number"]);
     });
 
     it("does not change an async generator or a for await loop in a function with the directive of the runtime", async () => {

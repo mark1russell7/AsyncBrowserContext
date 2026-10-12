@@ -38,8 +38,9 @@ function isAlreadyBound(path : FunctionPath, runtime : string) : boolean {
 }
 
 /**
- * This function gives the names of the parameters that the body declares again with `var`. In
- * the original function, such a variable starts with the value of the parameter. The inner
+ * This function gives the names of the parameters that the body declares again with `var` or
+ * with a function declaration. In the original function, such a variable starts with the value
+ * of the parameter. A function declaration in a block of sloppy code is not hoisted over it. The inner
  * function gets these names as its parameters, so the values stay the same.
  */
 function redeclaredParameters(path : FunctionPath) : string[] {
@@ -55,6 +56,12 @@ function redeclaredParameters(path : FunctionPath) : string[] {
     const redeclared = new Set<string>();
     path.get("body").traverse({
         Function(inner) {
+            // A function declaration in a block of sloppy code is hoisted (Annex B.3.3), but not
+            // over a parameter with the same name. In the inner generator, the name is no parameter.
+            const id = inner.isFunctionDeclaration() ? inner.node.id : null;
+            if (id !== null && id !== undefined && parameters.has(id.name)) {
+                redeclared.add(id.name);
+            }
             inner.skip();
         },
         VariableDeclaration(declaration) {

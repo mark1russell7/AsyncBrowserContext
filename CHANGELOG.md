@@ -46,7 +46,7 @@ This version changes some behaviors, so it is a minor version. The first section
 - A frame of the same variable replaces its parent. Thus many uses of `enterWith()` in one context do not make a long chain, and do not keep old stores in memory.
 - Node.js: the probe of the native options also examines `exit()`, and it disables itself after the probe. With `--no-async-context-frame` on Node.js 24, `exit()` thus gives `undefined`, as in the browser.
 - Babel preset:
-  - A generator parameter that the body declares again with `var` keeps its value.
+  - A generator parameter that the body declares again with `var`, or with a function declaration in a block of a sloppy script, keeps its value.
   - The generator of a Babel helper in a compiled dependency gets a binding (rule C5). The generators that `coroutine` and `asyncGenerator` operate do not get a second binding.
   - A generator declaration in a block of a script stays in the block.
   - The plugin of the async generator helpers sets its helpers in `Program` enter. Thus `@babel/plugin-transform-runtime` and the presets earlier in the list do not break the markers of the driver.
