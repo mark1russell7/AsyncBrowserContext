@@ -45,10 +45,11 @@ export interface ContextStore {
     /** `true` while a hook operates. Callbacks that start in a hook do not start the hook methods. */
     inHook? : boolean | undefined;
     /**
-     * The patches that a copy with callback hooks installed. The patches of version 0.1 have
-     * no hooks. The store of an older copy of the library does not have this property.
+     * The patches that a copy of version 0.1 installed before a newer copy loaded. Version 0.1
+     * has no callback hooks, so the callbacks of these patches do not start the hooks. Only a
+     * store that a copy of version 0.1 made has this property.
      */
-    hookPatches? : Set<string> | undefined;
+    oldCopyPatches? : ReadonlySet<string> | undefined;
     /**
      * The frame that stays current between tasks: the root frame, or the frame of a top-level
      * `enterWith()` (a default store). The event patch handles it as the root frame (rule C13).
@@ -88,7 +89,6 @@ function createStore() : ContextStore {
         // Own properties from the start: each callback reads `hooks`, and the read of an own property is faster
         hooks : undefined,
         inHook : false,
-        hookPatches : new Set(),
         idle : root,
     };
 }
@@ -97,6 +97,10 @@ function getOrCreateStore() : ContextStore {
     const holder = globalThis as unknown as Record<symbol, ContextStore | undefined>;
     const existing = holder[STORE_KEY];
     if (existing !== undefined) {
+        // The stores of version 0.2 and later have the own property hooks from the start. Version 0.1 has no hooks.
+        if (!Object.prototype.hasOwnProperty.call(existing, "hooks") && existing.oldCopyPatches === undefined) {
+            existing.oldCopyPatches = new Set(existing.patches);
+        }
         return existing;
     }
     const created = createStore();

@@ -8,14 +8,14 @@ let warned = false;
 /**
  * Version 0.1 of the library has no callback hooks. If a copy of version 0.1 installed some
  * patches first, the callbacks of those patches do not start the hooks. The function tells
- * this one time on the console.
+ * this one time on the console. The patches of version 0.2 start the hooks, and the patch of
+ * `Function.prototype.toString` has no callbacks.
  */
 function warnAboutOldPatches() : void {
     if (warned) {
         return;
     }
-    const withHooks = store.hookPatches;
-    const without = [...store.patches].filter((name) => withHooks?.has(name) !== true);
+    const without = [...(store.oldCopyPatches ?? [])].filter((name) => name !== "Function.prototype.toString");
     if (without.length > 0) {
         warned = true;
         console.warn(`async-browser-context: an older copy of the library installed these patches, and their callbacks do not start the callback hooks: ${without.join(", ")}`);

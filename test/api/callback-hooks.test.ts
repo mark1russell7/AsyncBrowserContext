@@ -335,22 +335,27 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
 
     it("tells one time on the console when an older copy without hooks installed some patches", () => {
         const holder = globalThis as unknown as Record<symbol, unknown>;
-        const store = holder[Symbol.for("async-browser-context/store/v1")] as { hookPatches? : Set<string> | undefined };
-        const saved = store.hookPatches;
+        const store = holder[Symbol.for("async-browser-context/store/v1")] as { oldCopyPatches? : ReadonlySet<string> | undefined };
+        const saved = store.oldCopyPatches;
         const warnings : unknown[] = [];
         const nativeWarn = console.warn;
         console.warn = (...args : unknown[]) => { warnings.push(args.join(" ")); };
         try {
-            // As if a copy of version 0.1 installed the patches: no patch has hooks
-            store.hookPatches = new Set();
+            // Patches of version 0.2 and later start the hooks: no warning
+            removers.push(addCallbackHook({}));
+            expect(warnings).toEqual([]);
+            // As if a copy of version 0.1 made the store and installed two patches
+            store.oldCopyPatches = new Set(["timers", "Function.prototype.toString"]);
             removers.push(addCallbackHook({}));
             removers.push(addCallbackHook({}));
         } finally {
             console.warn = nativeWarn;
-            store.hookPatches = saved;
+            store.oldCopyPatches = saved;
         }
         expect(warnings).toHaveLength(1);
         expect(String(warnings[0])).toContain("older copy of the library");
+        // The patch of toString has no callbacks
+        expect(String(warnings[0])).toMatch(/: timers$/);
     });
 
     it("starts a callback that has its own call and apply properties", async () => {
