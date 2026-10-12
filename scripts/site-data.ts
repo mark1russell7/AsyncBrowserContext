@@ -12,7 +12,8 @@
  * - `size.json` has the size of the browser runtime: the classes and the
  *   runtime of the transform, in one minified bundle. The script builds `dist/` first.
  *
- * The script does not change a file when its source does not exist.
+ * The script does not change a file when its source does not exist. Without
+ * a Stryker report, `mutation.json` keeps its Stryker summary.
  */
 import { execSync } from "node:child_process";
 import { brotliCompressSync, gzipSync } from "node:zlib";
@@ -36,10 +37,30 @@ function writeData(name : string, value : object) : void {
     console.log(`wrote site/public/data/${name}.json`);
 }
 
-interface BenchResults {
+export interface BenchResults {
     readonly date : string;
     readonly environment : { readonly node : string; readonly os : string; readonly cpu : string };
     readonly rows : readonly { readonly benchmark : string; readonly plainMs : number; readonly transformOnlyMs : number | null; readonly libraryMs : number | null }[];
+}
+
+export type BenchRow = { benchmark : string; plainMs : number; transformOnlyMs : number; libraryMs : number };
+
+/**
+ * This function gives the rows of `bench.json`. A benchmark without a value
+ * for each case is not in the rows, because the site cannot compare its cases.
+ * The second list has the names of these benchmarks.
+ */
+export function benchRows(results : BenchResults) : { rows : BenchRow[]; incomplete : string[] } {
+    const rows : BenchRow[] = [];
+    const incomplete : string[] = [];
+    for (const row of results.rows) {
+        if (row.transformOnlyMs === null || row.libraryMs === null) {
+            incomplete.push(row.benchmark);
+            continue;
+        }
+        rows.push({ benchmark : row.benchmark, plainMs : row.plainMs, transformOnlyMs : row.transformOnlyMs, libraryMs : row.libraryMs });
+    }
+    return { rows, incomplete };
 }
 
 function writeBench() : void {
@@ -48,20 +69,13 @@ function writeBench() : void {
         console.log("no bench/results/latest.json: start pnpm bench first");
         return;
     }
-    writeData("bench", {
-        generated : results.date,
-        environment : results.environment,
-        rows : results.rows.map((row) => ({
-            benchmark : row.benchmark,
-            plainMs : row.plainMs,
-            transformOnlyMs : row.transformOnlyMs ?? 0,
-            libraryMs : row.libraryMs ?? 0,
-        })),
-    });
+    const { rows, incomplete } = benchRows(results);
+    for (const name of incomplete) console.log(`bench: the benchmark "${name}" has no value for each case, so it is not in bench.json`);
+    writeData("bench", { generated : results.date, environment : results.environment, rows });
 }
 
 /** The mutants of the review of 2026-10-08 (docs/remediation-plan.md, Appendix C), with the old tests. */
-const REVIEW_MUTANTS = [
+export const REVIEW_MUTANTS = [
     { mutant : "real", description : "The old runtime without a change, run 1", suite : "old", passed : 217, total : 217 },
     { mutant : "real", description : "The old runtime without a change, run 2 (three speed tests failed)", suite : "old", passed : 214, total : 217 },
     { mutant : "m1", description : "No Promise patches", suite : "old", passed : 202, total : 217 },
@@ -72,40 +86,58 @@ const REVIEW_MUTANTS = [
     { mutant : "m6", description : "then uses the registration context", suite : "old", passed : 214, total : 217 },
 ];
 
-interface MutationReport {
+export interface MutationReport {
     readonly files : Record<string, { readonly mutants : readonly { readonly status : string }[] }>;
+}
+
+/**
+ * The summary of a Stryker report. The score is the Stryker mutation score:
+ * the mutants that the tests found (killed or timeout), as a percentage of the
+ * killed, timeout, survived and no-coverage mutants.
+ */
+export function strykerSummary(report : MutationReport) : Record<string, unknown> {
+    const counts = new Map<string, number>();
+    for (const file of Object.values(report.files)) {
+        for (const mutant of file.mutants) {
+            counts.set(mutant.status, (counts.get(mutant.status) ?? 0) + 1);
+        }
+    }
+    const count = (status : string) : number => counts.get(status) ?? 0;
+    const killed = count("Killed");
+    const timeout = count("Timeout");
+    const survived = count("Survived");
+    const noCoverage = count("NoCoverage");
+    const valid = killed + timeout + survived + noCoverage;
+    return {
+        score : valid === 0 ? 0 : (100 * (killed + timeout)) / valid,
+        killed,
+        survived,
+        timeout,
+        noCoverage,
+        total : [...counts.values()].reduce((sum, value) => sum + value, 0),
+        scope : Object.keys(report.files).map((file) => file.replace(/\\/g, "/")).sort(),
+    };
+}
+
+/**
+ * The content of `mutation.json`, or `undefined` if the file must stay as it is.
+ * Without a report, the function keeps the Stryker summary of `existing`.
+ * Then it gives `undefined` if the rows of the review are also the same.
+ */
+export function mutationData(report : MutationReport | undefined, existing : { rows? : unknown; stryker? : unknown } | undefined, time : string) : object | undefined {
+    if (report !== undefined) return { generated : time, rows : REVIEW_MUTANTS, stryker : strykerSummary(report) };
+    if (existing !== undefined && JSON.stringify(existing.rows) === JSON.stringify(REVIEW_MUTANTS)) return undefined;
+    return { generated : time, rows : REVIEW_MUTANTS, ...(existing?.stryker === undefined ? {} : { stryker : existing.stryker }) };
 }
 
 function writeMutation() : void {
     const report = readJson<MutationReport>(path.join(root, "reports", "mutation", "mutation.json"));
-    let stryker : object | undefined;
-    if (report !== undefined) {
-        const counts = new Map<string, number>();
-        for (const file of Object.values(report.files)) {
-            for (const mutant of file.mutants) {
-                counts.set(mutant.status, (counts.get(mutant.status) ?? 0) + 1);
-            }
-        }
-        const count = (status : string) : number => counts.get(status) ?? 0;
-        const killed = count("Killed");
-        const timeout = count("Timeout");
-        const survived = count("Survived");
-        const noCoverage = count("NoCoverage");
-        const covered = killed + timeout + survived;
-        stryker = {
-            score : covered === 0 ? 0 : (100 * (killed + timeout)) / (covered + noCoverage),
-            killed,
-            survived,
-            timeout,
-            noCoverage,
-            total : [...counts.values()].reduce((sum, value) => sum + value, 0),
-            scope : Object.keys(report.files).map((file) => file.replace(/\\/g, "/")).sort(),
-        };
-    }
-    writeData("mutation", { generated, rows : REVIEW_MUTANTS, ...(stryker === undefined ? {} : { stryker }) });
+    const data = mutationData(report, readJson(path.join(dataDir, "mutation.json")), generated);
+    if (report === undefined) console.log("no reports/mutation/mutation.json: start pnpm mutation first. mutation.json keeps its Stryker summary.");
+    if (data !== undefined) writeData("mutation", data);
 }
 
-interface VitestJsonReport {
+export interface VitestJsonReport {
     readonly numPassedTests : number;
     readonly numFailedTests : number;
     readonly numPendingTests : number;
@@ -117,25 +149,37 @@ const BROWSER_TYPES : Readonly<Record<string, BrowserType>> = { chromium, firefo
 async function writeBrowsers() : Promise<void> {
     const selected = (process.env["BROWSERS"] ?? (process.platform === "win32" ? "chromium,firefox" : "chromium,firefox,webkit")).split(",").map((name) => name.trim());
     const rows = [];
-    for (const browser of selected) {
-        const type = BROWSER_TYPES[browser];
-        if (type === undefined) {
-            continue;
+    // Each run writes its report into a new folder. Thus, a run that writes no report cannot give the report of an earlier run.
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "abc-browsers-"));
+    try {
+        for (const browser of selected) {
+            const type = BROWSER_TYPES[browser];
+            if (type === undefined) {
+                console.log(`browsers: there is no browser "${browser}"`);
+                continue;
+            }
+            const output = path.join(directory, `${browser}.json`);
+            try {
+                execSync(`npx vitest run --project "browser (${browser})" --reporter=json --outputFile="${output}"`, { cwd : root, stdio : "ignore", env : { ...process.env, BROWSERS : browser } });
+            } catch {
+                // A failed test gives a non-zero exit code. The report still has the counts.
+            }
+            const report = readJson<VitestJsonReport>(output);
+            if (report === undefined) {
+                console.log(`browsers: the tests in ${browser} wrote no report`);
+                continue;
+            }
+            const instance = await type.launch();
+            const version = instance.version();
+            await instance.close();
+            rows.push({ browser, version, passed : report.numPassedTests, failed : report.numFailedTests, skipped : report.numPendingTests + report.numTodoTests });
         }
-        const output = path.join(os.tmpdir(), `async-browser-context-${browser}.json`);
-        try {
-            execSync(`npx vitest run --project "browser (${browser})" --reporter=json --outputFile="${output}"`, { cwd : root, stdio : "ignore", env : { ...process.env, BROWSERS : browser } });
-        } catch {
-            // A failed test gives a non-zero exit code. The report still has the counts.
-        }
-        const report = readJson<VitestJsonReport>(output);
-        if (report === undefined) {
-            continue;
-        }
-        const instance = await type.launch();
-        const version = instance.version();
-        await instance.close();
-        rows.push({ browser, version, passed : report.numPassedTests, failed : report.numFailedTests, skipped : report.numPendingTests + report.numTodoTests });
+    } finally {
+        fs.rmSync(directory, { recursive : true, force : true });
+    }
+    if (rows.length === 0) {
+        console.log("browsers: no browser gave results. browsers.json stays the same.");
+        return;
     }
     writeData("browsers", { generated, rows });
 }
@@ -181,10 +225,20 @@ async function writeSize() : Promise<void> {
     }
 }
 
-writeBench();
-writeMutation();
-writeProbes();
-await writeSize();
-if (process.argv.includes("--browsers")) {
-    await writeBrowsers();
+/** True when Node.js started this file, and false when a test imports its functions. */
+function isMainModule() : boolean {
+    const started = process.argv[1];
+    if (started === undefined) return false;
+    const key = (file : string) : string => (process.platform === "win32" ? path.resolve(file).toLowerCase() : path.resolve(file));
+    return key(started) === key(fileURLToPath(import.meta.url));
+}
+
+if (isMainModule()) {
+    writeBench();
+    writeMutation();
+    writeProbes();
+    await writeSize();
+    if (process.argv.includes("--browsers")) {
+        await writeBrowsers();
+    }
 }

@@ -1,4 +1,4 @@
-import type { PageMeta, PageStatus } from "./types";
+import type { PageMeta, PageStatus } from "./types.ts";
 
 export type FrontmatterResult = {
     meta : PageMeta;

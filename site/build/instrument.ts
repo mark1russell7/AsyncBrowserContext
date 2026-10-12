@@ -156,8 +156,12 @@ export function splitScenario(file : string, id : string) : { meta : ScenarioMet
     const title = fields.get("title");
     const summary = fields.get("summary");
     if (title === undefined || summary === undefined) throw new Error(`The scenario "${id}" needs @title and @summary.`);
+    const orderText = fields.get("order") ?? "100";
+    const order = orderText.trim() === "" ? Number.NaN : Number(orderText);
+    // A value that is not a number makes the order of the list random (refer to debugger-plugin.ts).
+    if (!Number.isFinite(order)) throw new Error(`The scenario "${id}" has the @order "${orderText}". Use a number, for example "@order 3".`);
     return {
-        meta : { title, summary, order : Number(fields.get("order") ?? "100") },
+        meta : { title, summary, order },
         source : file.slice(match[0].length).replace(/\s+$/, "\n"),
     };
 }

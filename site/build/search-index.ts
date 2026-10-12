@@ -1,7 +1,8 @@
-import { readdir, readFile } from "node:fs/promises";
-import path from "node:path";
-import GithubSlugger from "github-slugger";
-import { extractFrontmatter } from "./frontmatter.ts";
+import type { Root } from "hast";
+import { readContentFiles } from "./content-files.ts";
+import { sectionLabel } from "./head-tags.ts";
+import { readPageTrees } from "./mdx-pipeline.ts";
+import { collectToc, expressionText, textOf } from "./rehype-export-toc.ts";
 
 /** One heading of a page, with the ID that `rehype-slug` gives it. */
 export type SearchHeading = { text : string; id : string };
@@ -15,88 +16,109 @@ export type SearchEntry = {
     title : string;
     description : string;
     headings : SearchHeading[];
-    /** The text of the page without Markdown, JSX and frontmatter. */
+    /** The text of the page without Markdown, JSX and frontmatter: first the prose, then the code blocks. */
     text : string;
 };
 
-/** The most characters of text for each page. */
-const TEXT_LIMIT = 8000;
-const FRONTMATTER = /^﻿?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
-const FENCE = /^\s*(```|~~~)/;
+/** The most characters of prose for each page. */
+const TEXT_LIMIT = 20_000;
+/** The most characters of code for each page. The code comes after the prose, so it has its own limit. */
+const CODE_LIMIT = 8000;
 
-/** This function removes the inline marks of Markdown: code, links, emphasis. */
-function inlineText(markdown : string) : string {
-    return markdown
-        .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-        .replace(/[`*_]/g, "")
-        .trim();
+/** The HTML elements that are part of a line of text. Each other element is a block, and its text is a separate word. */
+const INLINE_ELEMENTS = new Set(["a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "del", "dfn", "em", "i", "ins", "kbd", "mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr"]);
+
+/** The attributes of a JSX element that the page shows as text, for example the title of a callout. */
+const TEXT_ATTRIBUTES = new Set(["title", "caption"]);
+/** The attributes of a JSX element that contain code, for example the source of a diagram (refer to `remark-mermaid.ts`). */
+const CODE_ATTRIBUTES = new Set(["chart"]);
+
+type TreeNode = {
+    type : string;
+    tagName? : string;
+    value? : unknown;
+    name? : string | null;
+    attributes? : Array<{ type : string; name? : string; value? : unknown }>;
+    children? : TreeNode[];
+    data? : unknown;
+};
+
+/** The text of the page: the prose (headings, paragraphs, lists, tables and the text in JSX elements), and the code blocks. */
+export type PageText = { prose : string; code : string };
+
+function clean(parts : readonly string[]) : string {
+    return parts.join("").replace(/\s+/g, " ").trim();
 }
 
-/** This function gives the `h2` and `h3` headings of an MDX source, outside code blocks. */
-export function headingsOf(source : string) : SearchHeading[] {
-    const slugger = new GithubSlugger();
-    const headings : SearchHeading[] = [];
-    let inFence = false;
-    for (const line of source.replace(FRONTMATTER, "").split(/\r?\n/)) {
-        if (FENCE.test(line)) {
-            inFence = !inFence;
-            continue;
+/**
+ * This function gives the text of an MDX page from its HTML tree (hast).
+ * The MDX compiler parsed the JSX, so the attributes of an element are not
+ * text, except the title, the caption and the diagram source. Imports,
+ * exports and other JavaScript are not text. A code block goes into `code`,
+ * with all its lines.
+ */
+export function pageText(tree : Root) : PageText {
+    const prose : string[] = [];
+    const code : string[] = [];
+    const visit = (node : TreeNode) : void => {
+        switch (node.type) {
+            case "text":
+                prose.push(String(node.value ?? ""));
+                return;
+            case "mdxjsEsm":
+            case "comment":
+            case "doctype":
+                return;
+            case "mdxFlowExpression":
+            case "mdxTextExpression":
+                prose.push(expressionText(node));
+                return;
+            default:
+                break;
         }
-        const match = inFence ? null : /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
-        if (match === null) continue;
-        const text = inlineText(match[2] ?? "");
-        // rehype-slug gives each heading of the page an ID, also an h1 or h4.
-        const id = slugger.slug(text);
-        if ((match[1] ?? "").length === 2 || (match[1] ?? "").length === 3) headings.push({ text, id });
-    }
-    return headings;
+        if (node.type === "element" && node.tagName === "pre") {
+            code.push(" ", textOf(node as Root), " ");
+            return;
+        }
+        const inline = node.type === "mdxJsxTextElement" || (node.type === "element" && INLINE_ELEMENTS.has(node.tagName ?? ""));
+        if (!inline) prose.push(" ");
+        if (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") {
+            for (const attribute of node.attributes ?? []) {
+                if (attribute.type !== "mdxJsxAttribute" || typeof attribute.value !== "string") continue;
+                if (TEXT_ATTRIBUTES.has(attribute.name ?? "")) prose.push(" ", attribute.value, " ");
+                else if (CODE_ATTRIBUTES.has(attribute.name ?? "")) code.push(" ", attribute.value, " ");
+            }
+        }
+        for (const child of node.children ?? []) visit(child);
+        if (!inline) prose.push(" ");
+    };
+    visit(tree as TreeNode);
+    return { prose : clean(prose), code : clean(code) };
 }
 
-/** This function changes an MDX source into plain text: no frontmatter, imports, JSX or Markdown marks. */
-export function plainText(source : string) : string {
-    return source
-        .replace(FRONTMATTER, "")
-        .replace(/^\s*(import|export)\s.*$/gm, " ")
-        .replace(/^\s*(```|~~~).*$/gm, " ")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-        .replace(/^\s*\|?\s*-{3,}.*$/gm, " ")
-        .replace(/[`*_>#|]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, TEXT_LIMIT);
+/** The `text` of a search entry: the prose, then the code. Each part has its own limit. */
+export function searchText({ prose, code } : PageText) : string {
+    return [prose.slice(0, TEXT_LIMIT), code.slice(0, CODE_LIMIT)].filter(part => part !== "").join(" ");
 }
 
-/** This function gives the paths of the MDX files in `dir`, relative to `dir`. */
-export async function mdxFiles(dir : string, prefix = "") : Promise<string[]> {
-    const files : string[] = [];
-    for (const entry of await readdir(dir, { withFileTypes : true })) {
-        const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-        if (entry.isDirectory()) files.push(...await mdxFiles(path.join(dir, entry.name), relative));
-        else if (entry.name.endsWith(".mdx")) files.push(relative);
-    }
-    return files.sort();
-}
-
-/** This function makes the search index of all the MDX pages in `contentDir`. Draft pages are not in it. */
+/**
+ * This function makes the search index of all the MDX pages in `contentDir`.
+ * It compiles each page as the site does, so the headings have the IDs and the
+ * text of the table of contents. Draft pages are not in the index (refer to
+ * `ContentFile.draft`).
+ */
 export async function buildSearchIndex(contentDir : string) : Promise<SearchEntry[]> {
-    const entries : SearchEntry[] = [];
-    for (const file of await mdxFiles(contentDir)) {
-        const source = await readFile(path.join(contentDir, file), "utf8");
-        const meta = extractFrontmatter(source);
-        if (meta["status"] === "draft") continue;
-        const route = file.replace(/\.mdx$/, "").replace(/(^|\/)index$/, "");
-        const first = route.split("/")[0] ?? "";
-        entries.push({
-            path : route,
-            section : first.charAt(0).toUpperCase() + first.slice(1),
-            title : typeof meta["title"] === "string" ? meta["title"] : route,
-            description : typeof meta["description"] === "string" ? meta["description"] : "",
-            headings : headingsOf(source),
-            text : plainText(source),
-        });
-    }
-    return entries;
+    const pages = (await readContentFiles(contentDir)).filter(page => !page.draft);
+    const trees = await readPageTrees(pages.map(page => ({ source : page.source, path : page.file })), tree => ({
+        headings : collectToc(tree).map(({ text, id }) => ({ text, id })),
+        text : searchText(pageText(tree)),
+    }));
+    return pages.map((page, index) => ({
+        path : page.route,
+        section : sectionLabel(page.section),
+        title : page.meta.title,
+        description : page.meta.description,
+        headings : trees[index]?.headings ?? [],
+        text : trees[index]?.text ?? "",
+    }));
 }

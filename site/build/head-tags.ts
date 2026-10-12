@@ -65,11 +65,19 @@ function licenseUrl(spdx : string) : string {
     return `https://opensource.org/licenses/${encodeURIComponent(spdx)}`;
 }
 
+/** Options of the head tags. */
+export type HeadOptions = {
+    /** False when the build makes no Open Graph images (`SITE_PRERENDER=0`). Then no tag refers to an image. */
+    images : boolean;
+};
+
+const WITH_IMAGES : HeadOptions = { images : true };
+
 /**
  * The schema.org data of a route, as JSON-LD. The home page gets the site and
  * the library. Each other page gets an article and its breadcrumbs.
  */
-export function structuredData(route : StaticRoute, routes : readonly StaticRoute[], site : SiteFacts) : Record<string, unknown> {
+export function structuredData(route : StaticRoute, routes : readonly StaticRoute[], site : SiteFacts, options : HeadOptions = WITH_IMAGES) : Record<string, unknown> {
     const websiteId = `${site.url}#website`;
     const softwareId = `${site.url}#software`;
     if (route.path === "") {
@@ -111,7 +119,7 @@ export function structuredData(route : StaticRoute, routes : readonly StaticRout
                 ...(route.description === undefined ? {} : { description : route.description }),
                 url,
                 mainEntityOfPage : url,
-                image : routeUrl(site.url, ogImageFile(route)),
+                ...(options.images ? { image : routeUrl(site.url, ogImageFile(route)) } : {}),
                 inLanguage : "en",
                 isPartOf : { "@type" : "WebSite", "@id" : websiteId, name : site.name, url : site.url },
                 about : { "@type" : "SoftwareSourceCode", "@id" : softwareId, name : site.name, codeRepository : site.repository },
@@ -138,9 +146,10 @@ export function jsonForScript(value : unknown) : string {
 /**
  * The head tags of a route: the canonical URL, Open Graph, the Twitter card,
  * the sitemap and the JSON-LD data. The title and the description are
- * already in the template (refer to `routeHtml`).
+ * already in the template (refer to `routeHtml`). A draft also gets a
+ * `robots` tag, so that search engines do not index it.
  */
-export function headTags(route : StaticRoute, routes : readonly StaticRoute[], site : SiteFacts, fallbackDescription : string) : string {
+export function headTags(route : StaticRoute, routes : readonly StaticRoute[], site : SiteFacts, fallbackDescription : string, options : HeadOptions = WITH_IMAGES) : string {
     const url = routeUrl(site.url, route.path);
     const image = routeUrl(site.url, ogImageFile(route));
     const description = route.description ?? fallbackDescription;
@@ -148,26 +157,32 @@ export function headTags(route : StaticRoute, routes : readonly StaticRoute[], s
     const alt = ogImageAlt(route, site);
     const meta = (attribute : "name" | "property", key : string, value : string) : string =>
         `<meta ${attribute}="${key}" content="${escapeHtml(value)}" />`;
+    const imageTags = options.images
+        ? [
+            meta("property", "og:image", image),
+            meta("property", "og:image:type", "image/png"),
+            meta("property", "og:image:width", String(OG_IMAGE_WIDTH)),
+            meta("property", "og:image:height", String(OG_IMAGE_HEIGHT)),
+            meta("property", "og:image:alt", alt),
+        ]
+        : [];
     const tags = [
+        ...(route.draft === true ? [meta("name", "robots", "noindex")] : []),
         `<link rel="canonical" href="${escapeHtml(url)}" />`,
         meta("property", "og:type", route.path === "" ? "website" : "article"),
         meta("property", "og:site_name", site.name),
         meta("property", "og:title", title),
         meta("property", "og:description", description),
         meta("property", "og:url", url),
-        meta("property", "og:image", image),
-        meta("property", "og:image:type", "image/png"),
-        meta("property", "og:image:width", String(OG_IMAGE_WIDTH)),
-        meta("property", "og:image:height", String(OG_IMAGE_HEIGHT)),
-        meta("property", "og:image:alt", alt),
+        ...imageTags,
         ...(route.path === "" ? [] : [meta("property", "article:section", sectionLabel(route.path.split("/")[0] ?? ""))]),
-        meta("name", "twitter:card", "summary_large_image"),
+        // A large image card needs an image. Without an image, the card is a summary.
+        meta("name", "twitter:card", options.images ? "summary_large_image" : "summary"),
         meta("name", "twitter:title", title),
         meta("name", "twitter:description", description),
-        meta("name", "twitter:image", image),
-        meta("name", "twitter:image:alt", alt),
+        ...(options.images ? [meta("name", "twitter:image", image), meta("name", "twitter:image:alt", alt)] : []),
         `<link rel="sitemap" type="application/xml" href="${escapeHtml(routeUrl(site.url, "sitemap.xml"))}" />`,
-        `<script type="application/ld+json">${jsonForScript(structuredData(route, routes, site))}</script>`,
+        `<script type="application/ld+json">${jsonForScript(structuredData(route, routes, site, options))}</script>`,
     ];
     return tags.map(tag => `        ${tag}`).join("\n");
 }

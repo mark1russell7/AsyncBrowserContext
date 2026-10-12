@@ -2,14 +2,11 @@ import mdx from "@mdx-js/rollup";
 import rehypeShiki from "@shikijs/rehype";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypeSlug from "rehype-slug";
-import remarkFrontmatter from "remark-frontmatter";
-import remarkGfm from "remark-gfm";
-import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import type { Plugin } from "vite";
 import { CODE_LANGUAGES, CODE_THEMES } from "./highlight.ts";
 import { isFrontmatterRequest } from "./frontmatter.ts";
+import { REMARK_PLUGINS } from "./mdx-pipeline.ts";
 import { rehypeExportToc } from "./rehype-export-toc.ts";
-import { remarkMermaid } from "./remark-mermaid.ts";
 
 /**
  * This plugin compiles `.mdx` pages. Each page module exports:
@@ -22,15 +19,11 @@ import { remarkMermaid } from "./remark-mermaid.ts";
  */
 export function mdxPlugin() : Plugin {
     const inner = mdx({
-        remarkPlugins : [
-            remarkFrontmatter,
-            [remarkMdxFrontmatter, { name : "frontmatter" }],
-            remarkGfm,
-            remarkMermaid,
-        ],
+        remarkPlugins : REMARK_PLUGINS,
         rehypePlugins : [
             // Each code block gets the colors of the light and the dark theme as CSS variables.
             [rehypeShiki, { themes : CODE_THEMES, defaultColor : false, langs : CODE_LANGUAGES, fallbackLanguage : "text" }],
+            // The search index also gives the headings the IDs of rehype-slug (refer to `mdx-pipeline.ts`).
             rehypeSlug,
             rehypeExportToc,
             [rehypeAutolinkHeadings, { behavior : "wrap", properties : { className : ["heading-anchor"] } }],

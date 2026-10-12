@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { colorRules, colorTokens, pageHtml, replaceTokenColors, type Snapshot } from "./snapshot";
+import { colorRules, colorTokens, pageHtml, REPLACE_TOKEN_COLORS_SOURCE, replaceTokenColors, type Snapshot } from "./snapshot";
 import type { StaticRoute } from "./static-routes";
 
 const TEMPLATE = `<!doctype html>
@@ -38,8 +38,15 @@ describe("color tokens", () => {
         expect(replaceTokenColors("#mermaid-1 .node{fill:#2a78d6}", TOKENS)).toBe("#mermaid-1 .node{fill:var(--series-1)}");
     });
 
-    it("works with no outside value, so the prerender can run it in the browser", () => {
-        const copy = new Function(`return (${replaceTokenColors.toString()})`)() as typeof replaceTokenColors;
+    it("keeps the value of a custom property, because it is a fixed color for one theme", () => {
+        expect(replaceTokenColors("--shiki-light: #1f2328; --shiki-light-bg: #ffffff; color: #ffffff", TOKENS)).toBe("--shiki-light: #1f2328; --shiki-light-bg: #ffffff; color: var(--color-surface)");
+        expect(replaceTokenColors(":root{--a:#2a78d6}.b{fill:#2a78d6;--c: rgb(35, 70, 196)}", TOKENS)).toBe(":root{--a:#2a78d6}.b{fill:var(--series-1);--c: rgb(35, 70, 196)}");
+        expect(replaceTokenColors(".flow--x:hover{fill:#2a78d6}", TOKENS)).toBe(".flow--x:hover{fill:var(--series-1)}");
+    });
+
+    it("comes from a source text, so the prerender runs the same code in the browser", () => {
+        expect(REPLACE_TOKEN_COLORS_SOURCE).toMatch(/^function replaceTokenColors\(text, tokens\) \{/);
+        const copy = new Function(`return (${REPLACE_TOKEN_COLORS_SOURCE})`)() as typeof replaceTokenColors;
         expect(copy("fill: #2a78d6", TOKENS)).toBe("fill: var(--series-1)");
     });
 

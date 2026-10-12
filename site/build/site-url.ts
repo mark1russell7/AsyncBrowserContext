@@ -27,6 +27,17 @@ export function resolveSiteUrl(value : string | undefined, fallback : string) : 
  * of the app use the same form.
  */
 export function routeUrl(siteUrl : string, routePath : string) : string {
-    const relative = routePath.split("/").filter(segment => segment !== "").map(encodeURIComponent).join("/");
-    return new URL(relative, siteUrl).href;
+    return new URL(encodedRoute(routePath), siteUrl).href;
+}
+
+function encodedRoute(routePath : string) : string {
+    return routePath.split("/").filter(segment => segment !== "").map(encodeURIComponent).join("/");
+}
+
+/**
+ * The link of a route below the base of Vite (refer to `normalizeBase`),
+ * for example "/AsyncBrowserContext/docs/api". The links of the app use the same form.
+ */
+export function routeHref(base : string, routePath : string) : string {
+    return `${base.endsWith("/") ? base : `${base}/`}${encodedRoute(routePath)}`;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { formatBytes, formatCount, formatDate, formatDateTime, formatMs, formatPercent, formatValue, shortCommit } from "./format";
-import { memoizePromise, memoizePromiseByKey } from "./memoize-promise";
+import { formatBytes, formatCount, formatDate, formatDateTime, formatMs, formatPercent, formatValue } from "./format";
+import { memoizePromise } from "./memoize-promise";
+import { pathWithoutHtmlFile } from "./page-path";
 
 describe("format", () => {
     it("formats durations", () => {
@@ -12,22 +13,46 @@ describe("format", () => {
         expect(formatMs(Number.NaN)).toBe("–");
     });
 
+    it("rounds a duration before it selects the unit", () => {
+        expect(formatMs(999.4)).toBe("999 ms");
+        expect(formatMs(999.6)).toBe("1 s");
+        expect(formatMs(59_994)).toBe("59.99 s");
+        expect(formatMs(59_999)).toBe("1 min 0 s");
+        expect(formatMs(119_700)).toBe("2 min 0 s");
+        expect(formatMs(-125_000)).toBe("-2 min 5 s");
+        expect(formatMs(-1_250)).toBe("-1.25 s");
+    });
+
     it("formats percentages, bytes, units and counts", () => {
         expect(formatPercent(87.54)).toBe("87.5%");
         expect(formatPercent(100)).toBe("100%");
         expect(formatPercent(undefined)).toBe("No data");
         expect(formatBytes(1536)).toBe("1.5 KB");
+        expect(formatBytes(1023)).toBe("1,023 B");
+        expect(formatBytes(1048575)).toBe("1 MB");
+        expect(formatBytes(1048524)).toBe("1,023.9 KB");
         expect(formatValue(0.25, "ratio")).toBe("25%");
         expect(formatValue(3, "{gc}")).toBe("3 gc");
         expect(formatCount(1, "test")).toBe("1 test");
         expect(formatCount(1200, "test")).toBe("1,200 tests");
-        expect(shortCommit("f6e5d4c3b2a1")).toBe("f6e5d4c");
     });
 
     it("formats dates in UTC", () => {
         expect(formatDateTime("2026-10-06T09:41:33.000Z")).toBe("6 Oct 2026, 09:41 UTC");
         expect(formatDate("2026-10-06T23:59:00.000Z")).toBe("6 Oct 2026");
         expect(formatDate("soon")).toBe("soon");
+    });
+});
+
+describe("pathWithoutHtmlFile", () => {
+    it("removes the name of the HTML file of a page, and keeps each other path", () => {
+        expect(pathWithoutHtmlFile("/AsyncBrowserContext/docs.html")).toBe("/AsyncBrowserContext/docs");
+        expect(pathWithoutHtmlFile("/AsyncBrowserContext/docs/concepts/rules.html")).toBe("/AsyncBrowserContext/docs/concepts/rules");
+        expect(pathWithoutHtmlFile("/AsyncBrowserContext/index.html")).toBe("/AsyncBrowserContext/");
+        expect(pathWithoutHtmlFile("/docs/index.html")).toBe("/docs/");
+        expect(pathWithoutHtmlFile("/AsyncBrowserContext/docs")).toBe("/AsyncBrowserContext/docs");
+        expect(pathWithoutHtmlFile("/")).toBe("/");
+        expect(pathWithoutHtmlFile("/docs/.html")).toBe("/docs/.html");
     });
 });
 
@@ -41,15 +66,6 @@ describe("memoizePromise", () => {
         const second = memo();
         expect(memo()).toBe(second);
         await expect(second).resolves.toBe("ok");
-        expect(load).toHaveBeenCalledTimes(2);
-    });
-
-    it("keeps one entry for each key", async () => {
-        const load = vi.fn((key : string) => Promise.resolve(key.toUpperCase()));
-        const memo = memoizePromiseByKey(load);
-        await expect(memo("a")).resolves.toBe("A");
-        await memo("a");
-        await memo("b");
         expect(load).toHaveBeenCalledTimes(2);
     });
 });

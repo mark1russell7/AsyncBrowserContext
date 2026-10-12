@@ -15,16 +15,3 @@ export function memoizePromise<T>(load : () => Promise<T>) : () => Promise<T> {
         return pending;
     };
 }
-
-/** The same as `memoizePromise`, with one cache entry per key. */
-export function memoizePromiseByKey<T>(load : (key : string) => Promise<T>) : (key : string) => Promise<T> {
-    const cache = new Map<string, () => Promise<T>>();
-    return (key) => {
-        let entry = cache.get(key);
-        if (!entry) {
-            entry = memoizePromise(() => load(key));
-            cache.set(key, entry);
-        }
-        return entry();
-    };
-}

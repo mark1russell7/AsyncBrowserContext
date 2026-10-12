@@ -1,6 +1,6 @@
 import type { Element, ElementContent, Root } from "hast";
 import { describe, expect, it } from "vitest";
-import { collectToc, createExportNode, rehypeExportToc } from "./rehype-export-toc";
+import { collectToc, createExportNode, expressionText, rehypeExportToc, textOf } from "./rehype-export-toc";
 
 function heading(tagName : string, id : string | undefined, children : ElementContent[]) : Element {
     return { type : "element", tagName, properties : id === undefined ? {} : { id }, children };
@@ -34,6 +34,32 @@ describe("collectToc", () => {
             { id : "detail", depth : 3, text : "A detail" },
             { id : "nested", depth : 2, text : "Nested" },
         ]);
+    });
+});
+
+describe("the text of a heading", () => {
+    /** An MDX expression node, as the MDX compiler gives it: the estree of `{<code>}`. */
+    const expression = (body : unknown[]) : ElementContent => ({ type : "mdxTextExpression", value : "", data : { estree : { type : "Program", body } } }) as unknown as ElementContent;
+    const statement = (node : unknown) : unknown => ({ type : "ExpressionStatement", expression : node });
+
+    it("takes the text of a JSX element and of a string literal expression", () => {
+        const jsx = { type : "mdxJsxTextElement", name : "Badge", attributes : [], children : [text("new")] } as unknown as ElementContent;
+        const node = heading("h2", "x", [
+            text("A "),
+            jsx,
+            text(" "),
+            expression([statement({ type : "Literal", value : "string" })]),
+            text(" "),
+            expression([statement({ type : "TemplateLiteral", expressions : [], quasis : [{ value : { cooked : "template" } }] })]),
+        ]);
+        expect(collectToc({ type : "root", children : [node] })).toEqual([{ id : "x", depth : 2, text : "A new string template" }]);
+    });
+
+    it("gives no text for an expression that only JavaScript can compute", () => {
+        expect(textOf(expression([statement({ type : "Identifier", name : "version" })]))).toBe("");
+        expect(textOf(expression([statement({ type : "TemplateLiteral", expressions : [{}], quasis : [] })]))).toBe("");
+        expect(textOf(expression([]))).toBe("");
+        expect(expressionText({ type : "text" })).toBe("");
     });
 });
 

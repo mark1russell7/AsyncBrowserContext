@@ -41,27 +41,37 @@ export function colorTokens(tokensCss : string) : Array<[string, string]> {
 }
 
 /**
- * This function replaces each color of a token with `var(<token>)`, in a
- * style attribute or in a style sheet. It knows "#rgb", "#rrggbb" and
- * "rgb(r, g, b)". The prerender also uses it in the browser, so it uses
- * nothing from outside its body.
+ * The source of `replaceTokenColors`, as JavaScript text. The prerender
+ * starts this text in the browser, and Node.js makes the same function from
+ * it. The bundle of the Vite configuration does not change a text, so both
+ * use the same code, and the code needs nothing from outside its body.
  */
-export function replaceTokenColors(text : string, tokens : ReadonlyArray<readonly [string, string]>) : string {
+export const REPLACE_TOKEN_COLORS_SOURCE = String.raw`function replaceTokenColors(text, tokens) {
     const names = new Map(tokens);
     return text.replace(
-        /(?<![\w#(-])#([0-9a-f]{6}|[0-9a-f]{3})(?![\w-])|\brgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})\s*(?:[,/]\s*1(?:\.0*)?\s*)?\)/gi,
-        (match : string, digits : string | undefined, red : string | undefined, green : string | undefined, blue : string | undefined) : string => {
-            let color : string;
+        /((?:^|[;{\s])--[\w-]+\s*:[^;{}]*)|(?<![\w#(-])#([0-9a-f]{6}|[0-9a-f]{3})(?![\w-])|\brgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})\s*(?:[,/]\s*1(?:\.0*)?\s*)?\)/gi,
+        (match, custom, digits, red, green, blue) => {
+            // A custom property keeps its value: it holds a fixed color for one theme, for example the code colors.
+            if (custom !== undefined) return match;
+            let color;
             if (digits === undefined) {
-                color = `#${[red, green, blue].map(part => Number(part).toString(16).padStart(2, "0")).join("")}`;
+                color = "#" + [red, green, blue].map((part) => Number(part).toString(16).padStart(2, "0")).join("");
             } else {
-                color = `#${(digits.length === 3 ? digits.replace(/./g, "$&$&") : digits).toLowerCase()}`;
+                color = "#" + (digits.length === 3 ? digits.replace(/./g, "$&$&") : digits).toLowerCase();
             }
             const name = names.get(color);
-            return name === undefined ? match : `var(${name})`;
+            return name === undefined ? match : "var(" + name + ")";
         },
     );
-}
+}`;
+
+/**
+ * This function replaces each color of a token with `var(<token>)`, in a
+ * style attribute or in a style sheet. It knows "#rgb", "#rrggbb" and
+ * "rgb(r, g, b)". It does not change the value of a custom property
+ * (`--name: value`), because such a value is a fixed color for one theme.
+ */
+export const replaceTokenColors = new Function(`return (${REPLACE_TOKEN_COLORS_SOURCE});`)() as (text : string, tokens : ReadonlyArray<readonly [string, string]>) => string;
 
 /**
  * CSS rules that give the SVG attributes of the snapshot the colors of the

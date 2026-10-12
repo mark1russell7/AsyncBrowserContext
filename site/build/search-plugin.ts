@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { Plugin } from "vite";
-import { buildSearchIndex, mdxFiles } from "./search-index.ts";
+import { mdxFiles } from "./content-files.ts";
+import { buildSearchIndex } from "./search-index.ts";
 
 /** The ID of the module that gives the search index. */
 export const SEARCH_INDEX_ID = "virtual:search-index";

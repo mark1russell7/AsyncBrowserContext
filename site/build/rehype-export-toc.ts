@@ -10,12 +10,33 @@ export type TocEntry = {
 
 type Node = Root | RootContent | ElementContent;
 
+/** An MDX expression in the tree, for example `{"text"}`. Its estree is the parsed JavaScript of the expression. */
+type ExpressionNode = {
+    type : "mdxTextExpression" | "mdxFlowExpression";
+    data? : { estree? : { body? : Array<{ type : string; expression? : { type : string; value? : unknown; expressions? : unknown[]; quasis? : Array<{ value : { cooked? : string | null } }> } }> } | null };
+};
+
 const DEPTHS : Readonly<Record<string, 2 | 3>> = { h2 : 2, h3 : 3 };
 
-function textOf(node : Node) : string {
+/**
+ * The text of an MDX expression. The build cannot know the value of most
+ * expressions, so only a string literal or a template literal without
+ * expressions gives text. Each other expression gives "".
+ */
+export function expressionText(node : { type : string; data? : unknown }) : string {
+    if (node.type !== "mdxTextExpression" && node.type !== "mdxFlowExpression") return "";
+    const body = (node as ExpressionNode).data?.estree?.body ?? [];
+    const expression = body.length === 1 && body[0]?.type === "ExpressionStatement" ? body[0].expression : undefined;
+    if (expression?.type === "Literal" && typeof expression.value === "string") return expression.value;
+    if (expression?.type === "TemplateLiteral" && expression.expressions?.length === 0) return expression.quasis?.map(quasi => quasi.value.cooked ?? "").join("") ?? "";
+    return "";
+}
+
+/** The text of a node, as the table of contents shows it. JSX elements give the text of their children. */
+export function textOf(node : Node) : string {
     if (node.type === "text") return node.value;
     if ("children" in node) return (node.children as Node[]).map(textOf).join("");
-    return "";
+    return expressionText(node);
 }
 
 /** This function collects the `h2` and `h3` headings that have an `id`, in document order. */
