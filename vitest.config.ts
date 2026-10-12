@@ -112,9 +112,10 @@ export const SHARED : string[] = ["test/rules/**/*.test.ts", "test/regression/**
  * esbuild cannot change a top-level `for await` for the target ES2016: its
  * output has `yield` outside a generator. With this target, esbuild also
  * refuses a top-level `await`. Thus the esbuild project does not run the
- * probes, which have a top-level `for await` (P10).
+ * probe P10, which has a top-level `for await`. The probe has its own file,
+ * so the esbuild project runs the other probes.
  */
-const ESBUILD_EXCLUDE : readonly string[] = ["test/regression/probes.test.ts"];
+const ESBUILD_EXCLUDE : readonly string[] = ["test/regression/probe-p10.test.ts"];
 
 /** The files that no project runs. */
 const EXCLUDE : readonly string[] = [...configDefaults.exclude, "**/.stryker-tmp/**", "test/smoke/fixture/**"];

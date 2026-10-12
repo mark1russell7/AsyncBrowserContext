@@ -33,7 +33,7 @@ Use `pnpm test:node` for the Node.js projects only, and `pnpm test:browser` for 
 | `unit` | Browser runtime in Node.js | Yes | `src/**/*.test.ts` and `test/vitest/**/*.test.ts` |
 | `rules (browser runtime, Node.js)` | Browser runtime in Node.js | Yes | The shared files |
 | `rules (browser runtime, SWC ES2016)` | Browser runtime in Node.js | SWC with the target ES2016 in place of the preset | The shared files |
-| `rules (browser runtime, esbuild ES2016)` | Browser runtime in Node.js | esbuild with the target ES2016 in place of the preset | The shared files, without the probes |
+| `rules (browser runtime, esbuild ES2016)` | Browser runtime in Node.js | esbuild with the target ES2016 in place of the preset | The shared files, without the probe P10 |
 | `rules (node runtime)` | Node.js runtime | Yes | The shared files |
 | `rules (node runtime, no transform)` | Node.js runtime | No | The shared files |
 | `memory` | Browser runtime in Node.js, with `--expose-gc` | Yes | `test/memory/` |
@@ -41,7 +41,7 @@ Use `pnpm test:node` for the Node.js projects only, and `pnpm test:browser` for 
 
 The shared files are in `test/rules/`, `test/regression/`, `test/api/`, `test/interleave/` and `test/legacy/`. The library's own Vite plugin transforms the test files.
 
-The constant `__TEST_COMPILER__` tells a test file which compiler changed it. Only the preset binds generators to the context of their creation (rule C5), and gives the names of the async functions to the callback hooks. Thus the projects without the preset skip these tests. They start a test of the other behavior in place of the rule C5 tests: a generator body gets the context of each `next()` call. The esbuild project does not start the probes, because esbuild cannot change their top-level `for await` for the target ES2016.
+The constant `__TEST_COMPILER__` tells a test file which compiler changed it. Only the preset binds generators to the context of their creation (rule C5), and gives the names of the async functions to the callback hooks. Thus the projects without the preset skip these tests. They start a test of the other behavior in place of the rule C5 tests: a generator body gets the context of each `next()` call. The esbuild project does not start the probe P10, because esbuild cannot change its top-level `for await` for the target ES2016. Thus P10 has its own file, `test/regression/probe-p10.test.ts`.
 
 ## Test layers
 
@@ -49,7 +49,7 @@ The constant `__TEST_COMPILER__` tells a test file which compiler changed it. On
 | --- | --- | --- |
 | Rules | `test/rules/` | The context rules C1 to C13. |
 | Browser APIs | `test/browser/` | The event rule C13 and the patched browser APIs. A test makes sure that each `on...` property of the browser has the patch. |
-| Regression | `test/regression/probes.test.ts` | The 23 probes of the review of 2026-10-08. |
+| Regression | `test/regression/` | The 23 probes of the review of 2026-10-08. |
 | API | `test/api/` | The `AsyncLocalStorage` tests run against the native class on Node.js and against the browser class. Thus, the two classes agree. The tests of `addCallbackHook()` and of the OpenTelemetry context manager are also here. |
 | Order variation | `test/interleave/` | 40 tasks do random operations with 5 fixed seeds. Each task reads its context after each operation. |
 | Memory | `test/memory/` | Rule C12, with `WeakRef` and the garbage collector. |
