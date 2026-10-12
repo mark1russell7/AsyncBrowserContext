@@ -4,28 +4,35 @@
  *
  * 1. It packs the package and a fake dependency with native async functions.
  * 2. It installs the two tarballs and Vite with npm in a new folder.
- * 3. It builds the application, starts `vite preview`, and opens the page in
- *    Chromium.
- * 4. It starts the dev server, which pre-bundles the dependencies, and opens
- *    the page again.
+ * 3. It builds the application with `vite build`, starts `vite preview`, and
+ *    opens the page in Chromium.
+ * 4. It starts the dev server (`vite`), which pre-bundles the dependencies,
+ *    and opens the page again.
  *
  * The page writes its results to `window.__results`. Each result must be "A".
  * The dependency result shows that the Vite plugin transforms the code in
  * `node_modules`.
+ *
+ * An error on the page, or a Vite server that ends before it answers, stops
+ * the test immediately with the message. The test removes the work folder and
+ * stops the servers and the browser also when a step fails. Vite operates in
+ * child processes: on Windows, a process that loaded the native modules of
+ * Vite locks their files, and the work folder then stays.
  */
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { chromium } from "playwright";
+import { fileURLToPath } from "node:url";
+import { chromium, type Browser } from "playwright";
+import { removeFolder } from "../scripts/folder.js";
+import { resultsOf, type Results } from "../scripts/page.js";
+import { startProcess, withServer } from "../scripts/process.js";
 import { BROWSER_HOST, freePort } from "../vitest/free-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
 const EXPECTED = { inExpression : "A", inDependency : "A", generator : "A", browserEvent : "A" };
-
-type ViteModule = typeof import("vite");
 
 /** Runs a command in a shell (npm is a .cmd file on Windows). Each argument is in quotes. */
 function run(command : string, args : string[], cwd : string) : string {
@@ -39,90 +46,64 @@ function pack(directory : string, destination : string) : string {
     return path.join(destination, output);
 }
 
-async function importVite(app : string) : Promise<ViteModule> {
-    const manifest = JSON.parse(fs.readFileSync(path.join(app, "node_modules", "vite", "package.json"), "utf8")) as { exports : Record<string, unknown> };
-    const entry = manifest.exports["."] as { import? : string | { default? : string }; default? : string };
-    const relative = typeof entry.import === "string" ? entry.import : entry.import?.default ?? entry.default ?? "./dist/node/index.js";
-    return await import(pathToFileURL(path.join(app, "node_modules", "vite", relative)).href) as ViteModule;
+/** The command line of Vite in the application. */
+function viteCli(app : string) : string {
+    return path.join(app, "node_modules", "vite", "bin", "vite.js");
 }
 
-async function resultsOf(url : string) : Promise<Record<string, unknown>> {
-    const browser = await chromium.launch();
-    try {
-        const page = await browser.newPage();
-        const errors : string[] = [];
-        page.on("pageerror", (error) => errors.push(error.message));
-        await page.goto(url);
-        // The dev server can reload the page one time, after it pre-bundles new dependencies
-        for (let attempt = 1; ; attempt++) {
-            try {
-                await page.waitForFunction(() => (window as unknown as { __results? : unknown }).__results !== undefined, undefined, { timeout : 30_000 });
-                const results = await page.evaluate(() => (window as unknown as { __results : Record<string, unknown> }).__results);
-                if (errors.length > 0) {
-                    throw new Error(`Page errors: ${errors.join("; ")}`);
-                }
-                return results;
-            } catch (error) {
-                const destroyed = error instanceof Error && error.message.includes("Execution context was destroyed");
-                if (!destroyed || attempt === 3) {
-                    throw error;
-                }
-                await page.waitForLoadState("load");
-            }
-        }
-    } finally {
-        await browser.close();
-    }
+/**
+ * Starts a Vite server in the application (`vite preview` or the dev server),
+ * and stops it after `use`. Free ports on 127.0.0.1: another program can use a
+ * fixed port (test/vitest/free-port.ts).
+ */
+async function withViteServer<T>(app : string, command : readonly string[], use : (url : string) => Promise<T>) : Promise<T> {
+    const port = await freePort();
+    const args = [viteCli(app), ...command, "--host", BROWSER_HOST, "--port", String(port), "--strictPort", "--logLevel", "warn"];
+    return await withServer(startProcess(process.execPath, args, { cwd : app, echo : true }), `http://${BROWSER_HOST}:${port}/`, use);
 }
 
-function check(label : string, results : Record<string, unknown>) : boolean {
+function check(label : string, results : Results) : boolean {
     const failures = Object.entries(EXPECTED).filter(([key, value]) => results[key] !== value);
     console.log(`${failures.length === 0 ? "PASS" : "FAIL"} ${label}: ${JSON.stringify(results)}`);
     return failures.length === 0;
 }
 
-async function main() : Promise<void> {
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-smoke-"));
+/** Makes the application in `work`, and installs the two tarballs and Vite. Gives the folder of the application. */
+function install(work : string) : string {
     const app = path.join(work, "app");
     fs.cpSync(path.join(here, "fixture"), app, { recursive : true });
-    console.log(`Work folder: ${work}`);
-
     const libraryTarball = pack(root, work);
     const dependencyTarball = pack(path.join(app, "fake-dependency"), work);
     fs.rmSync(path.join(app, "fake-dependency"), { recursive : true });
     const viteVersion = (JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as { devDependencies : Record<string, string> }).devDependencies["vite"] ?? "latest";
     run("npm", ["install", "--no-audit", "--no-fund", "--loglevel=error", libraryTarball, dependencyTarball, `vite@${viteVersion}`], app);
+    return app;
+}
 
-    const vite = await importVite(app);
+/** Builds the application and opens it with `vite preview`, then with the dev server. Gives true if each result is "A". */
+async function checkApp(app : string, browser : Browser) : Promise<boolean> {
     let passed = true;
+    execFileSync(process.execPath, [viteCli(app), "build", "--logLevel", "warn"], { cwd : app, stdio : "inherit" });
+    passed = check("build + preview", await withViteServer(app, ["preview"], (url) => resultsOf(browser, url))) && passed;
+    passed = check("dev server", await withViteServer(app, [], (url) => resultsOf(browser, url))) && passed;
+    return passed;
+}
 
-    await vite.build({ root : app, logLevel : "warn" });
-    // Free ports on 127.0.0.1: another program can use a fixed port (test/vitest/free-port.ts)
-    const previewPort = await freePort();
-    const preview = await vite.preview({ root : app, logLevel : "warn", preview : { host : BROWSER_HOST, port : previewPort, strictPort : true } });
+async function main() : Promise<void> {
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-smoke-"));
+    console.log(`Work folder: ${work}`);
     try {
-        passed = check("build + preview", await resultsOf(`http://${BROWSER_HOST}:${previewPort}/`)) && passed;
+        const app = install(work);
+        const browser = await chromium.launch();
+        try {
+            if (!await checkApp(app, browser)) {
+                process.exitCode = 1;
+            }
+        } finally {
+            await browser.close();
+        }
     } finally {
-        await preview.close();
-    }
-
-    const serverPort = await freePort();
-    const server = await vite.createServer({ root : app, logLevel : "warn", server : { host : BROWSER_HOST, port : serverPort, strictPort : true } });
-    await server.listen();
-    try {
-        passed = check("dev server", await resultsOf(`http://${BROWSER_HOST}:${serverPort}/`)) && passed;
-    } finally {
-        await server.close();
-    }
-
-    try {
-        // Windows can lock the files of the closed servers for a short time
-        fs.rmSync(work, { recursive : true, force : true, maxRetries : 10, retryDelay : 500 });
-    } catch {
-        console.warn(`Could not remove the work folder ${work}`);
-    }
-    if (!passed) {
-        process.exitCode = 1;
+        removeFolder(work);
     }
 }
 

@@ -155,7 +155,7 @@ export default defineConfig(async () : Promise<ViteUserConfig> => ({
             reportsDirectory : "coverage",
         },
         projects : [
-            nodeProject("unit", "browser", "babel-preset", ["src/**/*.test.ts", "test/vitest/**/*.test.ts"]),
+            nodeProject("unit", "browser", "babel-preset", ["src/**/*.test.ts", "test/vitest/**/*.test.ts", "test/scripts/**/*.test.ts"]),
             nodeProject("rules (browser runtime, Node.js)", "browser", "babel-preset", SHARED),
             nodeProject("rules (browser runtime, SWC ES2016)", "browser", "swc-es2016", SHARED),
             nodeProject("rules (browser runtime, esbuild ES2016)", "browser", "esbuild-es2016", SHARED),

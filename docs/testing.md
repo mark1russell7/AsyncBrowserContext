@@ -30,7 +30,7 @@ Use `pnpm test:node` for the Node.js projects only, and `pnpm test:browser` for 
 
 | Project | Runtime | Transform | Files |
 | --- | --- | --- | --- |
-| `unit` | Browser runtime in Node.js | Yes | `src/**/*.test.ts` and `test/vitest/**/*.test.ts` |
+| `unit` | Browser runtime in Node.js | Yes | `src/**/*.test.ts`, `test/vitest/**/*.test.ts` and `test/scripts/**/*.test.ts` |
 | `rules (browser runtime, Node.js)` | Browser runtime in Node.js | Yes | The shared files |
 | `rules (browser runtime, SWC ES2016)` | Browser runtime in Node.js | SWC with the target ES2016 in place of the preset | The shared files |
 | `rules (browser runtime, esbuild ES2016)` | Browser runtime in Node.js | esbuild with the target ES2016 in place of the preset | The shared files, without the probe P10 |
@@ -55,6 +55,7 @@ The constant `__TEST_COMPILER__` tells a test file which compiler changed it. On
 | Memory | `test/memory/` | Rule C12, with `WeakRef` and the garbage collector. |
 | Units and transform | `src/**/*.test.ts` | The runtime parts, the Vite plugin, and output snapshots of the Babel preset. |
 | Test tools | `test/vitest/` | The port of the browser API server, the check for lost test files, and the filter that selects the test files for the transform. |
+| Script tools | `test/scripts/` | The parts of the smoke test, the build tool test and the Babel test: the results of a page, the server processes and the removal of the work folders. |
 | Legacy | `test/legacy/` | The tests of the first test runner that were kept. `legacy-test-triage.md` gives the result for each test. |
 | Smoke | `test/smoke/run.ts` | `pnpm smoke` packs the package, installs it in a new Vite application, and examines the build and the dev server in Chromium. |
 | Babel versions | `test/babel/run.ts` | `pnpm test:babel` packs the package and installs it with Babel 7.22, the newest Babel 7 and Babel 8. Each version transforms `test/babel/program.js` with the preset, and the test starts the output on the browser runtime. The test also examines the names that the callback hooks get for the steps after an `await`. |
@@ -99,6 +100,15 @@ Vitest does not fail a run when a planned test file gives no result. The file is
 The check does not examine a run that stopped early, for example with `--bail` or after a cancel in watch mode. It also does not examine a run with `--shard`: Vitest then plans all files, but runs only a part of them. A plugin adds the reporter, thus the check also operates when the command line selects other reporters, for example `--reporter=json`.
 
 `vitest.stryker.config.ts` does not add the check. Stryker counts a failed run as a found mutant, and a lost file must not count as a found mutant.
+
+## The package test scripts
+
+`pnpm smoke`, `pnpm test:bundlers` and `pnpm test:babel` use the parts in `test/scripts/`:
+
+- An uncaught error or a console error on a test page stops the script immediately, with the message of the error. The script does not wait for the time limit of the page.
+- A server process (`vite preview`, the Vite dev server or `next start`) that ends before it answers stops the script immediately, with the output of the server.
+- After each check, the script stops the server process and waits until the process ended. If the process does not end after SIGTERM, the script sends SIGKILL.
+- The script removes its work folder also when a step fails. Vite operates in a child process, because Windows locks the native modules of a process until the process ends.
 
 ## Mutation testing
 
