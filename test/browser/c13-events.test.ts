@@ -225,6 +225,23 @@ describe("rule C13: event listeners", () => {
         expect(calls).toBe(1);
     });
 
+    it("keeps a capture listener and a listener without capture apart, as the DOM does", () => {
+        const variable = new Variable<string>();
+        const target = new EventTarget();
+        const seen : unknown[] = [];
+        const listener = () : void => { seen.push(variable.get()); };
+        variable.run("capture", () => target.addEventListener("x", listener, true));
+        variable.run("bubble", () => target.addEventListener("x", listener, false));
+        target.dispatchEvent(new Event("x"));
+        // A removal with the other capture flag does not remove the capture listener
+        target.removeEventListener("x", listener, false);
+        target.removeEventListener("x", listener, { capture : false });
+        target.dispatchEvent(new Event("x"));
+        target.removeEventListener("x", listener, { capture : true });
+        target.dispatchEvent(new Event("x"));
+        expect(seen).toEqual(["capture", "bubble", "capture"]);
+    });
+
     it("keeps the first registration and its context for a second registration of the same listener", () => {
         const variable = new Variable<string>();
         const target = new EventTarget();

@@ -48,6 +48,25 @@ describe.skipIf(!isBrowserRuntime || inBrowser)("rule C10: two copies of the lib
         });
         expect(seen).toBe("x");
     });
+
+    it("shares the contexts in both directions: each copy reads and keeps the variables of the other copy", async () => {
+        vi.resetModules();
+        const second = await import("async-browser-context");
+        const ofFirst = new Variable<string>();
+        const ofSecond = new second.Variable<string>();
+        // A snapshot of the second copy keeps a value of the first copy, and the reverse
+        const snapshotOfSecond = ofFirst.run("first", () => new second.Snapshot());
+        const snapshotOfFirst = ofSecond.run("second", () => new Snapshot());
+        expect(snapshotOfSecond.run(() => ofFirst.get())).toBe("first");
+        expect(snapshotOfFirst.run(() => ofSecond.get())).toBe("second");
+        // The values of the two copies nest, also through await and a timer
+        const seen = await ofSecond.run("outer", () => ofFirst.run("inner", async () => {
+            await null;
+            await new Promise((resolve) => setTimeout(resolve, 1));
+            return [ofFirst.get(), ofSecond.get()];
+        }));
+        expect(seen).toEqual(["inner", "outer"]);
+    });
 });
 
 describe("rule C11: the library does not change the identity of Promise", () => {

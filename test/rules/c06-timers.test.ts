@@ -63,6 +63,23 @@ describe("rule C6: a timer callback runs in the context of the call that schedul
         expect(called).toBe(false);
     });
 
+    it("gives a string callback to the native setTimeout without a change", async () => {
+        const schedule = setTimeout as unknown as (handler : string, timeout : number) => unknown;
+        if (inBrowser) {
+            // A browser evaluates the string as a script
+            const holder = globalThis as unknown as Record<string, unknown>;
+            schedule("globalThis.__asyncBrowserContextStringTimer = 'ran';", 0);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            expect(holder["__asyncBrowserContextStringTimer"]).toBe("ran");
+            delete holder["__asyncBrowserContextStringTimer"];
+        } else {
+            // Node.js refuses a string, also through the patch
+            const native = process.getBuiltinModule("node:timers").setTimeout as unknown as (handler : string, timeout : number) => unknown;
+            expect(() => native("1", 0)).toThrow(TypeError);
+            expect(() => schedule("1", 0)).toThrow(TypeError);
+        }
+    });
+
     it("keeps the names and lengths of the timer functions", () => {
         expect(setTimeout.name).toBe("setTimeout");
         expect(setInterval.name).toBe("setInterval");

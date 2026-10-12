@@ -111,6 +111,20 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         ]);
     });
 
+    it.skipIf(!preset)("calls after for a step that throws after an await, and the promise of the call rejects", async () => {
+        const variable = new Variable<string>();
+        const calls = record(variable);
+        async function failLater() : Promise<never> {
+            await null;
+            throw new Error("late");
+        }
+        await expect(variable.run("f", () => failLater())).rejects.toThrow("late");
+        expect(calls.filter((call) => call.source === "await").map((call) => `${call.phase} ${call.name} ${String(call.value)}`)).toEqual([
+            "before failLater f",
+            "after failLater f",
+        ]);
+    });
+
     it.skipIf(!preset)("calls the hooks for each step of an async generator after an await, in the context of the generator", async () => {
         const variable = new Variable<string>();
         const calls = record(variable);
@@ -180,6 +194,27 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
             removers.push(addCallbackHook({ before : () => { if (variable.get() === "e") throw error; } }));
             const value = await variable.run("e", () => Promise.resolve().then(() => variable.get()));
             expect(value).toBe("e");
+            expect(reported).toEqual([error]);
+        } finally {
+            if (nativeReportError === undefined) {
+                delete holder.reportError;
+            } else {
+                holder.reportError = nativeReportError;
+            }
+        }
+    });
+
+    it("gives an error of an after method to reportError, and keeps the result of the callback", async () => {
+        const variable = new Variable<string>();
+        const holder = globalThis as { reportError? : (error : unknown) => void };
+        const nativeReportError = holder.reportError;
+        const reported : unknown[] = [];
+        holder.reportError = (error) => { reported.push(error); };
+        try {
+            const error = new Error("after error");
+            removers.push(addCallbackHook({ after : () => { if (variable.get() === "a") throw error; } }));
+            const value = await variable.run("a", () => Promise.resolve().then(() => `${variable.get() ?? "none"} value`));
+            expect(value).toBe("a value");
             expect(reported).toEqual([error]);
         } finally {
             if (nativeReportError === undefined) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AsyncLocalStorage } from "async-browser-context";
-import { busyOther, runtime, turns } from "../helpers.js";
+import { busyOther, preset, runtime, turns } from "../helpers.js";
 import { Variable } from "async-browser-context";
 
 /**
@@ -77,6 +77,36 @@ describe(`AsyncLocalStorage (${runtime} runtime)`, () => {
         });
         expect(seen).toEqual({ afterCall : "entered", afterAwait : "entered" });
         expect(storage.getStore()).toBeUndefined();
+    });
+
+    it("keeps the store of enterWith() in a generator body across its steps", async () => {
+        const storage = new AsyncLocalStorage<string>();
+        const result = await storage.run("outer", async () => {
+            async function* values() : AsyncGenerator<unknown> {
+                storage.enterWith("entered");
+                yield storage.getStore();
+                await null;
+                yield storage.getStore();
+            }
+            function* syncValues() : Generator<unknown> {
+                storage.enterWith("sync");
+                yield storage.getStore();
+                yield storage.getStore();
+            }
+            const seen : unknown[] = [];
+            for await (const value of values()) {
+                seen.push(value);
+            }
+            const afterAsync = storage.getStore();
+            const syncSeen = storage.run("loop", () => [...syncValues()]);
+            return { seen, syncSeen, afterAsync };
+        });
+        expect(result.seen).toEqual(["entered", "entered"]);
+        expect(result.syncSeen).toEqual(["sync", "sync"]);
+        // The preset binds a generator to the context of its creation (rule C5): the body has its own
+        // context, so its enterWith() stays in the body. A native generator body operates in the
+        // context of the caller of next(), so the caller also gets the store.
+        expect(result.afterAsync).toBe(preset ? "outer" : "entered");
     });
 
     it("ends the effect of enterWith() inside run() when run() returns", () => {

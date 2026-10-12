@@ -108,6 +108,32 @@ describe("rule C3: an async function keeps the context of its call", () => {
         });
     });
 
+    it("keeps the context after an await in a finally block, after a return and after a throw", async () => {
+        const variable = new Variable<string>();
+        const seen : unknown[] = [];
+        const afterReturn = async () : Promise<string> => {
+            try {
+                return "result";
+            } finally {
+                const other = busyOther(variable, "other");
+                await null;
+                seen.push(variable.get());
+                await other;
+            }
+        };
+        const afterThrow = async () : Promise<never> => {
+            try {
+                throw new Error("thrown");
+            } finally {
+                await new Promise((resolve) => setTimeout(resolve, 1));
+                seen.push(variable.get());
+            }
+        };
+        expect(await variable.run("returns", afterReturn)).toBe("result");
+        await expect(variable.run("throws", afterThrow)).rejects.toThrow("thrown");
+        expect(seen).toEqual(["returns", "throws"]);
+    });
+
     // SWC changes `async (a = f()) => body` into `(a = f()) => helper(body)`, so the default value throws outside the promise
     it.skipIf(compiler === "swc-es2016")("rejects the promise of the call when a parameter default or a parameter destructuring throws (not with SWC, which evaluates the parameters of an async arrow function outside the promise)", async () => {
         const fail = () : never => {
