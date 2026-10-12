@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
-import { compiler, preset } from "../helpers.js";
+// @ts-expect-error The fixture is plain JavaScript without types
+import { libraryGenerator } from "../fixtures/untransformed.js";
+import { lowered, preset } from "../helpers.js";
 
 /**
  * The preset gives each async generator to the driver of the runtime
@@ -92,7 +94,7 @@ describe("async generators: the driver keeps the behavior of native async genera
     });
 
     // The helpers of SWC and esbuild end the generator at the first await of the finally block
-    it.skipIf(compiler === "swc-es2016" || compiler === "esbuild-es2016")("runs a finally block with await and yield on return(), and then gives the value of return() (not with SWC or esbuild, which end the generator at the await)", async () => {
+    it.skipIf(lowered)("runs a finally block with await and yield on return(), and then gives the value of return() (not with SWC or esbuild, which end the generator at the await)", async () => {
         const log : string[] = [];
         async function* cleaning() : AsyncGenerator<number | string> {
             try {
@@ -167,7 +169,7 @@ describe("async generators: the driver keeps the behavior of native async genera
     });
 
     // SWC and esbuild make their own async generator objects, without Symbol.toStringTag
-    it.skipIf(compiler === "swc-es2016" || compiler === "esbuild-es2016")("gives an object that is its own async iterator, with the tag AsyncGenerator (not with SWC or esbuild)", async () => {
+    it.skipIf(lowered)("gives an object that is its own async iterator, with the tag AsyncGenerator (not with SWC or esbuild)", async () => {
         async function* one() : AsyncGenerator<number> {
             yield 1;
         }
@@ -194,5 +196,100 @@ describe("async generators: the driver keeps the behavior of native async genera
             return values;
         });
         expect(seen).toEqual(["created", "created", "created"]);
+    });
+
+    it("gives the objects of a delegate through yield* without a change", async () => {
+        const first = { id : 1 };
+        const second = { id : 2 };
+        async function* rows() : AsyncGenerator<{ id : number }> {
+            yield first;
+            await null;
+            yield second;
+        }
+        async function* all() : AsyncGenerator<{ id : number }> {
+            yield* rows();
+        }
+        const values : unknown[] = [];
+        for await (const row of all()) {
+            values.push(row);
+        }
+        expect(values).toHaveLength(2);
+        expect(values[0]).toBe(first);
+        expect(values[1]).toBe(second);
+    });
+
+    // The helpers of SWC and esbuild do not await the value of return() at a yield
+    it.skipIf(lowered)("awaits the value of return() at a yield before the finally block, and throws a rejection into the body (not with SWC or esbuild)", async () => {
+        const log : string[] = [];
+        async function* guarded() : AsyncGenerator<string> {
+            try {
+                yield "first";
+            } catch (error) {
+                log.push(`caught ${String(error)}`);
+                yield "after catch";
+            } finally {
+                log.push("finally");
+            }
+        }
+        const pending = guarded();
+        await pending.next();
+        let settle! : (value : string) => void;
+        const done = pending.return(new Promise<string>((resolve) => { settle = resolve; }) as unknown as string);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(log).toEqual([]);
+        settle("stop");
+        expect(await done).toEqual({ value : "stop", done : true });
+        expect(log).toEqual(["finally"]);
+
+        const rejected = guarded();
+        await rejected.next();
+        expect(await rejected.return(Promise.reject("x") as unknown as string)).toEqual({ value : "after catch", done : false });
+        expect(log).toEqual(["finally", "caught x"]);
+    });
+
+    // The helpers of SWC and esbuild resume the body for next() of a complete generator
+    it.skipIf(lowered)("settles next() of a complete generator before a later microtask, as a native async generator does (not with SWC or esbuild)", async () => {
+        async function* empty() : AsyncGenerator<number> {
+            // An empty body
+        }
+        const generator = empty();
+        await generator.next();
+        const order : string[] = [];
+        const next = generator.next().then(() => order.push("next"));
+        const turn = Promise.resolve().then(() => order.push("turn"));
+        await Promise.all([next, turn]);
+        expect(order).toEqual(["next", "turn"]);
+    });
+
+    // The helpers of SWC and esbuild throw
+    it.skipIf(lowered)("rejects, and does not throw, when a method starts on an object that is not an async generator (not with SWC or esbuild)", async () => {
+        async function* one() : AsyncGenerator<number> {
+            yield 1;
+        }
+        const prototype = Object.getPrototypeOf(one()) as AsyncGenerator<number>;
+        let promise : Promise<unknown> | undefined;
+        expect(() => { promise = prototype.next.call({} as AsyncGenerator<number>); }).not.toThrow();
+        await expect(promise).rejects.toThrow(TypeError);
+    });
+
+    // SWC and esbuild make their own async generator objects
+    it.skipIf(lowered)("has no enumerable properties, and has Symbol.asyncDispose as a native async generator has (not with SWC or esbuild)", async () => {
+        async function* one() : AsyncGenerator<number> {
+            yield 1;
+        }
+        const generator = one();
+        const keys : string[] = [];
+        for (const key in generator) {
+            keys.push(key);
+        }
+        expect(keys).toEqual([]);
+        // A native async generator of a module that the transform does not change
+        const native = libraryGenerator(() => 1);
+        const dispose = (Symbol as { asyncDispose? : symbol }).asyncDispose;
+        if (dispose !== undefined) {
+            expect(typeof (generator as unknown as Record<symbol, unknown>)[dispose]).toBe(typeof (native as unknown as Record<symbol, unknown>)[dispose]);
+        }
+        await native.return(undefined);
     });
 });

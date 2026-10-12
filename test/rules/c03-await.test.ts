@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
-import { busyOther, compiler, delay, turns } from "../helpers.js";
+import { busyOther, compiler, delay, lowered, turns } from "../helpers.js";
 
 function pick<T>(_first : unknown, second : T) : T {
     return second;
@@ -149,6 +149,59 @@ describe("rule C3: an async function keeps the context of its call", () => {
         const value = await variable.run("body", async () => await thenable);
         expect(value).toBe(1);
         expect(seen).toBe("body");
+    });
+
+    /** A thenable that records the context of the read of `then` and of the call of `then`, as a query builder that starts its work in `then`. */
+    function recordingThenable(variable : Variable<string>, seen : string[]) : PromiseLike<number> {
+        return {
+            get then() {
+                seen.push(`read ${variable.get() ?? "none"}`);
+                return (resolve : (value : number) => void) : void => {
+                    seen.push(`call ${variable.get() ?? "none"}`);
+                    resolve(1);
+                };
+            },
+        } as unknown as PromiseLike<number>;
+    }
+
+    // SWC and esbuild resolve the thenable in a promise job without the context, so the call of then gets the root context
+    it.skipIf(lowered)("reads and calls the then method of an awaited thenable in the context of the body, also after an await (not with SWC or esbuild)", async () => {
+        const variable = new Variable<string>();
+        const seen : string[] = [];
+        const value = await variable.run("body", async () => {
+            await null;
+            const other = busyOther(variable, "other");
+            const result = await recordingThenable(variable, seen);
+            await other;
+            return result;
+        });
+        expect(value).toBe(1);
+        expect(seen).toEqual(["read body", "call body"]);
+    });
+
+    it.skipIf(lowered)("reads and calls the then method of a returned thenable in the context of the body (not with SWC or esbuild)", async () => {
+        const variable = new Variable<string>();
+        const seen : string[] = [];
+        const value = await variable.run("body", async () => {
+            await null;
+            return recordingThenable(variable, seen);
+        });
+        expect(value).toBe(1);
+        expect(seen).toEqual(["read body", "call body"]);
+    });
+
+    it("throws the error of a then getter into the body at the await", async () => {
+        const failing = { get then() { throw new Error("then getter"); } };
+        const caught = await (async () => {
+            await null;
+            try {
+                await failing;
+                return "no error";
+            } catch (error) {
+                return (error as Error).message;
+            }
+        })();
+        expect(caught).toBe("then getter");
     });
 
     it("runs the body synchronously until the first await", () => {

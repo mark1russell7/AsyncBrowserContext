@@ -220,9 +220,13 @@ describe("the Babel preset", () => {
         expect(coroutineNames(output.code)).toEqual(["other"]);
     });
 
-    it("does not change the runtime of the library, which has native async functions", async () => {
-        for (const file of ["../core/coroutine.ts", "../node/runtime.ts"]) {
-            const source = fs.readFileSync(new URL(file, import.meta.url), "utf8");
+    // Mutation testing instruments the source files, so a directive is not the first statement of its function there
+    const RUNTIME_FILES = ["../core/coroutine.ts", "../core/async-generator.ts", "../node/runtime.ts"]
+        .map((file) => [file, fs.readFileSync(new URL(file, import.meta.url), "utf8")] as const);
+    const instrumented = RUNTIME_FILES.some(([, source]) => source.includes("stryMutAct_"));
+
+    it.skipIf(instrumented)("does not change the runtime of the library, which has native async functions (not in the copy of mutation testing)", async () => {
+        for (const [file, source] of RUNTIME_FILES) {
             const result = await transformAsync(source, {
                 filename : file.replace("../", "src/"),
                 babelrc : false,

@@ -4,6 +4,8 @@ import type { Variable } from "async-browser-context";
 export const runtime : "browser" | "node" = __TEST_RUNTIME__;
 /** The compiler of the test files: the Babel preset, SWC or esbuild with the target ES2016, or none. */
 export const compiler : "babel-preset" | "swc-es2016" | "esbuild-es2016" | "none" = __TEST_COMPILER__;
+/** `true` if SWC or esbuild changed the test files with their own helpers (the target ES2016). */
+export const lowered : boolean = compiler === "swc-es2016" || compiler === "esbuild-es2016";
 /** `true` if a compiler changed the async functions of the test files into generators. */
 export const transformed : boolean = compiler !== "none";
 /**

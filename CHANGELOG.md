@@ -1,5 +1,19 @@
 # Change history
 
+## 0.2.4
+
+### Corrections
+
+- `yield*` in a transformed async generator gave a promise in place of each object of the delegate. Version 0.2.3 had this error. The driver does not change the result of a `yield*` step at this time.
+- Transformed code can await a thenable that is not a native promise, or give it as the result of a function. Its `then` method operates in the context of the body at this time. Before, only the read of `then` had the context, and the call had the root context. A query builder that starts its request in `then`, for example of supabase-js, gets the context, as on Node.js.
+- An `enterWith()` in the synchronous part of a transformed async function stays for the caller, as on Node.js.
+- An async generator of transformed code is closer to a native async generator:
+  - `return(value)` at a `yield` awaits the value before the `finally` blocks. A rejection goes into the body at the `yield`.
+  - `next()` of a complete generator settles before a later microtask.
+  - Its methods give a rejected promise for an object that is not an async generator.
+  - The object inherits from `%AsyncIteratorPrototype%`, so `Symbol.asyncDispose` and the async iterator helpers are available, and its methods are not enumerable.
+- An error of the `then` getter of an awaited object goes into the body at the `await`.
+
 ## 0.2.3
 
 ### Corrections

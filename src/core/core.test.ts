@@ -156,7 +156,7 @@ describe("coroutine", () => {
         expect(seen).toBe("body");
     });
 
-    it("keeps the store of enterWith in the next steps of the body, as the TC39 draft does for await", async () => {
+    it("keeps the store of enterWith in the next steps of the body, as on Node.js", async () => {
         const storage = new AsyncLocalStorage<string>();
         const run = coroutine(function* () : Generator<unknown, unknown, unknown> {
             storage.enterWith("entered");

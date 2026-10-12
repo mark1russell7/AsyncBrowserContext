@@ -1,4 +1,4 @@
-import { createAsyncGenerator, OverloadYield } from "./async-generator.js";
+import { createAsyncGenerator, PlainValue, unbox } from "./async-generator.js";
 import { applyWithHooks, store, type Frame } from "./store.js";
 
 /**
@@ -29,11 +29,63 @@ function namedForHooks(generatorFunction : Function, name : string | undefined) 
  * this function to `@babel/plugin-transform-async-to-generator` as its
  * `method` option, and adds `name`, the name of the async function, if it has one.
  */
+/** This function gives `true` for a value that can have a `then` property: an object or a function. */
+function isObject(value : unknown) : value is object {
+    return (typeof value === "object" && value !== null) || typeof value === "function";
+}
+
+/**
+ * This function gives the value that a driver awaits or gives as its result, in place of `value`. It
+ * operates in the context of the body, as `await` reads the `then` property there:
+ *
+ * - A primitive value and a native promise stay the same. `await` does not read a `then`
+ *   property of them.
+ * - For another object, the function reads `then` one time. A `then` method gets the current
+ *   frame for its later call. Thus the method operates in the context of the body, as with
+ *   the native `AsyncLocalStorage`. With `box`, an object without a `then` method goes into a
+ *   box, so that the engine does not read `then` a second time.
+ * - When the read throws, the function gives a rejected promise: the error goes into the body.
+ */
+function awaitable(value : unknown, NativePromise : PromiseConstructor, box : boolean) : unknown {
+    if (!isObject(value)) {
+        return value;
+    }
+    let then : unknown;
+    try {
+        if (value instanceof NativePromise && value.constructor === NativePromise) {
+            return value;
+        }
+        then = (value as { then? : unknown }).then;
+    } catch (error) {
+        return new NativePromise((_resolve, reject) => reject(error));
+    }
+    if (typeof then !== "function") {
+        return box ? new PlainValue(value) : value;
+    }
+    const frame = store.current;
+    return {
+        then(this : unknown, resolve : unknown, reject : unknown) : unknown {
+            const previous = store.current;
+            store.current = frame;
+            try {
+                return Reflect.apply(then, value, [resolve, reject]);
+            } finally {
+                store.current = previous;
+            }
+        },
+    };
+}
+
+/**
+ * This function gives an async function that operates `generatorFunction`. The preset gives
+ * this function to `@babel/plugin-transform-async-to-generator` as its
+ * `method` option, and adds `name`, the name of the async function, if it has one.
+ */
 export function coroutine<T, A extends unknown[], R>(
     generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>,
     name? : string,
 ) : (this : T, ...args : A) => Promise<R> {
-    const { promiseResolve } = store.intrinsics;
+    const NativePromise = store.intrinsics.Promise;
     return function asyncFunction(this : T, ...args : A) : Promise<R> {
         // The context of the call. The body can change it with AsyncLocalStorage.enterWith.
         let frame : Frame = store.current;
@@ -42,9 +94,11 @@ export function coroutine<T, A extends unknown[], R>(
         const throwInto = (error : unknown) : IteratorResult<unknown, R> => generator.throw(error);
 
         /**
-         * This function does one step of the body in the context of the async function, and sets
-         * the previous context again. `resumed` is `true` for a step after an `await`. Only these
-         * steps start the hook methods. The function gives the value to await.
+         * This function does one step of the body in the context of the async function. `resumed`
+         * is `true` for a step after an `await`. Only these steps start the hook methods. After a
+         * resumed step, the function sets the previous context again. The first step operates in
+         * the code of the caller, so an `enterWith` of that step stays for the caller, as on
+         * Node.js. The function gives the value to await, or the result of the function.
          */
         const step = (resume : (argument : unknown) => IteratorResult<unknown, R>, argument : unknown, resumed : boolean) : IteratorResult<unknown, R> => {
             const previous = store.current;
@@ -54,16 +108,12 @@ export function coroutine<T, A extends unknown[], R>(
                 const result = hooks === undefined
                     ? resume(argument)
                     : applyWithHooks(hooks, namedForHooks(generatorFunction, name), "await", resume, undefined, [argument]);
-                const value : unknown = result.value;
-                if (!result.done && ((typeof value === "object" && value !== null) || typeof value === "function")) {
-                    // Promise.resolve reads the "then" property of an object. Do it in the context of the body, as await does.
-                    // The result object is new for each step, so the change is not visible to other code.
-                    (result as { value : unknown }).value = promiseResolve(value);
-                }
+                // The result object is new for each step, so the change is not visible to other code
+                (result as { value : unknown }).value = awaitable(result.value, NativePromise, result.done !== true);
                 return result;
             } finally {
                 frame = store.current;
-                store.current = previous;
+                store.current = resumed ? previous : frame;
             }
         };
 
@@ -74,14 +124,15 @@ export function coroutine<T, A extends unknown[], R>(
          */
         const drive = async () : Promise<R> => {
             // The directive tells the Babel preset not to change this function (src/babel/skip-runtime.ts)
+            // Stryker disable next-line all: the directive matters only when a bundler applies the preset to the runtime
             "async-browser-context runtime";
             // In the driver, an error of the parameters rejects the promise, as with a native async function
-            generator = generatorFunction.apply(this, args);
+            generator = Reflect.apply(generatorFunction, this, args);
             let result = step(next, undefined, false);
             while (result.done !== true) {
                 let value : unknown;
                 try {
-                    value = await result.value;
+                    value = unbox(await result.value);
                 } catch (error) {
                     result = step(throwInto, error, true);
                     continue;
@@ -92,11 +143,6 @@ export function coroutine<T, A extends unknown[], R>(
         };
         return drive();
     };
-}
-
-/** This function gives `true` for a value that can have a `then` property: an object or a function. */
-function isObject(value : unknown) : value is object {
-    return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
 /**
@@ -110,39 +156,40 @@ function isObject(value : unknown) : value is object {
 export function asyncGenerator<T, A extends unknown[]>(
     generatorFunction : (this : T, ...args : A) => Generator<unknown, unknown, unknown>,
 ) : (this : T, ...args : A) => AsyncGenerator<unknown, unknown, unknown> {
-    const { Promise : NativePromise, promiseResolve } = store.intrinsics;
+    const NativePromise = store.intrinsics.Promise;
     return function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
         let frame : Frame = store.current;
-        const generator = generatorFunction.apply(this, args);
+        const generator = Reflect.apply(generatorFunction, this, args);
         const methods : Record<ResumeMethod, (argument : unknown) => IteratorResult<unknown, unknown>> = {
             next : (argument) => generator.next(argument),
             throw : (argument) => generator.throw(argument),
             return : (argument) => generator.return(argument),
         };
+        /** One step of the body in the context of the generator. The result stays the same: `yield*` gives the result of the delegate back. */
         const step = (key : ResumeMethod, argument : unknown, resumed : boolean) : IteratorResult<unknown, unknown> => {
             const previous = store.current;
             store.current = frame;
             try {
                 const hooks = resumed ? store.hooks : undefined;
-                const result = hooks === undefined
+                return hooks === undefined
                     ? methods[key](argument)
                     : applyWithHooks(hooks, generatorFunction, "await", methods[key], undefined, [argument]);
-                // Read the "then" property of an awaited or yielded object in the context of the body, as await and yield do
-                const value : unknown = result.value;
-                if (value instanceof OverloadYield) {
-                    if (isObject(value.v)) {
-                        value.v = promiseResolve(value.v);
-                    }
-                } else if (isObject(value)) {
-                    (result as { value : unknown }).value = promiseResolve(value);
-                }
-                return result;
             } finally {
                 frame = store.current;
                 store.current = previous;
             }
         };
-        return createAsyncGenerator(step, NativePromise);
+        /** The value to await, in the context of the generator: `await` and `yield` read the `then` property of an object there. */
+        const prepare = (value : unknown) : unknown => {
+            const previous = store.current;
+            store.current = frame;
+            try {
+                return awaitable(value, NativePromise, true);
+            } finally {
+                store.current = previous;
+            }
+        };
+        return createAsyncGenerator(step, NativePromise, undefined, prepare);
     };
 }
 

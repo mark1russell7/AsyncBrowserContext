@@ -63,6 +63,22 @@ describe(`AsyncLocalStorage (${runtime} runtime)`, () => {
         expect(storage.getStore()).toBeUndefined();
     });
 
+    it("keeps an enterWith() of the synchronous part of an async function for the caller", async () => {
+        const storage = new AsyncLocalStorage<string>();
+        const seen = await storage.run("outer", async () => {
+            const init = async () : Promise<void> => {
+                storage.enterWith("entered");
+                await null;
+            };
+            const promise = init();
+            const afterCall = storage.getStore();
+            await promise;
+            return { afterCall, afterAwait : storage.getStore() };
+        });
+        expect(seen).toEqual({ afterCall : "entered", afterAwait : "entered" });
+        expect(storage.getStore()).toBeUndefined();
+    });
+
     it("ends the effect of enterWith() inside run() when run() returns", () => {
         const storage = new AsyncLocalStorage<string>();
         storage.run("outer", () => {
