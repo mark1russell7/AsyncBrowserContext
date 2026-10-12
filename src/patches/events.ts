@@ -65,7 +65,8 @@ function keyOf(type : unknown, capture : boolean) : string {
 /** This function gives the frame for a listener call: the current frame, or the registration frame in the root context. */
 function frameForCall(registered : Frame) : Frame {
     const current = store.current;
-    return current === store.root ? registered : current;
+    // After a top-level enterWith(), the default store stays current between tasks, as the root frame does
+    return current === store.root || current === store.idle ? registered : current;
 }
 
 /** `source` is `addEventListener:` and the event type, for the callback hooks. */

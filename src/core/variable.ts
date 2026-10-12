@@ -1,4 +1,4 @@
-import { createFrame, findValue, NOT_FOUND, store } from "./store.js";
+import { createFrame, findValue, NOT_FOUND, recordIdleFrame, store } from "./store.js";
 
 /** The options of a `Variable`. */
 export interface VariableOptions<T> {
@@ -76,4 +76,5 @@ Object.defineProperty(Variable.prototype, Symbol.toStringTag, { value : "AsyncCo
  */
 export function enterValue<T>(variable : Variable<T>, value : T) : void {
     store.current = createFrame(store.current, variable, value);
+    recordIdleFrame();
 }

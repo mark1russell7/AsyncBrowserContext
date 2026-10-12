@@ -48,6 +48,12 @@ export interface ContextStore {
      * no hooks. The store of an older copy of the library does not have this property.
      */
     hookPatches? : Set<string> | undefined;
+    /**
+     * The frame that stays current between tasks: the root frame, or the frame of a top-level
+     * `enterWith()` (a default store). The event patch handles it as the root frame (rule C13).
+     * The store of an older copy of the library does not have this property.
+     */
+    idle? : Frame | undefined;
 }
 
 /** The methods of a callback hook. The public type is `CallbackHook` in `hooks.ts`. */
@@ -82,6 +88,7 @@ function createStore() : ContextStore {
         hooks : undefined,
         inHook : false,
         hookPatches : new Set(),
+        idle : root,
     };
 }
 
@@ -98,6 +105,26 @@ function getOrCreateStore() : ContextStore {
 
 /** The store of this global object. */
 export const store : ContextStore = getOrCreateStore();
+
+/** `true` while a record of the idle frame waits in the microtask queue. */
+let idleRecordQueued = false;
+
+/**
+ * This function records `store.idle` in the next microtask. `enterWith()` starts it, because a
+ * top-level `enterWith()` changes the frame that stays current between tasks. A microtask
+ * operates when the stack is empty, after each wrapper set its previous frame again. The callback
+ * goes to the native `then`, so no wrapper sets a frame for it.
+ */
+export function recordIdleFrame() : void {
+    if (idleRecordQueued) {
+        return;
+    }
+    idleRecordQueued = true;
+    Reflect.apply(store.intrinsics.promiseThen, store.intrinsics.promiseResolve(undefined), [() : void => {
+        idleRecordQueued = false;
+        store.idle = store.current;
+    }]);
+}
 
 /** This function makes `frame` the current frame. It gives the frame that was current before. */
 export function enter(frame : Frame) : Frame {

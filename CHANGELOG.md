@@ -32,6 +32,7 @@ This version changes some behaviors, so it is a minor version. The first section
 - The patch of `Promise.prototype.then` starts the `then` that it replaces, as the other patches do. Thus a patch of `then` that another tool installed before the library stays in effect. Before, the patch started the native `then`.
 - The preset does not change the native async generator of the runtime, also when a bundler applies the preset to `node_modules`. The plugin of Babel for async generators changes async generators and `for await` loops in its own traversal. The preset makes that traversal skip the functions with the directive of the runtime too. Before, the runtime then imported itself, and its async generator objects did not inherit `Symbol.asyncDispose`.
 - Events:
+  - After a top-level `enterWith()`, an event that the browser dispatches gives the registration context to each listener (rule C13). Before, each listener got the default store of the `enterWith()`. The event patch handles the default store as the root context.
   - A listener with a `signal` does not stay in memory. The map of the listeners is weak, and the abort listener of a registration keeps only weak references. Before, a signal that lived long kept the target, the listener and its context in memory, also on Node.js.
   - A removed registration and a `once` listener that operated remove their abort listener. A failed native `addEventListener()` keeps no registration.
   - A registration with an aborted signal, or a `once` listener that operated, gets a new registration at the next add.

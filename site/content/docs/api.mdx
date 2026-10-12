@@ -97,7 +97,7 @@ The class of `node:async_hooks`, for browsers. On Node.js, the package gives the
 `enterWith()` outside all `run()` calls, for example at the top level of a module, sets a default store. No code sets the root context again, as on Node.js. Thus the store stays after a top-level `await`, and the callbacks that the later code registers get it. This has these effects in the browser:
 
 - Between tasks, the current context is not the root context (rule C1).
-- An event that the browser dispatches gives the context of the `enterWith()` to each listener, in place of the registration context (rule C13).
+- Rule C13 handles the default store as the root context. An event that the browser dispatches, or that code of the default store dispatches, gives the registration context to each listener.
 - Code without the transform also gets the default store after its native `await`.
 
 A timer or a `then` callback that the code registered before the `enterWith()` keeps the context of its registration.

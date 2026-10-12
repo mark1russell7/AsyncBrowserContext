@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Variable } from "async-browser-context";
+import { AsyncLocalStorage, Variable } from "async-browser-context";
 import { store } from "../../src/core/store.js";
 import { deferred } from "../helpers.js";
 
@@ -43,6 +43,39 @@ describe("rule C13: event listeners", () => {
         });
         // Two images load at the same time: each listener gets the context of its own request
         expect(await Promise.all([load("request-a"), load("request-b")])).toEqual(["request-a", "request-b"]);
+    });
+
+    it("gives the registration context to a browser event also after a top-level enterWith() (a default store)", async () => {
+        const storage = new AsyncLocalStorage<string>();
+        const nativeSetTimeout = store.originals.get(setTimeout) as typeof setTimeout;
+        const done = deferred<unknown>();
+        try {
+            // A task without a wrapper, as the evaluation of a module: its enterWith() stays after the task
+            await new Promise<void>((resolve) => nativeSetTimeout(() => {
+                storage.enterWith("default");
+                resolve();
+            }, 0));
+            storage.run("request", () => {
+                const image = new Image();
+                image.addEventListener("load", () => done.resolve(storage.getStore()));
+                image.src = PIXEL;
+            });
+            expect(await done.promise).toBe("request");
+            // Code of the default store that dispatches an event gives the registration context too, as code of the root context does
+            const target = new EventTarget();
+            const seen : unknown[] = [];
+            storage.run("registration", () => target.addEventListener("ping", () => seen.push(storage.getStore())));
+            nativeSetTimeout(() => target.dispatchEvent(new Event("ping")), 0);
+            await new Promise((resolve) => nativeSetTimeout(resolve, 10));
+            expect(seen).toEqual(["registration"]);
+        } finally {
+            // Also in a task without a wrapper: a step of this test sets its previous frame again at its end
+            await new Promise<void>((resolve) => nativeSetTimeout(() => {
+                store.current = store.root;
+                store.idle = store.root;
+                resolve();
+            }, 0));
+        }
     });
 
     it("gives the registration context to an on... handler of an event that the browser dispatches later", async () => {

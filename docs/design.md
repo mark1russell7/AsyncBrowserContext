@@ -45,7 +45,9 @@ The runtime sets a frame only for one step of code that it controls. After the s
 
 Thus, between tasks, the current frame is the root frame. Code that the library does not control gets the root context, not the context of a different operation. Where application code gives a callback to such code, `AsyncLocalStorage.bind()` or a snapshot keeps the context (refer to the page "Boundaries" of the website).
 
-`AsyncLocalStorage.enterWith()` makes a new frame current until the code that controls the step sets the previous frame again. The first step of an async function operates in the step of its caller. Thus an `enterWith()` of that step stays for the caller, as on Node.js. An `enterWith()` outside all steps, for example at the top level of a module, stays current after the task. No code sets the root frame again, as on Node.js, so the store also stays after a top-level `await`. This store is then the default store of all code that the library does not control.
+`AsyncLocalStorage.enterWith()` makes a new frame current until the code that controls the step sets the previous frame again. The first step of an async function operates in the step of its caller. Thus an `enterWith()` of that step stays for the caller, as on Node.js.
+
+An `enterWith()` outside all steps, for example at the top level of a module, stays current after the task. No code sets the root frame again, as on Node.js, so the store also stays after a top-level `await`. This store is then the default store of all code that the library does not control. The store records this frame (`store.idle`) in a microtask after each `enterWith()`, when no step operates. The event patch handles it as the root frame (rule C13).
 
 ### The transform
 
