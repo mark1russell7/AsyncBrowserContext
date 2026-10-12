@@ -52,16 +52,16 @@ The transform also makes the code of the application larger. The command builds 
 | --- | --- | --- | --- | --- | --- |
 | react-dom 19.3.0 | 0 | 76.0 kB | 76.0 kB (+0%) | 76.0 kB (+0%) | 76.0 kB (+0%) |
 | @tanstack/query-core 5.104.2 | 8 | 13.1 kB | 13.8 kB (+5.9%) | 13.8 kB (+5.8%) | 16.9 kB (+29.3%) |
-| ky 2.2.0 | 28 | 12.1 kB | 12.6 kB (+4.3%) | 12.5 kB (+3.3%) | 14.3 kB (+17.9%) |
-| idb 8.0.4 | 2 | 1.8 kB | 2.3 kB (+31.9%) | 2.3 kB (+31.4%) | 3.0 kB (+71.9%) |
+| ky 2.2.0 | 28 | 12.1 kB | 12.6 kB (+4.3%) | 12.5 kB (+3.2%) | 14.3 kB (+17.9%) |
+| idb 8.0.4 | 2 | 1.8 kB | 1.9 kB (+8.1%) | 1.9 kB (+7.8%) | 3.0 kB (+71.4%) |
 | @supabase/supabase-js 2.117.3 | 358 | 62.6 kB | 66.1 kB (+5.5%) | 65.1 kB (+3.9%) | 67.3 kB (+7.5%) |
-| openai 7.32.0 | 145 | 91.7 kB | 100.1 kB (+9.1%) | 99.4 kB (+8.4%) | 100.9 kB (+10%) |
-| @aws-sdk/client-s3 3.1149.0 | 210 | 100.8 kB | 105.7 kB (+4.9%) | 105.2 kB (+4.4%) | 108.1 kB (+7.3%) |
+| openai 7.32.0 | 145 | 91.7 kB | 98.6 kB (+7.5%) | 97.8 kB (+6.7%) | 100.9 kB (+10%) |
+| @aws-sdk/client-s3 3.1149.0 | 210 | 100.8 kB | 104.3 kB (+3.5%) | 103.8 kB (+3%) | 108.1 kB (+7.3%) |
 | An application: React DOM, TanStack Query, supabase-js and ky | 394 | 161.9 kB | 166.5 kB (+2.9%) | 165.3 kB (+2.1%) | 171.2 kB (+5.8%) |
 
 - **User interface code.** React DOM has no async functions, so the transform does not change it. In an application, the code with async functions is usually a small part.
-- **Code with much async code.** The transform adds 4 to 9 percent to API clients. Each async function becomes a generator in a function that starts `coroutine`.
-- **Small packages with `for await` or async generators.** Babel adds its helpers for async iteration to each module that has such code: approximately 0.5 kB with gzip. This is the cause of the large percent of idb and TanStack Query.
+- **Code with much async code.** The transform adds 3 to 8 percent to API clients. Each async function becomes a generator in a function that starts `coroutine`.
+- **Small packages with `for await`.** Babel adds its helper for `for await` to each module that has such a loop: approximately 0.5 kB with gzip. This is the cause of the large percent of TanStack Query. Since version 0.2.3, the async generators use the driver of the runtime, so the modules do not contain the async generator helper of Babel.
 - **The names.** The preset gives the name of each async function to the callback hooks. The option `names: false` removes the names: 0.1 to 1.6 percent of the package.
 - **The target ES2016.** A compiler with this target also keeps the context through `await`, except rule C5 ([build tools](/docs/guides/build-tools)). The target also changes newer syntax, so the bundles are larger than with the preset.
 
@@ -71,16 +71,20 @@ The command `pnpm bench:browsers` measures `await` and `then` in Chromium, Firef
 
 | Browser | Workload | Native | Babel helper | Library |
 | --- | --- | --- | --- | --- |
-| Chromium 156 | `await null` | 2.3 | 4.0 | 4.1 |
-| Chromium 156 | `await` of a promise | 5.9 | 7.3 | 5.7 |
-| Chromium 156 | `then` chain | 1.8 | 1.9 | 5.2 |
-| Firefox 157 | `await null` | 1.0 | 271 | 4.0 |
-| Firefox 157 | `await` of a promise | 1.0 | 193 | 51 |
-| Firefox 157 | `then` chain | 81 | 82 | 147 |
-| WebKit 27.2 | `await null` | 3.0 | 4.0 | 5.0 |
-| WebKit 27.2 | `await` of a promise | 3.0 | 4.0 | 6.0 |
-| WebKit 27.2 | `then` chain | 3.0 | 3.0 | 4.0 |
+| Chromium 156 | `await null` | 0.9 | 1.4 | 2.1 |
+| Chromium 156 | `await` of a promise | 3.6 | 5.0 | 2.8 |
+| Chromium 156 | Async generator with `for await` | 4.6 | 7.4 | 9.0 |
+| Chromium 156 | `then` chain | 0.7 | 0.7 | 2.2 |
+| Firefox 157 | `await null` | less than 1 | 161 | 2.0 |
+| Firefox 157 | `await` of a promise | 1.0 | 105 | 32 |
+| Firefox 157 | Async generator with `for await` | 107 | 529 | 370 |
+| Firefox 157 | `then` chain | 35 | 32 | 55 |
+| WebKit 27.2 | `await null` | 2.0 | 2.0 | 2.0 |
+| WebKit 27.2 | `await` of a promise | 2.0 | 3.0 | 4.0 |
+| WebKit 27.2 | Async generator with `for await` | 4.0 | 10 | 13 |
+| WebKit 27.2 | `then` chain | 1.0 | 1.0 | 2.0 |
 
+- **Async generators.** Since version 0.2.3, the driver of the runtime operates each async generator with a native `await`. Before, the helper of Babel was in each module, and each step was a `then` callback. With version 0.2.2, the async generator workload took 11.2 ms in Chromium, 560 ms in Firefox and 16 ms in WebKit.
 - **The coroutine.** Since version 0.2.2, the coroutine operates each async function with a native `await`. Before, each step was a `then` callback, as in the Babel helper. In Firefox, 50,000 awaits of `null` took 292 ms with version 0.2.1.
 - **Firefox and the patch of `then`.** Firefox has a fast path for `await` of a promise. A patch of `Promise.prototype.then` stops this fast path, also for code without the transform. Each `await` of a promise then takes approximately 0.8 µs more. zone.js also patches the promises, so it has the same cost.
 - **Playwright and Firefox.** Playwright controls Firefox with the debugger API. Firefox then records an async stack for each `then` callback. Thus, `then` callbacks take more time in this measurement than in a Firefox without Playwright. With the preference `javascript.options.asyncstack` set to `false`, a chain of steps in `then` callbacks was 7 times faster.

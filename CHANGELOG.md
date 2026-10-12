@@ -1,5 +1,17 @@
 # Change history
 
+## 0.2.3
+
+### Corrections
+
+- Async generators are faster. The runtime has a driver for async generators (`asyncGenerator`), which continues each step with a native `await`. Before, the helper of Babel was in each module, and each step was a `then` callback. A `for await` loop over an async generator with 50,000 steps took 11.2 ms in Chromium, 560 ms in Firefox and 16 ms in WebKit. It takes 9.0 ms, 370 ms and 13 ms at this time (`pnpm bench:browsers`).
+- The modules with async generators are smaller, because they do not contain the async generator helper of Babel. In the size measurement, idb changed from +31.9 to +8.1 percent and openai from +9.1 to +7.5 percent.
+- The preset does not wrap async generators with `bindGenerator`. The driver keeps the context of the creation itself (rule C5).
+
+### Tests
+
+- The tests examine the behavior of async generators: the queue of requests, `throw()`, `return()` with `await` and `yield` in a `finally` block, and `yield*`. The project without a transform starts the same tests on native async generators.
+
 ## 0.2.2
 
 ### Corrections

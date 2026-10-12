@@ -10,15 +10,16 @@ A native `await` continues the function from the microtask queue of the engine. 
 
 ## The parts of the preset
 
-The preset `async-browser-context/babel-preset` contains five Babel plugins, in this order:
+The preset `async-browser-context/babel-preset` contains six Babel plugins, in this order:
 
 1. A plugin of this library skips each function with the directive `"async-browser-context runtime"`. The native async functions of the runtime have this directive, so the other plugins do not change them.
-2. A plugin of this library binds each generator to the context of its creation (rule C5). It operates in the `Program` visitor, so it gets the generators before the other plugins change them.
+2. A plugin of this library binds each sync generator to the context of its creation (rule C5). It operates in the `Program` visitor, so it gets the generators before the other plugins change them.
 3. A plugin of this library gives the name of each async function to `coroutine`, for the callback hooks. The option `names: false` removes this plugin.
-4. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops.
-5. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
+4. A plugin of this library gives the async generators to the driver of the runtime. It replaces the helpers `wrapAsyncGenerator` and `OverloadYield` of the next plugin with `asyncGenerator` and `OverloadYield` of the runtime.
+5. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops.
+6. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
 
-The Babel transforms of steps 4 and 5 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
+The Babel transforms of steps 5 and 6 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
 
 ```mermaid title="The transform pipeline" caption="The plugins of the library change the generators and record the names first. Then the two Babel plugins change the async code."
 flowchart TB
@@ -51,9 +52,20 @@ Before the coroutine awaits an object, it reads the `then` property of the objec
 
 The preset does not change the runtime of the library, because a directive marks its native async functions. Thus, a bundler can apply the preset to all of `node_modules`.
 
+## What asyncGenerator() does
+
+Babel changes each async generator into a sync generator. Each `await` becomes `yield new OverloadYield(value, 0)`, and each step of `yield*` becomes `yield new OverloadYield(promise, 1)`. `asyncGenerator(generatorFunction)` gives a function that makes an async generator object for that generator:
+
+1. When the code makes the async generator, record the current frame.
+2. Queue each `next()`, `throw()` and `return()` of the consumer. Start one request at a time, as a native async generator does.
+3. Start each step of the body in the recorded frame, then make the previous frame current again.
+4. Continue after each `await` of the body with a native `await`. Give each yielded value to the consumer.
+
+The protocol is the protocol of the Babel 8 helper. The other helpers of Babel, `awaitAsyncGenerator` and `asyncGeneratorDelegate`, stay in the module and make the `OverloadYield` values of the runtime.
+
 ## What bindGenerator() does
 
-The plugin changes each generator function so that it gives `bindGenerator(generator)`. The function keeps its name, its parameters and its kind, so a declaration stays hoisted. The body moves into an inner generator. `bindGenerator` records the frame of the creation. Each `next()`, `throw()` and `return()` starts its step in that frame, and then makes the frame of the caller current again.
+The plugin changes each sync generator function so that it gives `bindGenerator(generator)`. The function keeps its name, its parameters and its kind, so a declaration stays hoisted. The body moves into an inner generator. `bindGenerator` records the frame of the creation. Each `next()`, `throw()` and `return()` starts its step in that frame, and then makes the frame of the caller current again.
 
 ## Transform the dependencies
 

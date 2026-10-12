@@ -3,14 +3,16 @@
  * Chromium, Firefox and WebKit with Playwright:
  *
  * - **Native**: the page without the library and without a transform.
- * - **Babel helper**: `@babel/plugin-transform-async-to-generator` with its
- *   own helper, without the library. Each step of the helper is a `then`
- *   callback, as in the code of many compiled packages.
+ * - **Babel helper**: `@babel/plugin-transform-async-generator-functions` and
+ *   `@babel/plugin-transform-async-to-generator` with their own helpers,
+ *   without the library. Each step of the helpers is a `then` callback, as
+ *   in the code of many compiled packages.
  * - **Library**: the patches and the Vite plugin of the library.
  *
  * The workloads are one async function with 50,000 awaits of `null`, one
- * async function with 50,000 awaits of resolved promises, and a chain of
- * 50,000 `then` callbacks. Each value is the median of 7 runs in one page.
+ * async function with 50,000 awaits of resolved promises, a `for await`
+ * loop over an async generator with 50,000 steps (each with one `await`),
+ * and a chain of 50,000 `then` callbacks. Each value is the median of 7 runs in one page.
  * Firefox gives times with a resolution of 1 ms. The script writes
  * `bench/results/browsers.json` and shows a table. Set `BENCH_DIST` to the
  * `dist` folder of a different build, for example of a published version, to
@@ -24,18 +26,23 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { transformAsync } from "@babel/core";
+import asyncGeneratorFunctions from "@babel/plugin-transform-async-generator-functions";
 import asyncToGenerator from "@babel/plugin-transform-async-to-generator";
 import { chromium, firefox, webkit, type BrowserType } from "playwright";
 import { build, type Plugin } from "vite";
-import { asyncContext } from "../src/vite/plugin.js";
+import { asyncContext as sourcePlugin } from "../src/vite/plugin.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const work = path.join(root, "node_modules", ".cache", "abc-browsers");
 const slash = (file : string) : string => file.split(path.sep).join("/");
 const dist = (file : string) : string => slash(path.join(process.env["BENCH_DIST"] ?? path.join(root, "dist"), file));
+/** The Vite plugin of the measured build: the plugin of `BENCH_DIST`, or the plugin of this repository. */
+const asyncContext : typeof sourcePlugin = process.env["BENCH_DIST"] === undefined
+    ? sourcePlugin
+    : (await import(pathToFileURL(path.join(process.env["BENCH_DIST"], "vite", "plugin.js")).href) as { asyncContext : typeof sourcePlugin }).asyncContext;
 
 const COUNT = 50_000;
 const RUNS = 7;
@@ -48,6 +55,17 @@ async function awaitValues(count) {
 async function awaitPromises(promises) {
     let sum = 0;
     for (const promise of promises) sum += await promise;
+    return sum;
+}
+async function* ticks(count) {
+    for (let index = 0; index < count; index++) {
+        await null;
+        yield index;
+    }
+}
+async function consumeTicks(count) {
+    let sum = 0;
+    for await (const value of ticks(count)) sum += value;
     return sum;
 }
 function thenChain(count) {
@@ -66,6 +84,7 @@ window.workloads = {
         const promises = Array.from({ length : count }, (_, index) => Promise.resolve(index));
         return time(() => awaitPromises(promises));
     },
+    "async generator": (count) => time(() => consumeTicks(count)),
     "then chain": (count) => time(() => thenChain(count)),
 };
 `;
@@ -78,7 +97,7 @@ const babelHelper : Plugin = {
         if (!id.endsWith("main.js")) {
             return null;
         }
-        const result = await transformAsync(code, { filename : id, babelrc : false, configFile : false, plugins : [asyncToGenerator] });
+        const result = await transformAsync(code, { filename : id, babelrc : false, configFile : false, plugins : [asyncGeneratorFunctions, asyncToGenerator] });
         return result?.code ?? null;
     },
 };

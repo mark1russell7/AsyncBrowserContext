@@ -62,7 +62,7 @@ The command `pnpm bench:size` measures the size of the code that the library add
 | The same application with the Vite plugin, without the runtime | 166.5 kB (+2.9%) |
 | The same application with the target ES2016 and no plugin | 171.2 kB (+5.8%) |
 
-The transform adds 4 to 9 percent to packages with much async code, and nothing to React DOM. Babel adds its helpers for async iteration to each module with `for await` or an async generator, approximately 0.5 kB. The option `names: false` of the preset removes the names of the async functions: 0.1 to 1.6 percent. The page "Performance" of the website has the table of each package.
+The transform adds 3 to 8 percent to packages with much async code, and nothing to React DOM. Babel adds its helper for `for await` to each module with such a loop, approximately 0.5 kB. The async generators use the driver of the runtime, so the modules do not contain the async generator helper of Babel. The option `names: false` of the preset removes the names of the async functions: 0.1 to 1.6 percent. The page "Performance" of the website has the table of each package.
 
 ## Browsers
 
@@ -70,16 +70,20 @@ The command `pnpm bench:browsers` measures `await` and `then` in Chromium, Firef
 
 | Browser | Workload | Native | Babel helper | Library |
 | --- | --- | --- | --- | --- |
-| Chromium 156 | `await null` | 2.3 | 4.0 | 4.1 |
-| Chromium 156 | `await` of a promise | 5.9 | 7.3 | 5.7 |
-| Chromium 156 | `then` chain | 1.8 | 1.9 | 5.2 |
-| Firefox 157 | `await null` | 1.0 | 271 | 4.0 |
-| Firefox 157 | `await` of a promise | 1.0 | 193 | 51 |
-| Firefox 157 | `then` chain | 81 | 82 | 147 |
-| WebKit 27.2 | `await null` | 3.0 | 4.0 | 5.0 |
-| WebKit 27.2 | `await` of a promise | 3.0 | 4.0 | 6.0 |
-| WebKit 27.2 | `then` chain | 3.0 | 3.0 | 4.0 |
+| Chromium 156 | `await null` | 0.9 | 1.4 | 2.1 |
+| Chromium 156 | `await` of a promise | 3.6 | 5.0 | 2.8 |
+| Chromium 156 | Async generator with `for await` | 4.6 | 7.4 | 9.0 |
+| Chromium 156 | `then` chain | 0.7 | 0.7 | 2.2 |
+| Firefox 157 | `await null` | less than 1 | 161 | 2.0 |
+| Firefox 157 | `await` of a promise | 1.0 | 105 | 32 |
+| Firefox 157 | Async generator with `for await` | 107 | 529 | 370 |
+| Firefox 157 | `then` chain | 35 | 32 | 55 |
+| WebKit 27.2 | `await null` | 2.0 | 2.0 | 2.0 |
+| WebKit 27.2 | `await` of a promise | 2.0 | 3.0 | 4.0 |
+| WebKit 27.2 | Async generator with `for await` | 4.0 | 10 | 13 |
+| WebKit 27.2 | `then` chain | 1.0 | 1.0 | 2.0 |
 
+- **Async generators.** Since version 0.2.3, the driver of the runtime operates each async generator with a native `await`. Before, the helper of Babel was in each module, and each step was a `then` callback. With version 0.2.2, the async generator workload took 11.2 ms in Chromium, 560 ms in Firefox and 16 ms in WebKit.
 - **The coroutine.** Since version 0.2.2, the coroutine operates each async function with a native `await`. Before, each step was a `then` callback, as in the Babel helper. In Firefox, 50,000 awaits of `null` took 292 ms with version 0.2.1.
 - **Firefox and the patch of `then`.** Firefox has a fast path for `await` of a promise. A patch of `Promise.prototype.then` stops this fast path, also for code without the transform. Each `await` of a promise then takes approximately 0.8 µs more. zone.js also patches the promises, so it has the same cost.
 - **Playwright and Firefox.** Playwright controls Firefox with the debugger API. Firefox then records an async stack for each `then` callback. Thus, `then` callbacks take more time in this measurement than in a Firefox without Playwright. With the preference `javascript.options.asyncstack` set to `false`, a chain of steps in `then` callbacks was 7 times faster.

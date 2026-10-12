@@ -1,10 +1,10 @@
 {
-  "generated": "2026-10-12T16:41:34.780Z",
+  "generated": "2026-10-12T19:21:31.945Z",
   "entries": [
     "async-browser-context",
     "async-browser-context/runtime"
   ],
-  "minifiedBytes": 18976,
-  "gzipBytes": 5863,
-  "brotliBytes": 5132
+  "minifiedBytes": 19046,
+  "gzipBytes": 5870,
+  "brotliBytes": 5142
 }

@@ -87,7 +87,7 @@ export const TRANSFORM_INPUTS : readonly TransformInput[] = [
     {
         id : "async-generator",
         title : "Async generator",
-        note : "The preset binds the async generator first. Then the async generator transform changes the body.",
+        note : "The async generator transform of Babel changes the body into a sync generator. The asyncGenerator driver of the runtime operates it in the context of its creation.",
         input : [
             "async function* ticks(count) {",
             "    for (let index = 0; index < count; index++) {",

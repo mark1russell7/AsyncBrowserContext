@@ -276,7 +276,7 @@ When the page loads, the library installs its patches in approximately 8 ms: the
 
 In Chromium, Firefox and WebKit, an `await` in transformed code takes approximately the time of a native `await` (`pnpm bench:browsers`). In Firefox, the patch of `then` adds approximately 0.8 µs to each `await` of a promise. The performance page of the website tells more.
 
-The runtime is 5.9 kB with gzip, and zone.js 0.16.3 is 13.3 kB. The transform adds 4 to 9 percent to packages with much async code, and nothing to React DOM. In an example application with React DOM, TanStack Query, supabase-js and ky, it adds 2.9 percent (`pnpm bench:size`).
+The runtime is 5.9 kB with gzip, and zone.js 0.16.3 is 13.3 kB. The transform adds 3 to 8 percent to packages with much async code, and nothing to React DOM. In an example application with React DOM, TanStack Query, supabase-js and ky, it adds 2.9 percent (`pnpm bench:size`).
 
 ## Tests
 

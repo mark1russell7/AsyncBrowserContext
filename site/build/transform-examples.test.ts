@@ -11,13 +11,14 @@ describe("transformExamples", () => {
         }
     });
 
-    it("imports coroutine for async functions and bindGenerator for generators", async () => {
+    it("imports coroutine for async functions, bindGenerator for generators and asyncGenerator for async generators", async () => {
         const examples = await transformExamples();
         const byId = new Map(examples.map(example => [example.id, example.output]));
         expect(byId.get("await-in-expression")).toContain("from \"async-browser-context/runtime\"");
         expect(byId.get("await-in-expression")).toContain("coroutine");
         expect(byId.get("generator-method")).toContain("bindGenerator");
         expect(byId.get("generator-method")).toContain("items(limit)");
-        expect(byId.get("async-generator")).toContain("bindGenerator");
+        expect(byId.get("async-generator")).toContain("asyncGenerator");
+        expect(byId.get("async-generator")).not.toContain("bindGenerator");
     });
 });
