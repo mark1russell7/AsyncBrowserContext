@@ -1,5 +1,18 @@
 # Change history
 
+## 0.2.2
+
+### Corrections
+
+- Transformed async functions are much faster in Firefox. The coroutine operates each async function with a native `await` in place of a `then` callback. In Firefox 157, 50,000 awaits of `null` took 292 ms and take 4 ms at this time. 50,000 awaits of promises took 228 ms and take 51 ms. Chromium and WebKit are also a little faster (`pnpm bench:browsers`).
+- An error in a parameter default or in a parameter destructuring of a transformed async function rejects the promise, as with a native async function. Before, the call threw the error. The Node.js runtime has the same correction.
+- The Babel preset does not change the runtime of the library, also when a bundler applies the preset to `node_modules`. The native async functions of the runtime have the directive `"async-browser-context runtime"`, and the preset skips them.
+
+### Documentation
+
+- In Firefox, a patch of `Promise.prototype.then` makes each `await` of a promise slower, also in code without the transform. The performance page tells the cost.
+- The command `pnpm bench:browsers` measures `await` and `then` in Chromium, Firefox and WebKit.
+
 ## 0.2.1
 
 ### New functions

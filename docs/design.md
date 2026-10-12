@@ -45,12 +45,17 @@ Thus, between tasks, the current frame is the root frame. Code that the library 
 
 ### The transform
 
-The Babel preset has four plugins:
+The Babel preset has five plugins:
 
-1. A plugin of this library changes each generator function. The function gives `bindGenerator(generator)`. The generator then keeps the context of its creation, as the TC39 draft specifies.
-2. A plugin of this library gives the name of each async function to `coroutine`, for the callback hooks.
-3. `@babel/plugin-transform-async-generator-functions` changes async generators and `for await` loops.
-4. `@babel/plugin-transform-async-to-generator` changes each async function into a generator. The `coroutine` function of the runtime operates the generator. Before each step, `coroutine` sets the frame of the call. After the step, it sets the previous frame again.
+1. A plugin of this library skips the native async functions of the runtime. The directive `"async-browser-context runtime"` marks them.
+2. A plugin of this library changes each generator function. The function gives `bindGenerator(generator)`. The generator then keeps the context of its creation, as the TC39 draft specifies.
+3. A plugin of this library gives the name of each async function to `coroutine`, for the callback hooks.
+4. `@babel/plugin-transform-async-generator-functions` changes async generators and `for await` loops.
+5. `@babel/plugin-transform-async-to-generator` changes each async function into a generator. The `coroutine` function of the runtime operates the generator. Before each step, `coroutine` sets the frame of the call. After the step, it sets the previous frame again.
+
+The coroutine is a native async function, which awaits the value of each step. Version 0.2.1 used a `then` callback for each step. In Firefox, a native `await` is much faster: 50,000 awaits of `null` took 292 ms with `then` callbacks, and take 4 ms with a native `await`.
+
+The runtime has native async functions, so the preset must not change it. If a bundler applied the preset to the runtime, the coroutine could operate itself without end. Thus, the first plugin skips each function with the directive. A comment is not sufficient: esbuild removes comments, for example in the dependency bundles of the Vite dev server.
 
 The Babel transforms already handle destructuring, `var`, labels, closures, sync iterables and the `return()` call on `break`. Thus, the library has no custom code that changes `await` expressions.
 

@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-12T17:27:03.872Z",
+  "count": 50000,
+  "runs": 7,
+  "rows": [
+    {
+      "engine": "Chromium",
+      "version": "156.0.8078.4",
+      "workload": "await null",
+      "ms": {
+        "Native": 2.300000011920929,
+        "Babel helper": 4,
+        "Library": 4.099999964237213
+      }
+    },
+    {
+      "engine": "Chromium",
+      "version": "156.0.8078.4",
+      "workload": "await a promise",
+      "ms": {
+        "Native": 5.899999976158142,
+        "Babel helper": 7.300000011920929,
+        "Library": 5.699999988079071
+      }
+    },
+    {
+      "engine": "Chromium",
+      "version": "156.0.8078.4",
+      "workload": "then chain",
+      "ms": {
+        "Native": 1.800000011920929,
+        "Babel helper": 1.9000000357627869,
+        "Library": 5.199999988079071
+      }
+    },
+    {
+      "engine": "Firefox",
+      "version": "157.0",
+      "workload": "await null",
+      "ms": {
+        "Native": 1,
+        "Babel helper": 271,
+        "Library": 4
+      }
+    },
+    {
+      "engine": "Firefox",
+      "version": "157.0",
+      "workload": "await a promise",
+      "ms": {
+        "Native": 1,
+        "Babel helper": 193,
+        "Library": 51
+      }
+    },
+    {
+      "engine": "Firefox",
+      "version": "157.0",
+      "workload": "then chain",
+      "ms": {
+        "Native": 81,
+        "Babel helper": 82,
+        "Library": 147
+      }
+    },
+    {
+      "engine": "WebKit",
+      "version": "27.2",
+      "workload": "await null",
+      "ms": {
+        "Native": 3,
+        "Babel helper": 4,
+        "Library": 5
+      }
+    },
+    {
+      "engine": "WebKit",
+      "version": "27.2",
+      "workload": "await a promise",
+      "ms": {
+        "Native": 3,
+        "Babel helper": 4,
+        "Library": 6
+      }
+    },
+    {
+      "engine": "WebKit",
+      "version": "27.2",
+      "workload": "then chain",
+      "ms": {
+        "Native": 3,
+        "Babel helper": 3,
+        "Library": 4
+      }
+    }
+  ]
+}

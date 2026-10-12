@@ -51,11 +51,12 @@ sequenceDiagram
 
 ## The transform pipeline
 
-```mermaid title="The transform pipeline" caption="The Vite plugin gives each module to the preset. The preset contains three Babel plugins."
+```mermaid title="The transform pipeline" caption="The Vite plugin gives each module to the preset. The preset does not change the runtime of the library."
 flowchart TB
     module["Module (also in node_modules)"] --> plugin["Vite plugin, after the other plugins"]
     plugin --> bind["Bind the generators"]
-    bind --> asyncgen["Async generators and for await"]
+    bind --> names["Name the async functions, for the hooks"]
+    names --> asyncgen["Async generators and for await"]
     asyncgen --> asyncfn["Async functions with coroutine()"]
     asyncfn --> out["Module that imports the runtime"]
 ```

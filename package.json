@@ -120,7 +120,8 @@
     "site:data": "tsx scripts/site-data.ts",
     "readme:media": "tsx scripts/readme-media.ts",
     "test:bundlers": "pnpm build && tsx test/bundlers/run.ts",
-    "bench:size": "tsx bench/size.ts"
+    "bench:size": "tsx bench/size.ts",
+    "bench:browsers": "tsx bench/browsers.ts"
   },
   "dependencies": {
     "@babel/core": "^8.0.7",

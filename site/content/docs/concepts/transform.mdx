@@ -10,18 +10,21 @@ A native `await` continues the function from the microtask queue of the engine. 
 
 ## The parts of the preset
 
-The preset `async-browser-context/babel-preset` contains three Babel plugins, in this order:
+The preset `async-browser-context/babel-preset` contains five Babel plugins, in this order:
 
-1. A plugin of this library binds each generator to the context of its creation (rule C5). It operates first, in the `Program` visitor, so it gets the generators before the other plugins change them.
-2. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops.
-3. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
+1. A plugin of this library skips each function with the directive `"async-browser-context runtime"`. The native async functions of the runtime have this directive, so the other plugins do not change them.
+2. A plugin of this library binds each generator to the context of its creation (rule C5). It operates in the `Program` visitor, so it gets the generators before the other plugins change them.
+3. A plugin of this library gives the name of each async function to `coroutine`, for the callback hooks. The option `names: false` removes this plugin.
+4. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops.
+5. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
 
-The Babel transforms of steps 2 and 3 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
+The Babel transforms of steps 4 and 5 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
 
-```mermaid title="The transform pipeline" caption="The plugin of the library changes the generators first. Then the two Babel plugins change the async code."
+```mermaid title="The transform pipeline" caption="The plugins of the library change the generators and record the names first. Then the two Babel plugins change the async code."
 flowchart TB
     input["Source module"] --> bind["Plugin of the library: bind each generator"]
-    bind --> asyncgen["Babel: async generators and for await"]
+    bind --> names["Plugin of the library: name each async function"]
+    names --> asyncgen["Babel: async generators and for await"]
     asyncgen --> asyncfn["Babel: async functions, with coroutine()"]
     asyncfn --> output["Module that imports async-browser-context/runtime"]
 ```
@@ -42,7 +45,11 @@ Select an example to compare the input with the output of the real preset. The b
 4. Make the previous frame current again.
 5. When the value of the `yield` settles, go back to step 1.
 
-The function gives a native promise. For each `await`, the coroutine uses one promise reaction, as a native `await` of a native promise does.
+The coroutine is a native async function, and it awaits the value of each step with a native `await`. Thus, each `await` takes the same microtask turns as the `await` of the source. A native `await` is also faster than a `then` callback, mostly in Firefox ([browsers](/testing/performance#browsers)).
+
+Before the coroutine awaits an object, it reads the `then` property of the object in the frame of the function, as a native `await` does. An error in a parameter default or in a parameter destructuring rejects the promise, as with a native async function.
+
+The preset does not change the runtime of the library, because a directive marks its native async functions. Thus, a bundler can apply the preset to all of `node_modules`.
 
 ## What bindGenerator() does
 

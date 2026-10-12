@@ -274,6 +274,8 @@ One read with `get()` takes approximately 4 ns. The [documentation website](http
 
 When the page loads, the library installs its patches in approximately 8 ms: the median of Chromium, Firefox and WebKit on the same computer.
 
+In Chromium, Firefox and WebKit, an `await` in transformed code takes approximately the time of a native `await` (`pnpm bench:browsers`). In Firefox, the patch of `then` adds approximately 0.8 µs to each `await` of a promise. The performance page of the website tells more.
+
 The runtime is 5.9 kB with gzip, and zone.js 0.16.3 is 13.3 kB. The transform adds 4 to 9 percent to packages with much async code, and nothing to React DOM. In an example application with React DOM, TanStack Query, supabase-js and ky, it adds 2.9 percent (`pnpm bench:size`).
 
 ## Tests
@@ -288,6 +290,7 @@ The runtime is 5.9 kB with gzip, and zone.js 0.16.3 is 13.3 kB. The transform ad
 | `pnpm test:bundlers` | Packs the package, builds a page with webpack, Rspack, Rollup, esbuild and Next.js, and examines each page in Chromium |
 | `pnpm mutation` | Mutation testing with Stryker |
 | `pnpm bench` | The benchmarks |
+| `pnpm bench:browsers` | The time of `await` and `then` in Chromium, Firefox and WebKit, without the library, with the Babel helper and with the library |
 | `pnpm bench:size` | The size of the runtime, and the size that the transform adds to a set of npm packages |
 | `pnpm lint:ste` | The STE linter of the documentation and the TSDoc comments |
 

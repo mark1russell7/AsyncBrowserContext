@@ -64,3 +64,23 @@ The transform also makes the code of the application larger. The command builds 
 - **Small packages with `for await` or async generators.** Babel adds its helpers for async iteration to each module that has such code: approximately 0.5 kB with gzip. This is the cause of the large percent of idb and TanStack Query.
 - **The names.** The preset gives the name of each async function to the callback hooks. The option `names: false` removes the names: 0.1 to 1.6 percent of the package.
 - **The target ES2016.** A compiler with this target also keeps the context through `await`, except rule C5 ([build tools](/docs/guides/build-tools)). The target also changes newer syntax, so the bundles are larger than with the preset.
+
+## Browsers
+
+The command `pnpm bench:browsers` measures `await` and `then` in Chromium, Firefox and WebKit with Playwright. Each value is the median time of 50,000 steps, in ms. "Babel helper" is the async transform of Babel with its own helper, without the library. Many compiled packages use such a helper.
+
+| Browser | Workload | Native | Babel helper | Library |
+| --- | --- | --- | --- | --- |
+| Chromium 156 | `await null` | 2.3 | 4.0 | 4.1 |
+| Chromium 156 | `await` of a promise | 5.9 | 7.3 | 5.7 |
+| Chromium 156 | `then` chain | 1.8 | 1.9 | 5.2 |
+| Firefox 157 | `await null` | 1.0 | 271 | 4.0 |
+| Firefox 157 | `await` of a promise | 1.0 | 193 | 51 |
+| Firefox 157 | `then` chain | 81 | 82 | 147 |
+| WebKit 27.2 | `await null` | 3.0 | 4.0 | 5.0 |
+| WebKit 27.2 | `await` of a promise | 3.0 | 4.0 | 6.0 |
+| WebKit 27.2 | `then` chain | 3.0 | 3.0 | 4.0 |
+
+- **The coroutine.** Since version 0.2.2, the coroutine operates each async function with a native `await`. Before, each step was a `then` callback, as in the Babel helper. In Firefox, 50,000 awaits of `null` took 292 ms with version 0.2.1.
+- **Firefox and the patch of `then`.** Firefox has a fast path for `await` of a promise. A patch of `Promise.prototype.then` stops this fast path, also for code without the transform. Each `await` of a promise then takes approximately 0.8 µs more. zone.js also patches the promises, so it has the same cost.
+- **Playwright and Firefox.** Playwright controls Firefox with the debugger API. Firefox then records an async stack for each `then` callback. Thus, `then` callbacks take more time in this measurement than in a Firefox without Playwright. With the preference `javascript.options.asyncstack` set to `false`, a chain of steps in `then` callbacks was 7 times faster.
