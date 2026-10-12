@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
-import { deferred } from "../helpers.js";
+import { deferred, inBrowser } from "../helpers.js";
 
 function after<T>(schedule : (callback : () => void) => void, read : () => T) : Promise<T> {
     const done = deferred<T>();
@@ -67,5 +67,10 @@ describe("rule C6: a timer callback runs in the context of the call that schedul
         expect(setTimeout.name).toBe("setTimeout");
         expect(setInterval.name).toBe("setInterval");
         expect(queueMicrotask.name).toBe("queueMicrotask");
+        // The browsers use the lengths of WebIDL. On Node.js, the module node:timers keeps the unpatched functions.
+        const timers = inBrowser ? undefined : process.getBuiltinModule("node:timers");
+        expect(setTimeout.length).toBe(timers?.setTimeout.length ?? 1);
+        expect(setInterval.length).toBe(timers?.setInterval.length ?? 1);
+        expect(queueMicrotask.length).toBe(1);
     });
 });

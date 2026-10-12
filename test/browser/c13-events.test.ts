@@ -34,14 +34,15 @@ describe("rule C13: event listeners", () => {
 
     it("gives the registration context to a listener of an event that the browser dispatches later", async () => {
         const variable = new Variable<string>();
-        const done = deferred<unknown>();
-        variable.run("request-a", () => {
+        const load = (request : string) : Promise<unknown> => variable.run(request, () => {
+            const done = deferred<unknown>();
             const image = new Image();
             image.addEventListener("load", () => done.resolve(variable.get()));
             image.src = PIXEL;
+            return done.promise;
         });
-        variable.run("request-b", () => undefined);
-        expect(await done.promise).toBe("request-a");
+        // Two images load at the same time: each listener gets the context of its own request
+        expect(await Promise.all([load("request-a"), load("request-b")])).toEqual(["request-a", "request-b"]);
     });
 
     it("gives the registration context to an on... handler of an event that the browser dispatches later", async () => {

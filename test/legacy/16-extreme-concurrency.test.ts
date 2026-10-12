@@ -38,9 +38,13 @@ describe("legacy 16: extreme concurrency", () => {
             const leaves = (await recurse(6, "r") as unknown[]).flat(10);
             return { leaves, ctx : variable.get() };
         });
+        // Each leaf gives the value of its parent at depth 1: the two leaves of "r-a-a-a-a-a" give "r-a-a-a-a-a-1"
+        const expected = (depth : number, id : string) : string[] => (depth === 1
+            ? [`${id}-1`, `${id}-1`]
+            : [...expected(depth - 1, `${id}-a`), ...expected(depth - 1, `${id}-b`)]);
         expect(result.ctx).toBe("root");
         expect(result.leaves).toHaveLength(64);
-        expect(result.leaves.every((leaf) => typeof leaf === "string" && leaf.endsWith("-1"))).toBe(true);
+        expect(result.leaves).toEqual(expected(6, "r"));
         expect(wrong).toEqual([]);
     });
 

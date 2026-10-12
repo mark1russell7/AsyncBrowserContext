@@ -3,11 +3,12 @@ import { configDefaults, defineConfig } from "vitest/config";
 import { aliases, constants, here, SHARED, transformTests } from "./vitest.config.js";
 
 /**
- * The Vitest configuration of mutation testing. It has no projects: Stryker
- * gives the active mutant to the tests with `provide`, and with Vitest 5 a
- * project does not see a later `provide` of the root. The tests run on the
- * browser runtime in Node.js. Stryker does not mutate the Node.js runtime and
- * the browser-only patches (docs/testing.md).
+ * The Vitest configuration of mutation testing. Stryker starts Vitest once for
+ * each mutant, with the mutant in the environment variable
+ * __STRYKER_ACTIVE_MUTANT__ (stryker.config.mjs). For speed, the configuration
+ * has no projects: the tests run once, on the browser runtime in Node.js.
+ * Stryker does not mutate the Node.js runtime and the browser-only patches
+ * (docs/testing.md).
  */
 export default defineConfig({
     plugins : [transformTests],

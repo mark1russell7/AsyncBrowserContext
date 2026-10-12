@@ -29,8 +29,13 @@ interface Registration {
     stopWatching : (() => void) | undefined;
 }
 
-/** The registrations of each target: type and capture flag, then listener. */
-const registrations = new WeakMap<object, Map<string, Map<Listener, Registration>>>();
+/**
+ * The registrations of each target: type and capture flag, then listener. The map of the listeners
+ * is weak. On Node.js, the native addEventListener with a signal adds an abort listener to the
+ * signal through the patched method, and keeps that listener only weakly. A strong map of a signal
+ * that lives long kept that listener, its target and the context in memory.
+ */
+const registrations = new WeakMap<object, Map<string, WeakMap<Listener, Registration>>>();
 
 /** The options of an `addEventListener()` or `removeEventListener()` call, as the DOM reads them (WebIDL). */
 interface ListenerOptions {
@@ -104,7 +109,7 @@ function weak<T extends object>(value : T) : { deref() : T | undefined } {
  */
 function watchSignal(
     signal : AbortSignal,
-    listeners : Map<Listener, Registration>,
+    listeners : WeakMap<Listener, Registration>,
     listener : Listener,
     registration : Registration,
     nativeAdd : AddEventListener,
@@ -129,13 +134,6 @@ function watchSignal(
     registration.stopWatching = () : void => {
         Reflect.apply(nativeRemove, signal, ["abort", forget]);
     };
-}
-
-/** This function removes the map of a type and capture flag when it has no registration. */
-function dropIfEmpty(byKey : Map<string, Map<Listener, Registration>>, key : string, byListener : Map<Listener, Registration>) : void {
-    if (byListener.size === 0 && byKey.get(key) === byListener) {
-        byKey.delete(key);
-    }
 }
 
 /** This function gives the arguments of a call, with `wrapper` in place of the listener. The number of arguments stays the same. */
@@ -169,7 +167,7 @@ function installListenerPatch() : void {
             }
             let byListener = byKey.get(key);
             if (byListener === undefined) {
-                byListener = new Map();
+                byListener = new WeakMap();
                 byKey.set(key, byListener);
             }
             const listeners = byListener;
@@ -195,16 +193,10 @@ function installListenerPatch() : void {
                 }
                 : undefined;
             (registration as { wrapper : EventListener }).wrapper = createWrapper(listener, store.current, onCall, `addEventListener:${String(type)}`);
-            try {
-                // The native method examines the options, and throws for an incorrect signal
-                Reflect.apply(nativeAdd, target, withListener(arguments, registration.wrapper));
-            } catch (error) {
-                dropIfEmpty(byKey, key, listeners);
-                throw error;
-            }
+            // The native method examines the options, and throws for an incorrect signal
+            Reflect.apply(nativeAdd, target, withListener(arguments, registration.wrapper));
             if (signal?.aborted === true) {
                 // The DOM does not add a listener with an aborted signal
-                dropIfEmpty(byKey, key, listeners);
                 return;
             }
             listeners.set(listener, registration);
@@ -222,10 +214,9 @@ function installListenerPatch() : void {
                 const byKey = registrations.get(target);
                 const byListener = byKey?.get(key);
                 const registration = byListener?.get(listener);
-                if (registration !== undefined && byKey !== undefined && byListener !== undefined) {
+                if (registration !== undefined && byListener !== undefined) {
                     byListener.delete(listener);
                     registration.stopWatching?.();
-                    dropIfEmpty(byKey, key, byListener);
                     Reflect.apply(native, target, withListener(arguments, registration.wrapper));
                     return;
                 }

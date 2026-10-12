@@ -24,9 +24,10 @@ export type Runtime = "browser" | "node";
 export type Compiler = "babel-preset" | "swc-es2016" | "esbuild-es2016" | "none";
 
 /**
- * The constants that tell a test file which runtime is under test. They are
- * Vite `define` constants, not `provide` values: Stryker gives its own values
- * with `provide`, and a project that sets `provide` hides them.
+ * The constants that tell a test file which runtime and which compiler are
+ * under test. They are Vite `define` constants, so each project gives its
+ * own values to the same test files, and the configuration of mutation
+ * testing (without projects) gives them too.
  */
 export function constants(runtime : Runtime, compiler : Compiler) : Record<string, string> {
     return { __TEST_RUNTIME__ : JSON.stringify(runtime), __TEST_COMPILER__ : JSON.stringify(compiler) };

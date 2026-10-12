@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { Snapshot, Variable } from "async-browser-context";
-import { delay, preset } from "../helpers.js";
+import { delay } from "../helpers.js";
 
 /**
  * Order variation. Many tasks run at the same time. Each task has its own
  * context and does a random sequence of asynchronous operations. After each
- * operation, the task reads its context. A fixed seed makes each order
- * repeatable: a failure message gives the seed.
+ * operation, the task reads its context. Each task has its own random
+ * generator, made from a fixed seed and the number of the task. Thus the
+ * sequence of operations of a task does not change with the order of the
+ * tasks, and a failure message gives the seed and the task.
  */
 
 /** A small random generator with a seed (mulberry32). */
@@ -20,8 +22,6 @@ function random(seed : number) : () => number {
         return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
     };
 }
-
-const generatorsBound = preset;
 
 type Operation = (variable : Variable<string>, other : Variable<string>, next : () => number) => Promise<unknown>;
 
@@ -44,7 +44,7 @@ const OPERATIONS : readonly Operation[] = [
         for await (const value of values()) {
             last = value;
         }
-        return generatorsBound ? last : v.get();
+        return last;
     },
     async (v) => {
         const shared = Promise.resolve();
@@ -54,11 +54,11 @@ const OPERATIONS : readonly Operation[] = [
 ];
 
 async function runSeed(seed : number, tasks : number, steps : number) : Promise<string[]> {
-    const next = random(seed);
     const variable = new Variable<string>();
     const other = new Variable<string>();
     const failures : string[] = [];
     await Promise.all(Array.from({ length : tasks }, (_, task) => variable.run(`task-${task}`, async () => {
+        const next = random(Math.imul(seed, 0x9e3779b1) ^ (task + 1));
         for (let step = 0; step < steps; step++) {
             const index = Math.floor(next() * OPERATIONS.length);
             const operation = OPERATIONS[index] as Operation;

@@ -9,13 +9,17 @@ const gc = (globalThis as { gc? : () => void }).gc;
 
 /** Runs the garbage collector, with tasks between the runs so that finalization can occur. */
 async function collect() : Promise<void> {
+    if (gc === undefined) {
+        // Without the flag, each test fails: a skip hides a change of the configuration
+        throw new Error("The memory tests need the garbage collector: start Node.js with --expose-gc");
+    }
     for (let index = 0; index < 4; index++) {
-        gc?.();
+        gc();
         await new Promise((resolve) => setTimeout(resolve, 0));
     }
 }
 
-describe.skipIf(gc === undefined)("rule C12: the library does not keep objects in memory", () => {
+describe("rule C12: the library does not keep objects in memory", () => {
     it("releases the first promise of a long then chain while the program keeps the last promise", async () => {
         let promise = Promise.resolve(0);
         const first = new WeakRef(promise);
@@ -80,6 +84,50 @@ describe.skipIf(gc === undefined)("rule C12: the library does not keep objects i
         })();
         await collect();
         expect(reference.deref()).toBeUndefined();
+    });
+
+    it("releases the context of an event listener after removeEventListener, while the target lives", async () => {
+        const variable = new Variable<object>();
+        const target = new EventTarget();
+        const reference = ((): WeakRef<object> => {
+            const value = {};
+            const listener = () : void => undefined;
+            variable.run(value, () => target.addEventListener("ping", listener));
+            target.removeEventListener("ping", listener);
+            return new WeakRef(value);
+        })();
+        await collect();
+        expect(reference.deref()).toBeUndefined();
+        expect(target).toBeInstanceOf(EventTarget);
+    });
+
+    it("releases the context of a once listener after it operates, while the target lives", async () => {
+        const variable = new Variable<object>();
+        const target = new EventTarget();
+        const reference = ((): WeakRef<object> => {
+            const value = {};
+            variable.run(value, () => target.addEventListener("ping", () => undefined, { once : true }));
+            target.dispatchEvent(new Event("ping"));
+            return new WeakRef(value);
+        })();
+        await collect();
+        expect(reference.deref()).toBeUndefined();
+        expect(target).toBeInstanceOf(EventTarget);
+    });
+
+    it("releases the target, the listener and the context of a listener with a signal that lives long", async () => {
+        const variable = new Variable<object>();
+        const controller = new AbortController();
+        const references = ((): WeakRef<object>[] => {
+            const value = {};
+            const target = new EventTarget();
+            const listener = () : void => undefined;
+            variable.run(value, () => target.addEventListener("ping", listener, { signal : controller.signal }));
+            return [new WeakRef(value), new WeakRef(target), new WeakRef(listener)];
+        })();
+        await collect();
+        expect(references.map((reference) => reference.deref())).toEqual([undefined, undefined, undefined]);
+        expect(controller.signal.aborted).toBe(false);
     });
 
     it("runs a FinalizationRegistry callback in the context of the construction", async () => {

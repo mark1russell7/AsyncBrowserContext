@@ -8,7 +8,7 @@ import * as transformedEs2015 from "../fixtures/compiled-tsc-es2015.js";
 import * as es2015 from "../fixtures/untransformed-tsc-es2015.js";
 // @ts-expect-error The fixture is plain JavaScript without types
 import * as es5 from "../fixtures/untransformed-tsc-es5.js";
-import { runtime } from "../helpers.js";
+import { compiler, runtime } from "../helpers.js";
 
 /** The functions of the compiled dependency. The source is at the end of this file. */
 type Dependency = {
@@ -21,7 +21,8 @@ const DEPENDENCIES : readonly (readonly [string, Dependency])[] = [
     ["TypeScript ES2015 output (__awaiter with generators), without the transform", es2015 as Dependency],
     ["TypeScript ES5 output (__awaiter with __generator), without the transform", es5 as Dependency],
     ["Babel output (_asyncToGenerator), without the transform", babel as Dependency],
-    ["TypeScript ES2015 output, with the transform of the preset", transformedEs2015 as Dependency],
+    // The compiler of the project also changes this fixture: the preset, SWC, esbuild or none
+    [`TypeScript ES2015 output, with the compiler of the project (${compiler})`, transformedEs2015 as Dependency],
 ];
 
 /**
