@@ -178,13 +178,119 @@ describe("rule C13: event listeners", () => {
         expect(self).toBe(target);
     });
 
-    it("applies the rule to MediaQueryList.addListener", () => {
+    it("applies the rule to MediaQueryList.addListener, also for a listener object, and removes with removeListener", () => {
+        const variable = new Variable<string>();
         const query = window.matchMedia("(min-width: 1px)");
-        const listener = () : void => undefined;
-        expect(() => {
+        const seen : unknown[] = [];
+        const listener = () : void => { seen.push(`function ${variable.get() ?? "none"}`); };
+        const object = { handleEvent() : void { seen.push(`object ${variable.get() ?? "none"}`); } };
+        variable.run("registered", () => {
             query.addListener(listener);
-            query.removeListener(listener);
-        }).not.toThrow();
+            query.addListener(object as unknown as (event : MediaQueryListEvent) => void);
+        });
+        query.dispatchEvent(new Event("change"));
+        query.removeListener(listener);
+        query.removeListener(object as unknown as (event : MediaQueryListEvent) => void);
+        query.dispatchEvent(new Event("change"));
+        expect(seen).toEqual(["function registered", "object registered"]);
+    });
+
+    it("accepts null and other values as options, as the DOM does", () => {
+        const target = new EventTarget();
+        let calls = 0;
+        const listener = () : void => { calls++; };
+        target.addEventListener("x", listener, null as unknown as boolean);
+        target.dispatchEvent(new Event("x"));
+        target.removeEventListener("x", listener, null as unknown as boolean);
+        target.dispatchEvent(new Event("x"));
+        expect(calls).toBe(1);
+    });
+
+    it("reads capture and once with ToBoolean, as the DOM does", () => {
+        const target = new EventTarget();
+        let calls = 0;
+        const listener = () : void => { calls++; };
+        target.addEventListener("x", listener, { capture : 1 } as unknown as AddEventListenerOptions);
+        target.removeEventListener("x", listener, true);
+        target.dispatchEvent(new Event("x"));
+        target.addEventListener("x", listener, 1 as unknown as boolean);
+        target.addEventListener("x", listener, false);
+        target.removeEventListener("x", listener, true);
+        target.removeEventListener("x", listener, false);
+        target.dispatchEvent(new Event("x"));
+        target.addEventListener("x", listener, { once : 1 } as unknown as AddEventListenerOptions);
+        target.dispatchEvent(new Event("x"));
+        target.dispatchEvent(new Event("x"));
+        expect(calls).toBe(1);
+    });
+
+    it("keeps the first registration and its context for a second registration of the same listener", () => {
+        const variable = new Variable<string>();
+        const target = new EventTarget();
+        const seen : unknown[] = [];
+        const listener = () : void => { seen.push(variable.get()); };
+        variable.run("first", () => target.addEventListener("x", listener));
+        variable.run("second", () => target.addEventListener("x", listener));
+        target.dispatchEvent(new Event("x"));
+        expect(seen).toEqual(["first"]);
+    });
+
+    it("gives a new registration and its context after the abort of the signal or after a once call", () => {
+        const variable = new Variable<string>();
+        const target = new EventTarget();
+        const seen : unknown[] = [];
+        const listener = () : void => { seen.push(variable.get()); };
+        const controller = new AbortController();
+        variable.run("first", () => target.addEventListener("x", listener, { signal : controller.signal }));
+        controller.abort();
+        variable.run("second", () => target.addEventListener("x", listener, { once : true }));
+        target.dispatchEvent(new Event("x"));
+        variable.run("third", () => target.addEventListener("x", listener));
+        target.dispatchEvent(new Event("x"));
+        expect(seen).toEqual(["second", "third"]);
+    });
+
+    it("can remove a listener that an abort listener adds again during the abort", () => {
+        const target = new EventTarget();
+        const controller = new AbortController();
+        let calls = 0;
+        const listener = () : void => { calls++; };
+        controller.signal.addEventListener("abort", () => target.addEventListener("x", listener));
+        target.addEventListener("x", listener, { signal : controller.signal });
+        controller.abort();
+        target.removeEventListener("x", listener);
+        target.dispatchEvent(new Event("x"));
+        expect(calls).toBe(0);
+    });
+
+    it("keeps no registration when the native addEventListener throws", () => {
+        const variable = new Variable<string>();
+        const target = new EventTarget();
+        const seen : unknown[] = [];
+        const listener = () : void => { seen.push(variable.get()); };
+        variable.run("failed", () => {
+            expect(() => target.addEventListener("x", listener, { signal : 1 } as unknown as AddEventListenerOptions)).toThrow(TypeError);
+        });
+        variable.run("valid", () => target.addEventListener("x", listener));
+        target.dispatchEvent(new Event("x"));
+        expect(seen).toEqual(["valid"]);
+    });
+
+    it("gives the handler of body.onload also from window.onload, as the browser reflects them", () => {
+        const handler = () : void => undefined;
+        document.body.onload = handler;
+        try {
+            expect(window.onload).toBe(handler);
+            expect(document.body.onload).toBe(handler);
+        } finally {
+            document.body.onload = null;
+        }
+    });
+
+    it("throws as the native methods do when an argument is missing", () => {
+        const target = new EventTarget();
+        expect(() => (target.addEventListener as unknown as (type : string) => void)("x")).toThrow(TypeError);
+        expect(() => (target.removeEventListener as unknown as (type : string) => void)("x")).toThrow(TypeError);
     });
 });
 

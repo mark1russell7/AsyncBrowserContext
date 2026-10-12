@@ -25,12 +25,24 @@ const PROTOTYPE_SCHEDULERS : readonly (readonly [string, string])[] = [
 ];
 // Stryker restore all
 
-/** `source` is the name of the scheduler, for the callback hooks. */
+/**
+ * `source` is the name of the scheduler, for the callback hooks. The replacement is a method,
+ * so it has no prototype property and is not a constructor, as the native function. It gives
+ * the native function the same number of arguments, so `setTimeout()` without arguments
+ * throws as the native function does.
+ */
 function wrapFirstArgument(source : string) : (original : Scheduler) => Scheduler {
-    return (original) => function (this : unknown, callback : unknown, ...rest : unknown[]) : unknown {
-        const wrapped = typeof callback === "function" ? bindToFrame(store.current, callback as (...args : unknown[]) => unknown, source) : callback;
-        return original.call(this, wrapped, ...rest);
-    };
+    return (original) => ({
+        scheduler(this : unknown, callback : unknown) : unknown {
+            if (typeof callback !== "function") {
+                // A string callback of setTimeout, or no callback: the native function decides
+                return Reflect.apply(original, this, arguments);
+            }
+            const args = Array.prototype.slice.call(arguments) as unknown[];
+            args[0] = bindToFrame(store.current, callback as (...values : unknown[]) => unknown, source);
+            return Reflect.apply(original, this, args);
+        },
+    }).scheduler;
 }
 
 /**

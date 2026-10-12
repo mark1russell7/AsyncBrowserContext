@@ -10,6 +10,8 @@ export function claim(name : string) : boolean {
         return false;
     }
     store.patches.add(name);
+    // The patches of this copy start the callback hooks. A store of an older copy gets the set here.
+    (store.hookPatches ??= new Set()).add(name);
     return true;
 }
 

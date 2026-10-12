@@ -166,4 +166,72 @@ describe("streams: the methods of the underlying object run in the context of th
         const stream = new ReadableStream({ type : "bytes", pull(controller) { controller.close(); } });
         expect(stream.getReader({ mode : "byob" })).toBeDefined();
     });
+
+    it("accepts a frozen underlying object, getters and a class with private fields, as the native constructor does", async () => {
+        const frozen = new ReadableStream<number>(Object.freeze({ start(controller : ReadableStreamDefaultController<number>) { controller.close(); } }));
+        expect(await frozen.getReader().read()).toEqual({ value : undefined, done : true });
+        class Source {
+            readonly #type = "bytes" as const;
+            get type() : "bytes" { return this.#type; }
+            get pull() : (controller : ReadableByteStreamController) => void { return (controller) => controller.close(); }
+        }
+        const stream = new ReadableStream(new Source() as unknown as UnderlyingByteSource);
+        expect(stream.getReader({ mode : "byob" })).toBeDefined();
+    });
+
+    it("applies the rule to start, cancel, close, abort and flush", async () => {
+        const variable = new Variable<string>();
+        const seen : string[] = [];
+        const record = (name : string) : void => { seen.push(`${name}:${variable.get() ?? "none"}`); };
+        const readable = variable.run("readable", () => new ReadableStream({ start() { record("start"); }, cancel() { record("cancel"); } }));
+        await variable.run("other", () => readable.cancel());
+        const writable = variable.run("writable", () => new WritableStream({ close() { record("close"); } }));
+        await variable.run("other", () => writable.close());
+        const aborted = variable.run("aborted", () => new WritableStream({ abort() { record("abort"); } }));
+        await variable.run("other", () => aborted.abort());
+        const transform = variable.run("transform", () => new TransformStream({ flush() { record("flush"); } }));
+        await variable.run("other", () => transform.writable.close());
+        expect(seen).toEqual(["start:readable", "cancel:readable", "close:writable", "abort:aborted", "flush:transform"]);
+    });
+
+    it("keeps subclasses and the identity of the patched stream constructors", () => {
+        class Counter extends ReadableStream<number> {}
+        const counter = new Counter({ start(controller) { controller.close(); } });
+        expect(counter).toBeInstanceOf(Counter);
+        expect(counter).toBeInstanceOf(ReadableStream);
+        expect(ReadableStream.prototype.constructor).toBe(ReadableStream);
+    });
+});
+
+describe("patched functions keep the form of the native functions", () => {
+    it("has no prototype property and is not a constructor, as a native method", () => {
+        for (const fn of [setTimeout, Promise.prototype.then, EventTarget.prototype.addEventListener, Function.prototype.toString] as unknown[]) {
+            expect("prototype" in (fn as object)).toBe(false);
+            expect(() => Reflect.construct(fn as new () => unknown, [])).toThrow(TypeError);
+        }
+    });
+
+    it("throws as the native setTimeout does without arguments", () => {
+        expect(() => (setTimeout as unknown as () => unknown)()).toThrow(TypeError);
+    });
+
+    it.skipIf(typeof (Array as { fromAsync? : unknown }).fromAsync !== "function")("gives Array.fromAsync its thisArg and an items function without a change", async () => {
+        const variable = new Variable<string>();
+        const fromAsync = (Array as unknown as { fromAsync : (items : unknown, map? : unknown, thisArg? : unknown) => Promise<unknown[]> }).fromAsync;
+        const thisArg = Object.assign(function marker() { /* a function as thisArg */ }, { k : 42 });
+        const result = await variable.run("mapped", () => fromAsync([1], function (this : { k : number }) { return `${this.k}:${variable.get() ?? "none"}`; }, thisArg));
+        expect(result).toEqual(["42:mapped"]);
+    });
+
+    it.skipIf(typeof (document as { startViewTransition? : unknown }).startViewTransition !== "function")("keeps inherited members of the options of startViewTransition (browsers with view transitions)", async () => {
+        const variable = new Variable<string>();
+        const update = deferred<unknown>();
+        const options = Object.assign(Object.create({ types : ["alpha"] }) as object, { update() { update.resolve(variable.get()); } });
+        const transition = variable.run("transition", () => (document as unknown as { startViewTransition : (options : object) => { types? : Set<string>; finished : Promise<void> } }).startViewTransition(options));
+        expect(await update.promise).toBe("transition");
+        if (transition.types !== undefined) {
+            expect([...transition.types]).toEqual(["alpha"]);
+        }
+        await transition.finished.catch(() => undefined);
+    });
 });

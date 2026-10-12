@@ -13,9 +13,12 @@ export function installToStringPatch() : void {
         return;
     }
     const nativeToString = store.intrinsics.functionToString;
-    replaceFunction<ToString>(Function.prototype, "toString", () => function toString(this : unknown) : string {
-        // WeakMap.get gives undefined for a primitive. The native function then throws its TypeError.
-        const original = store.originals.get(this as object);
-        return nativeToString.call(original ?? this);
-    });
+    // Method syntax: a native method has no prototype property and is not a constructor
+    replaceFunction<ToString>(Function.prototype, "toString", () => ({
+        toString(this : unknown) : string {
+            // WeakMap.get gives undefined for a primitive. The native function then throws its TypeError.
+            const original = store.originals.get(this as object);
+            return nativeToString.call(original ?? this);
+        },
+    }).toString);
 }

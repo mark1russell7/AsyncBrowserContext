@@ -15,35 +15,47 @@ const STREAMS : readonly (readonly [string, readonly string[]])[] = [
 type Method = (this : unknown, ...args : unknown[]) => unknown;
 
 /**
- * This function gives an object that inherits from `underlying` and has a wrapper for each
- * method. The other properties, for example `type`, come from `underlying`.
- * Each method gets `underlying` as its `this` value, as the specification
- * tells.
+ * This function gives a view of `underlying` in which each method of `methods` is a wrapper.
+ * The view is a Proxy, so the other properties, for example `type`, come from `underlying`
+ * with their getters and private fields. The target of the Proxy is an empty object, so a
+ * frozen object also operates. The browser reads the members of a dictionary with [[Get]]
+ * only. Each method gets `underlying` as its `this` value, as the specification tells.
  */
 function wrapUnderlying(underlying : object, methods : readonly string[], frame : Frame, name : string) : object {
-    const wrapped = Object.create(underlying) as Record<string, unknown>;
-    const properties = underlying as Record<string, unknown>;
-    for (const method of methods) {
-        const original = properties[method];
-        if (typeof original !== "function") {
-            continue;
+    // A method that a hook registers does not start the hooks
+    const quiet = store.inHook === true;
+    const wrappers = new Map<string, Method>();
+    const wrapperOf = (method : string, original : Method) : Method => {
+        let wrapper = wrappers.get(method);
+        if (wrapper !== undefined) {
+            return wrapper;
         }
         const source = `${name}.${method}`;
-        wrapped[method] = function asyncBrowserContextWrapper(...args : unknown[]) : unknown {
+        wrapper = function asyncBrowserContextWrapper() : unknown {
             const previous = store.current;
             store.current = frame;
             try {
-                const hooks = store.hooks;
+                const hooks = quiet ? undefined : store.hooks;
                 if (hooks === undefined) {
-                    return (original as Method).apply(underlying, args);
+                    return Reflect.apply(original, underlying, arguments);
                 }
-                return applyWithHooks(hooks, original as Method, source, original as Method, underlying, args);
+                return applyWithHooks(hooks, original, source, original, underlying, Array.prototype.slice.call(arguments) as unknown[]);
             } finally {
                 store.current = previous;
             }
         };
-    }
-    return wrapped;
+        wrappers.set(method, wrapper);
+        return wrapper;
+    };
+    return new Proxy({}, {
+        get(_target, property) : unknown {
+            const value : unknown = Reflect.get(underlying, property, underlying);
+            if (typeof property === "string" && typeof value === "function" && methods.includes(property)) {
+                return wrapperOf(property, value as Method);
+            }
+            return value;
+        },
+    });
 }
 
 /** This function patches the stream constructors. */

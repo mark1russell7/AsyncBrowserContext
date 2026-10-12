@@ -20,16 +20,41 @@ type RemoveEventListener = typeof EventTarget.prototype.removeEventListener;
 type Handler = (this : unknown, ...args : unknown[]) => unknown;
 
 interface Registration {
-    readonly frame : Frame;
     readonly wrapper : EventListener;
+    /** The DOM removes the listener when this signal aborts. */
+    readonly signal : AbortSignal | undefined;
+    /** `true` after a `once` listener operated, or after the abort of the signal. */
+    gone : boolean;
+    /** This function removes the abort listener of the registration from its signal. */
+    stopWatching : (() => void) | undefined;
 }
 
 /** The registrations of each target: type and capture flag, then listener. */
 const registrations = new WeakMap<object, Map<string, Map<Listener, Registration>>>();
 
-function keyOf(type : string, options : boolean | EventListenerOptions | undefined) : string {
-    const capture = typeof options === "boolean" ? options : options?.capture === true;
-    return `${type}\u0000${capture ? "1" : "0"}`;
+/** The options of an `addEventListener()` or `removeEventListener()` call, as the DOM reads them (WebIDL). */
+interface ListenerOptions {
+    readonly capture : boolean;
+    readonly once : boolean;
+    readonly signal : AbortSignal | undefined;
+}
+
+function readOptions(options : unknown) : ListenerOptions {
+    if ((typeof options === "object" && options !== null) || typeof options === "function") {
+        const dictionary = options as { capture? : unknown; once? : unknown; signal? : unknown };
+        const signal = dictionary.signal;
+        return {
+            capture : Boolean(dictionary.capture),
+            once : Boolean(dictionary.once),
+            signal : signal === undefined || signal === null ? undefined : signal as AbortSignal,
+        };
+    }
+    // undefined and null give the default options. Another value is the capture flag.
+    return { capture : Boolean(options), once : false, signal : undefined };
+}
+
+function keyOf(type : unknown, capture : boolean) : string {
+    return `${String(type)}\u0000${capture ? "1" : "0"}`;
 }
 
 /** This function gives the frame for a listener call: the current frame, or the registration frame in the root context. */
@@ -39,9 +64,11 @@ function frameForCall(registered : Frame) : Frame {
 }
 
 /** `source` is `addEventListener:` and the event type, for the callback hooks. */
-function createWrapper(listener : Listener, frame : Frame, onFirstCall : (() => void) | undefined, source : string) : EventListener {
+function createWrapper(listener : Listener, frame : Frame, onCall : (() => void) | undefined, source : string) : EventListener {
+    // A listener that a hook registers does not start the hooks
+    const quiet = store.inHook === true;
     return function asyncBrowserContextWrapper(this : unknown, event : Event) : unknown {
-        onFirstCall?.();
+        onCall?.();
         const previous = store.current;
         store.current = frameForCall(frame);
         try {
@@ -54,9 +81,9 @@ function createWrapper(listener : Listener, frame : Frame, onFirstCall : (() => 
                 fn = listener.handleEvent as Handler;
                 thisValue = listener;
             }
-            const hooks = store.hooks;
+            const hooks = quiet ? undefined : store.hooks;
             if (hooks === undefined || typeof fn !== "function") {
-                return fn.call(thisValue, event);
+                return Reflect.apply(fn, thisValue, [event]);
             }
             return applyWithHooks(hooks, fn, source, fn, thisValue, [event]);
         } finally {
@@ -65,91 +92,165 @@ function createWrapper(listener : Listener, frame : Frame, onFirstCall : (() => 
     };
 }
 
+/** A weak reference, or a strong one where the engine has no WeakRef. */
+function weak<T extends object>(value : T) : { deref() : T | undefined } {
+    return typeof WeakRef === "function" ? new WeakRef(value) : { deref : () => value };
+}
+
+/**
+ * This function removes `registration` from `listeners` when its signal aborts, as the DOM removes
+ * the listener. The abort listener keeps only weak references. Thus a signal that lives long
+ * does not keep the target, the listener or the context in memory.
+ */
+function watchSignal(
+    signal : AbortSignal,
+    listeners : Map<Listener, Registration>,
+    listener : Listener,
+    registration : Registration,
+    nativeAdd : AddEventListener,
+    nativeRemove : RemoveEventListener,
+) : void {
+    const listenersRef = weak(listeners);
+    const listenerRef = weak(listener);
+    const registrationRef = weak(registration);
+    const forget = () : void => {
+        const current = registrationRef.deref();
+        const key = listenerRef.deref();
+        if (current === undefined || key === undefined) {
+            return;
+        }
+        current.gone = true;
+        const map = listenersRef.deref();
+        if (map !== undefined && map.get(key) === current) {
+            map.delete(key);
+        }
+    };
+    Reflect.apply(nativeAdd, signal, ["abort", forget, { once : true }]);
+    registration.stopWatching = () : void => {
+        Reflect.apply(nativeRemove, signal, ["abort", forget]);
+    };
+}
+
+/** This function removes the map of a type and capture flag when it has no registration. */
+function dropIfEmpty(byKey : Map<string, Map<Listener, Registration>>, key : string, byListener : Map<Listener, Registration>) : void {
+    if (byListener.size === 0 && byKey.get(key) === byListener) {
+        byKey.delete(key);
+    }
+}
+
+/** This function gives the arguments of a call, with `wrapper` in place of the listener. The number of arguments stays the same. */
+function withListener(args : IArguments, wrapper : EventListener) : unknown[] {
+    const copy = Array.prototype.slice.call(args) as unknown[];
+    copy[1] = wrapper;
+    return copy;
+}
+
 function installListenerPatch() : void {
     const prototype = globalPrototype("EventTarget");
     if (prototype === undefined) {
         return;
     }
-    replaceFunction<AddEventListener>(prototype, "addEventListener", (nativeAdd) => function addEventListener(
-        this : EventTarget | null | undefined,
-        type : string,
-        listener : Listener | null,
-        options? : boolean | AddEventListenerOptions,
-    ) : void {
-        const target = this ?? (globalThis as unknown as EventTarget);
-        if (listener === null || (typeof listener !== "function" && typeof listener !== "object")) {
-            nativeAdd.call(target, type, listener, options);
-            return;
-        }
-        const key = keyOf(String(type), options);
-        let byKey = registrations.get(target);
-        if (byKey === undefined) {
-            byKey = new Map();
-            registrations.set(target, byKey);
-        }
-        let byListener = byKey.get(key);
-        if (byListener === undefined) {
-            byListener = new Map();
-            byKey.set(key, byListener);
-        }
-        let registration = byListener.get(listener);
-        if (registration === undefined) {
-            const listeners = byListener;
-            const forget = () : void => {
-                if (listeners.get(listener) === registration) {
-                    listeners.delete(listener);
-                }
-            };
-            const once = typeof options === "object" && options.once === true;
-            registration = { frame : store.current, wrapper : createWrapper(listener, store.current, once ? forget : undefined, `addEventListener:${String(type)}`) };
-            listeners.set(listener, registration);
-            const signal = typeof options === "object" ? options.signal : undefined;
-            if (signal !== undefined) {
-                if (signal.aborted) {
-                    forget();
-                } else {
-                    nativeAdd.call(signal, "abort", forget, { once : true });
-                }
-            }
-        }
-        // The DOM ignores a second registration of the same wrapper, as it does for the same listener
-        nativeAdd.call(target, type, registration.wrapper, options);
-    } as AddEventListener);
-
-    replaceFunction<RemoveEventListener>(prototype, "removeEventListener", (nativeRemove) => function removeEventListener(
-        this : EventTarget | null | undefined,
-        type : string,
-        listener : Listener | null,
-        options? : boolean | EventListenerOptions,
-    ) : void {
-        const target = this ?? (globalThis as unknown as EventTarget);
-        if (listener !== null && (typeof listener === "function" || typeof listener === "object")) {
-            const byListener = registrations.get(target)?.get(keyOf(String(type), options));
-            const registration = byListener?.get(listener);
-            if (registration !== undefined) {
-                byListener?.delete(listener);
-                nativeRemove.call(target, type, registration.wrapper, options);
+    const nativeRemove = (prototype as { removeEventListener : RemoveEventListener }).removeEventListener;
+    // Method syntax: a native method has no prototype property and is not a constructor
+    replaceFunction<AddEventListener>(prototype, "addEventListener", (nativeAdd) => ({
+        addEventListener(this : EventTarget | null | undefined, type : string, listener : Listener | null, options? : boolean | AddEventListenerOptions) : void {
+            const target = this ?? (globalThis as unknown as EventTarget);
+            if (arguments.length < 2 || listener === null || (typeof listener !== "function" && typeof listener !== "object")) {
+                // The DOM gives its own error, or ignores a null listener
+                Reflect.apply(nativeAdd, target, arguments);
                 return;
             }
-        }
-        nativeRemove.call(target, type, listener, options);
-    } as RemoveEventListener);
+            const { capture, once, signal } = readOptions(options);
+            const key = keyOf(type, capture);
+            let byKey = registrations.get(target);
+            if (byKey === undefined) {
+                byKey = new Map();
+                registrations.set(target, byKey);
+            }
+            let byListener = byKey.get(key);
+            if (byListener === undefined) {
+                byListener = new Map();
+                byKey.set(key, byListener);
+            }
+            const listeners = byListener;
+            const existing = listeners.get(listener);
+            if (existing !== undefined && !existing.gone && existing.signal?.aborted !== true) {
+                // The DOM ignores a second registration of the same listener, so the first context stays
+                Reflect.apply(nativeAdd, target, withListener(arguments, existing.wrapper));
+                return;
+            }
+            if (existing !== undefined) {
+                // The DOM removed the old registration: a once listener operated, or its signal aborted
+                existing.stopWatching?.();
+                listeners.delete(listener);
+            }
+            const registration : Registration = { wrapper : undefined as unknown as EventListener, signal, gone : false, stopWatching : undefined };
+            const onCall = once
+                ? () : void => {
+                    registration.gone = true;
+                    registration.stopWatching?.();
+                    if (listeners.get(listener) === registration) {
+                        listeners.delete(listener);
+                    }
+                }
+                : undefined;
+            (registration as { wrapper : EventListener }).wrapper = createWrapper(listener, store.current, onCall, `addEventListener:${String(type)}`);
+            try {
+                // The native method examines the options, and throws for an incorrect signal
+                Reflect.apply(nativeAdd, target, withListener(arguments, registration.wrapper));
+            } catch (error) {
+                dropIfEmpty(byKey, key, listeners);
+                throw error;
+            }
+            if (signal?.aborted === true) {
+                // The DOM does not add a listener with an aborted signal
+                dropIfEmpty(byKey, key, listeners);
+                return;
+            }
+            listeners.set(listener, registration);
+            if (signal !== undefined) {
+                watchSignal(signal, listeners, listener, registration, nativeAdd, nativeRemove);
+            }
+        },
+    }).addEventListener as AddEventListener);
+
+    replaceFunction<RemoveEventListener>(prototype, "removeEventListener", (native) => ({
+        removeEventListener(this : EventTarget | null | undefined, type : string, listener : Listener | null, options? : boolean | EventListenerOptions) : void {
+            const target = this ?? (globalThis as unknown as EventTarget);
+            if (arguments.length >= 2 && listener !== null && (typeof listener === "function" || typeof listener === "object")) {
+                const key = keyOf(type, readOptions(options).capture);
+                const byKey = registrations.get(target);
+                const byListener = byKey?.get(key);
+                const registration = byListener?.get(listener);
+                if (registration !== undefined && byKey !== undefined && byListener !== undefined) {
+                    byListener.delete(listener);
+                    registration.stopWatching?.();
+                    dropIfEmpty(byKey, key, byListener);
+                    Reflect.apply(native, target, withListener(arguments, registration.wrapper));
+                    return;
+                }
+            }
+            Reflect.apply(native, target, arguments);
+        },
+    }).removeEventListener as RemoveEventListener);
 }
 
-/** The handler and its wrapper of each `on...` property of each target. */
-const handlers = new WeakMap<object, Map<string, { readonly handler : Handler; readonly wrapper : Handler }>>();
+/** The handler of each wrapper of an `on...` property. The getter gives the handler in place of its wrapper. */
+const handlerOfWrapper = new WeakMap<object, Handler>();
 
 /** `source` is the name of the `on...` property, for the callback hooks. */
 function createHandlerWrapper(handler : Handler, frame : Frame, source : string) : Handler {
-    return function asyncBrowserContextWrapper(this : unknown, ...args : unknown[]) : unknown {
+    const quiet = store.inHook === true;
+    return function asyncBrowserContextWrapper(this : unknown) : unknown {
         const previous = store.current;
         store.current = frameForCall(frame);
         try {
-            const hooks = store.hooks;
+            const hooks = quiet ? undefined : store.hooks;
             if (hooks === undefined) {
-                return handler.apply(this, args);
+                // The arguments object gives the arguments without a new array
+                return Reflect.apply(handler, this, arguments);
             }
-            return applyWithHooks(hooks, handler, source, handler, this, args);
+            return applyWithHooks(hooks, handler, source, handler, this, Array.prototype.slice.call(arguments) as unknown[]);
         } finally {
             store.current = previous;
         }
@@ -171,25 +272,19 @@ function patchHandlerProperties(owner : object) : void {
         const accessors = {
             get [name]() : unknown {
                 const target = (this as object | undefined) ?? globalThis;
-                const value : unknown = nativeGet.call(target);
-                const entry = handlers.get(target)?.get(name);
-                return entry !== undefined && entry.wrapper === value ? entry.handler : value;
+                const value : unknown = Reflect.apply(nativeGet, target, []);
+                // One map for all targets: the handlers of body and window give the same wrapper
+                return typeof value === "function" ? handlerOfWrapper.get(value) ?? value : value;
             },
             set [name](value : unknown) {
                 const target = (this as object | undefined) ?? globalThis;
-                let byName = handlers.get(target);
                 if (typeof value !== "function") {
-                    byName?.delete(name);
-                    nativeSet.call(target, value);
+                    Reflect.apply(nativeSet, target, [value]);
                     return;
                 }
-                if (byName === undefined) {
-                    byName = new Map();
-                    handlers.set(target, byName);
-                }
                 const wrapper = createHandlerWrapper(value as Handler, store.current, name);
-                byName.set(name, { handler : value as Handler, wrapper });
-                nativeSet.call(target, wrapper);
+                handlerOfWrapper.set(wrapper, value as Handler);
+                Reflect.apply(nativeSet, target, [wrapper]);
             },
         };
         const replacement = Object.getOwnPropertyDescriptor(accessors, name);
@@ -227,28 +322,39 @@ function installHandlerPropertyPatch() : void {
     patchHandlerProperties(globalThis);
 }
 
-type LegacyListenerMethod = (this : unknown, callback : ((this : MediaQueryList, event : MediaQueryListEvent) => unknown) | null) => void;
+type LegacyListenerMethod = (this : unknown, callback : Listener | null) => void;
 
-/** `MediaQueryList.addListener()` and `removeListener()` do not use the JavaScript `addEventListener()`. */
+/**
+ * `MediaQueryList.addListener()` and `removeListener()` do not use the JavaScript `addEventListener()`.
+ * The patch gives each listener, also an object with `handleEvent`, to the patched methods of
+ * `EventTarget.prototype`, as the DOM does with the native methods.
+ */
 function installMediaQueryListPatch() : void {
     const prototype = globalPrototype("MediaQueryList");
-    if (prototype === undefined) {
+    const eventTarget = globalPrototype("EventTarget") as { addEventListener : AddEventListener; removeEventListener : RemoveEventListener } | undefined;
+    if (prototype === undefined || eventTarget === undefined) {
         return;
     }
-    replaceFunction<LegacyListenerMethod>(prototype, "addListener", (native) => function addListener(this : unknown, callback) : void {
-        if (typeof callback === "function") {
-            (this as MediaQueryList).addEventListener("change", callback);
-            return;
-        }
-        native.call(this, callback);
-    });
-    replaceFunction<LegacyListenerMethod>(prototype, "removeListener", (native) => function removeListener(this : unknown, callback) : void {
-        if (typeof callback === "function") {
-            (this as MediaQueryList).removeEventListener("change", callback);
-            return;
-        }
-        native.call(this, callback);
-    });
+    const patchedAdd = eventTarget.addEventListener;
+    const patchedRemove = eventTarget.removeEventListener;
+    replaceFunction<LegacyListenerMethod>(prototype, "addListener", (native) => ({
+        addListener(this : unknown, callback : Listener | null) : void {
+            if (typeof callback === "function" || (typeof callback === "object" && callback !== null)) {
+                Reflect.apply(patchedAdd, this, ["change", callback]);
+                return;
+            }
+            Reflect.apply(native, this, arguments);
+        },
+    }).addListener);
+    replaceFunction<LegacyListenerMethod>(prototype, "removeListener", (native) => ({
+        removeListener(this : unknown, callback : Listener | null) : void {
+            if (typeof callback === "function" || (typeof callback === "object" && callback !== null)) {
+                Reflect.apply(patchedRemove, this, ["change", callback]);
+                return;
+            }
+            Reflect.apply(native, this, arguments);
+        },
+    }).removeListener);
 }
 
 /** This function installs the event patch (rule C13). */

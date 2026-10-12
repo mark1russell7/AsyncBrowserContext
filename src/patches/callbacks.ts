@@ -1,4 +1,4 @@
-import { bindToFrame, store } from "../core/store.js";
+import { bindToFrame, store, type Frame } from "../core/store.js";
 import { claim, globalPrototype, ownDataValue, replaceFunction, wrapFunctionArguments } from "./patch.js";
 
 type Method = (this : unknown, ...args : unknown[]) => unknown;
@@ -24,40 +24,87 @@ const PROTOTYPE_METHODS : readonly (readonly [string, readonly string[]])[] = [
 /** The static methods that get callbacks and use them later. */
 const STATIC_METHODS : readonly (readonly [string, readonly string[]])[] = [
     ["Notification", ["requestPermission"]],
-    ["Array", ["fromAsync"]],
 ];
 
-/** `source` is the name of the method, for the callback hooks. */
+/** `source` is the name of the method, for the callback hooks. The replacement is a method, as the native function. */
 function wrapArguments(source : string) : (original : Method) => Method {
-    return (original) => function (this : unknown, ...args : unknown[]) : unknown {
-        return original.apply(this, wrapFunctionArguments(args, source));
-    };
+    return (original) => ({
+        method(this : unknown, ...args : unknown[]) : unknown {
+            return Reflect.apply(original, this, wrapFunctionArguments(args, source));
+        },
+    }).method;
 }
 
-/** `startViewTransition()` gets a callback, or an object with an `update` callback. */
-function wrapViewTransition(original : Method) : Method {
-    const source = "Document.startViewTransition";
-    return function (this : unknown, ...args : unknown[]) : unknown {
-        const [first] = args;
-        if (typeof first === "object" && first !== null && typeof (first as { update? : unknown }).update === "function") {
-            const options = first as { update : Method };
-            args[0] = { ...options, update : bindToFrame(store.current, options.update, source) };
-            return original.apply(this, args);
-        }
-        return original.apply(this, wrapFunctionArguments(args, source));
-    };
+/**
+ * `Array.fromAsync(items, mapFn, thisArg)` uses only `mapFn` later. `items` and `thisArg` can
+ * also be functions, and they must not change.
+ */
+function wrapFromAsync(original : Method) : Method {
+    return {
+        fromAsync(this : unknown) : unknown {
+            const mapFn : unknown = arguments[1];
+            if (typeof mapFn !== "function") {
+                return Reflect.apply(original, this, arguments);
+            }
+            const args = Array.prototype.slice.call(arguments) as unknown[];
+            args[1] = bindToFrame(store.current, mapFn as Method, "Array.fromAsync");
+            return Reflect.apply(original, this, args);
+        },
+    }.fromAsync;
 }
 
-/** `NavigateEvent.intercept()` gets an object with a `handler` callback. */
+/**
+ * This function gives a view of the dictionary `options` in which each key of `keys` gives a
+ * wrapper of its callback. The other members come from `options` with their getters and their
+ * prototype chain. The target of the Proxy is an empty object, so a frozen object also
+ * operates. The browser reads the members of a dictionary with [[Get]] only.
+ */
+function withCallback(options : object, keys : readonly string[], frame : Frame, source : string) : object {
+    const wrappers = new Map<PropertyKey, Method>();
+    return new Proxy({}, {
+        get(_target, property) : unknown {
+            const value : unknown = Reflect.get(options, property, options);
+            if (typeof property !== "string" || !keys.includes(property) || typeof value !== "function") {
+                return value;
+            }
+            let wrapper = wrappers.get(property);
+            if (wrapper === undefined) {
+                wrapper = bindToFrame(frame, value as Method, source);
+                wrappers.set(property, wrapper);
+            }
+            return wrapper;
+        },
+    });
+}
+
+/** `startViewTransition()` gets a callback, or an object with an `update` callback. `source` names the class. */
+function wrapViewTransition(source : string) : (original : Method) => Method {
+    return (original) => ({
+        startViewTransition(this : unknown) : unknown {
+            const first : unknown = arguments[0];
+            if (typeof first === "object" && first !== null) {
+                const args = Array.prototype.slice.call(arguments) as unknown[];
+                args[0] = withCallback(first, ["update"], store.current, source);
+                return Reflect.apply(original, this, args);
+            }
+            return Reflect.apply(original, this, wrapFunctionArguments(Array.prototype.slice.call(arguments) as unknown[], source));
+        },
+    }).startViewTransition;
+}
+
+/** `NavigateEvent.intercept()` gets an object with a `handler` and a `precommitHandler` callback. */
 function wrapIntercept(original : Method) : Method {
-    return function (this : unknown, ...args : unknown[]) : unknown {
-        const [first] = args;
-        if (typeof first === "object" && first !== null && typeof (first as { handler? : unknown }).handler === "function") {
-            const options = first as { handler : Method };
-            args[0] = { ...options, handler : bindToFrame(store.current, options.handler, "NavigateEvent.intercept") };
-        }
-        return original.apply(this, args);
-    };
+    return {
+        intercept(this : unknown) : unknown {
+            const first : unknown = arguments[0];
+            if (typeof first === "object" && first !== null) {
+                const args = Array.prototype.slice.call(arguments) as unknown[];
+                args[0] = withCallback(first, ["handler", "precommitHandler"], store.current, "NavigateEvent.intercept");
+                return Reflect.apply(original, this, args);
+            }
+            return Reflect.apply(original, this, arguments);
+        },
+    }.intercept;
 }
 
 /** This function patches the callback APIs that are not events, timers or observers. */
@@ -83,9 +130,15 @@ export function installCallbackPatches() : void {
             replaceFunction<Method>(constructor, method, wrapArguments(`${constructorName}.${method}`));
         }
     }
-    const documentPrototype = globalPrototype("Document");
-    if (documentPrototype !== undefined) {
-        replaceFunction<Method>(documentPrototype, "startViewTransition", wrapViewTransition);
+    const array = ownDataValue(globalThis, "Array");
+    if (typeof array === "function") {
+        replaceFunction<Method>(array, "fromAsync", wrapFromAsync);
+    }
+    for (const owner of ["Document", "Element"]) {
+        const prototype = globalPrototype(owner);
+        if (prototype !== undefined) {
+            replaceFunction<Method>(prototype, "startViewTransition", wrapViewTransition(`${owner}.startViewTransition`));
+        }
     }
     const navigateEventPrototype = globalPrototype("NavigateEvent");
     if (navigateEventPrototype !== undefined) {

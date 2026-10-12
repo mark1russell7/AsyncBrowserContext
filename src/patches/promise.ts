@@ -19,16 +19,19 @@ export function installPromisePatch() : void {
         return;
     }
     const nativeThen = store.intrinsics.promiseThen;
-    replaceFunction<Then>(Promise.prototype, "then", () => function then<T, R1 = T, R2 = never>(
-        this : Promise<T>,
-        onFulfilled? : ((value : T) => R1 | PromiseLike<R1>) | null,
-        onRejected? : ((reason : unknown) => R2 | PromiseLike<R2>) | null,
-    ) : Promise<R1 | R2> {
-        const frame = store.current;
-        return nativeThen.call(
-            this,
-            typeof onFulfilled === "function" ? bindOneArgument(frame, onFulfilled, "Promise.then") : onFulfilled,
-            typeof onRejected === "function" ? bindOneArgument(frame, onRejected, "Promise.then") : onRejected,
-        ) as Promise<R1 | R2>;
-    } as Then);
+    // Method syntax: a native method has no prototype property and is not a constructor
+    replaceFunction<Then>(Promise.prototype, "then", () => ({
+        then<T, R1 = T, R2 = never>(
+            this : Promise<T>,
+            onFulfilled? : ((value : T) => R1 | PromiseLike<R1>) | null,
+            onRejected? : ((reason : unknown) => R2 | PromiseLike<R2>) | null,
+        ) : Promise<R1 | R2> {
+            const frame = store.current;
+            return nativeThen.call(
+                this,
+                typeof onFulfilled === "function" ? bindOneArgument(frame, onFulfilled, "Promise.then") : onFulfilled,
+                typeof onRejected === "function" ? bindOneArgument(frame, onRejected, "Promise.then") : onRejected,
+            ) as Promise<R1 | R2>;
+        },
+    }).then as Then);
 }
