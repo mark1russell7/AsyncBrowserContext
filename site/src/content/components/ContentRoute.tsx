@@ -4,7 +4,7 @@ import { ContentPageView } from "./ContentPageView";
 import styles from "./ContentPageView.module.css";
 
 export type ContentRouteProps = {
-    /** The section ID, which is also the content folder: "docs", "thesis" or "research". */
+    /** The section ID, which is also the content folder, for example "docs", "explore" or "testing" (refer to `app/sections.tsx`). */
     section : string;
     /** The section name, for example "Docs". */
     label : string;

@@ -52,9 +52,11 @@ export type MutationRow = {
 /** The summary of a run of Stryker on the current tests. */
 export type StrykerSummary = {
     /**
-     * The mutation score of Stryker: the killed and timeout mutants, as a
-     * percentage of the killed, timeout, survived and no-coverage mutants.
-     * The other mutants (for example, a mutant that does not compile) are not in the score.
+     * The mutation score of Stryker. The tests found the mutants with the
+     * status `Killed` or `Timeout`. The score is these mutants as a percentage
+     * of the mutants with the status `Killed`, `Timeout`, `Survived` or
+     * `NoCoverage`. The other mutants (for example, a mutant that does not
+     * compile) are not in the score.
      */
     score : number;
     killed : number;

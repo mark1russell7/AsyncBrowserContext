@@ -10,17 +10,21 @@ export function formatNumber(value : number, maximumFractionDigits : 0 | 1 | 2 =
     return format.format(value);
 }
 
-/** This function formats a duration: "0.42 ms", "3.5 ms", "120 ms", "1.25 s", "2 min 5 s". */
+/**
+ * This function formats a duration: "0.42 ms", "3.5 ms", "120 ms", "1.25 s", "2 min 5 s".
+ * It rounds the value before it selects the unit. Thus, 59,999 ms gives "1 min 0 s", not "60 s".
+ */
 export function formatMs(ms : number) : string {
     if (!Number.isFinite(ms)) return "–";
     const abs = Math.abs(ms);
+    const sign = ms < 0 ? "-" : "";
     if (abs < 1) return `${number2.format(ms)} ms`;
     if (abs < 10) return `${number1.format(ms)} ms`;
-    if (abs < 1000) return `${integer.format(ms)} ms`;
-    if (abs < 60_000) return `${number2.format(ms / 1000)} s`;
-    const minutes = Math.floor(abs / 60_000);
-    const seconds = Math.round((abs % 60_000) / 1000);
-    return `${ms < 0 ? "-" : ""}${minutes} min ${seconds} s`;
+    if (Math.round(abs) < 1000) return `${integer.format(ms)} ms`;
+    const seconds = Math.round(abs / 10) / 100;
+    if (seconds < 60) return `${sign}${number2.format(seconds)} s`;
+    const totalSeconds = Math.round(abs / 1000);
+    return `${sign}${Math.floor(totalSeconds / 60)} min ${totalSeconds % 60} s`;
 }
 
 /** This function formats a percentage from 0 to 100. The value `undefined` means that there is no data. */
@@ -30,12 +34,17 @@ export function formatPercent(value : number | undefined) : string {
     return `${number1.format(value)}%`;
 }
 
+/**
+ * This function formats a size in bytes: "512 B", "1.5 KB", "1 MB". The
+ * next unit starts when the rounded value is 1,024. Thus, 1,048,575 bytes give "1 MB", not "1,024 KB".
+ */
 export function formatBytes(bytes : number) : string {
     if (!Number.isFinite(bytes)) return "–";
     const units = ["B", "KB", "MB", "GB"];
+    const rounded = (value : number) : number => Math.round(Math.abs(value) * 10) / 10;
     let value = bytes;
     let unit = 0;
-    while (Math.abs(value) >= 1024 && unit < units.length - 1) {
+    while (rounded(value) >= 1024 && unit < units.length - 1) {
         value /= 1024;
         unit++;
     }
@@ -83,10 +92,6 @@ export function formatDateTime(iso : string) : string {
 export function formatDate(iso : string) : string {
     const date = toDate(iso);
     return date ? dateOnly.format(date) : iso;
-}
-
-export function shortCommit(commit : string) : string {
-    return commit.slice(0, 7);
 }
 
 /** "1 test", "3 tests". */

@@ -1,15 +1,14 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router";
+import { memoizePromise } from "../lib/memoize-promise";
 import { search, type SearchEntry, type SearchResult } from "./match";
 import styles from "./Search.module.css";
 
-let index : Promise<SearchEntry[]> | undefined;
-
-/** The page loads the index when the reader opens the search the first time, or points to the button. */
-function loadIndex() : Promise<SearchEntry[]> {
-    index ??= import("virtual:search-index").then(module => module.default);
-    return index;
-}
+/**
+ * The page loads the index when the reader opens the search the first time, or points to the button.
+ * If the load fails, the next use loads the index again.
+ */
+const loadIndex : () => Promise<SearchEntry[]> = memoizePromise(() => import("virtual:search-index").then(module => module.default));
 
 /** A page loads its content after the navigation. This function waits for the heading, and then shows it. */
 function scrollToHeading(id : string) : void {
