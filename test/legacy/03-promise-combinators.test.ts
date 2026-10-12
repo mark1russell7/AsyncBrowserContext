@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
-import { delay } from "../helpers.js";
+import { deferred, delay } from "../helpers.js";
 
 /** Runs `fn` in a run() of `value` after `ms` milliseconds, and gives the value of the variable then. */
 function readAfter(variable : Variable<string>, value : string, ms : number) : Promise<string | undefined> {
@@ -13,6 +13,24 @@ function readAfter(variable : Variable<string>, value : string, ms : number) : P
 function failAfter(variable : Variable<string>, value : string, ms : number, message : string) : Promise<never> {
     return variable.run(value, async () => {
         await delay(ms);
+        throw new Error(`${message} in ${variable.get() ?? "none"}`);
+    });
+}
+
+/**
+ * Runs a function in a run() of `value` that awaits `gate`, and gives the value of the variable then.
+ * The tests open the gates in a fixed order, so the winner of a race does not depend on timers.
+ */
+function readWhen(variable : Variable<string>, value : string, gate : Promise<void>) : Promise<string | undefined> {
+    return variable.run(value, async () => {
+        await gate;
+        return variable.get();
+    });
+}
+
+function failWhen(variable : Variable<string>, value : string, gate : Promise<void>, message : string) : Promise<never> {
+    return variable.run(value, async () => {
+        await gate;
         throw new Error(`${message} in ${variable.get() ?? "none"}`);
     });
 }
@@ -50,35 +68,47 @@ describe("legacy 03: Promise combinators", () => {
 
     it("gives the winner of Promise.race its own context", async () => {
         const variable = new Variable<string>();
-        const racers = [readAfter(variable, "slow", 20), readAfter(variable, "fast", 5), readAfter(variable, "slowest", 30)];
-        expect(await Promise.race(racers)).toBe("fast");
+        const [slow, fast, slowest] = [deferred(), deferred(), deferred()];
+        const racers = [readWhen(variable, "slow", slow.promise), readWhen(variable, "fast", fast.promise), readWhen(variable, "slowest", slowest.promise)];
+        const winner = Promise.race(racers);
+        fast.resolve();
+        expect(await winner).toBe("fast");
+        slow.resolve();
+        slowest.resolve();
         expect(await Promise.all(racers)).toEqual(["slow", "fast", "slowest"]);
     });
 
     it("keeps the outer context after an await of Promise.race", async () => {
         const variable = new Variable<string>();
         const racers : Promise<string | undefined>[] = [];
-        const seen = await variable.run("outer-race", async () => {
-            racers.push(readAfter(variable, "racer-1", 10), readAfter(variable, "racer-2", 5));
+        const [first, second] = [deferred(), deferred()];
+        const pending = variable.run("outer-race", async () => {
+            racers.push(readWhen(variable, "racer-1", first.promise), readWhen(variable, "racer-2", second.promise));
             const winner = await Promise.race(racers);
             return { winner, outer : variable.get() };
         });
+        second.resolve();
+        const seen = await pending;
+        first.resolve();
         await Promise.all(racers);
         expect(seen).toEqual({ winner : "racer-2", outer : "outer-race" });
     });
 
     it("rejects Promise.race with the error of the first rejection, and keeps the outer context in the catch block", async () => {
         const variable = new Variable<string>();
-        const slow = readAfter(variable, "resolve-slow", 20);
-        const seen = await variable.run("race-reject", async () => {
+        const [late, early] = [deferred(), deferred()];
+        const slow = readWhen(variable, "resolve-slow", late.promise);
+        const pending = variable.run("race-reject", async () => {
             try {
-                await Promise.race([failAfter(variable, "reject-fast", 5, "fast rejection"), slow]);
+                await Promise.race([failWhen(variable, "reject-fast", early.promise, "fast rejection"), slow]);
                 return "no error";
             } catch (error) {
                 return `${variable.get() ?? "none"}: ${(error as Error).message}`;
             }
         });
-        expect(seen).toBe("race-reject: fast rejection in reject-fast");
+        early.resolve();
+        expect(await pending).toBe("race-reject: fast rejection in reject-fast");
+        late.resolve();
         expect(await slow).toBe("resolve-slow");
     });
 
@@ -117,8 +147,13 @@ describe("legacy 03: Promise combinators", () => {
 
     it("gives the first fulfilled input of Promise.any its own context", async () => {
         const variable = new Variable<string>();
-        const inputs = [failAfter(variable, "reject-1", 5, "reject-1"), readAfter(variable, "resolve-first", 10), readAfter(variable, "resolve-second", 15)];
-        expect(await Promise.any(inputs)).toBe("resolve-first");
+        const [rejectGate, firstGate, secondGate] = [deferred(), deferred(), deferred()];
+        const inputs = [failWhen(variable, "reject-1", rejectGate.promise, "reject-1"), readWhen(variable, "resolve-first", firstGate.promise), readWhen(variable, "resolve-second", secondGate.promise)];
+        const winner = Promise.any(inputs);
+        rejectGate.resolve();
+        firstGate.resolve();
+        expect(await winner).toBe("resolve-first");
+        secondGate.resolve();
         await Promise.allSettled(inputs);
     });
 
@@ -143,11 +178,15 @@ describe("legacy 03: Promise combinators", () => {
     it("keeps the outer context after an await of Promise.any", async () => {
         const variable = new Variable<string>();
         const inputs : Promise<string | undefined>[] = [];
-        const seen = await variable.run("outer-any", async () => {
-            inputs.push(readAfter(variable, "any-1", 20), readAfter(variable, "any-2", 5));
+        const [late, early] = [deferred(), deferred()];
+        const pending = variable.run("outer-any", async () => {
+            inputs.push(readWhen(variable, "any-1", late.promise), readWhen(variable, "any-2", early.promise));
             const winner = await Promise.any(inputs);
             return { winner, outer : variable.get() };
         });
+        early.resolve();
+        const seen = await pending;
+        late.resolve();
         await Promise.all(inputs);
         expect(seen).toEqual({ winner : "any-2", outer : "outer-any" });
     });
