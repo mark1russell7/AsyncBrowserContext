@@ -29,7 +29,7 @@ export function CodeView({ lines : code, trace, index, lanes } : ViewProps & { l
         return map;
     }, [trace, index]);
     return (
-        <pre className={styles.code} aria-label={`The code of the scenario. ${step ? `Line ${step.line} is active.` : ""}`}>
+        <pre className={styles.code} role="group" aria-label={`The code of the scenario. ${step ? `Line ${step.line} is active.` : ""}`}>
             <code>
                 {code.map((tokens, position) => {
                     const line = position + 1;
@@ -59,7 +59,7 @@ export function ReadsBar({ trace, index, lanes } : ViewProps) {
     const step = trace.steps[index];
     const lookups = step?.lookups ?? [];
     return (
-        <div className={styles.reads} style={laneStyle(lanes.get(step?.lane ?? "root"))} aria-live="polite">
+        <div className={styles.reads} style={laneStyle(lanes.get(step?.lane ?? "root"))}>
             <span className={styles.readsLabel}>Reads</span>
             {lookups.length === 0 ? <span className={styles.readsNone}>No read at this step</span> : lookups.map((lookup, key) => (
                 <span key={key} className={styles.read}>
@@ -263,7 +263,7 @@ export function ConsoleView({ trace, index, lanes, compare, compareLabel } : Vie
     const shown = trace.logs.filter(log => log.step <= index);
     if (compare === undefined) {
         return (
-            <ol className={styles.console} aria-live="polite">
+            <ol className={styles.console}>
                 {shown.length === 0 ? <li className={styles.consoleEmpty}>No output yet.</li> : null}
                 {shown.map((log, position) => (
                     <li key={position} style={laneStyle(lanes.get(log.lane))} data-new={log.step === index ? "true" : undefined}>
@@ -288,7 +288,7 @@ export function ConsoleView({ trace, index, lanes, compare, compareLabel } : Vie
                             <i aria-hidden="true" /><code>{log.text}</code>
                         </span>
                         <span className={styles.compareCell} data-status={same ? "same" : "different"} data-new={log.step === index ? "true" : undefined}>
-                            <span className={styles.compareIcon} aria-label={same ? "Same" : "Different"}>{same ? "✓" : "✗"}</span>
+                            <span className={styles.compareIcon} role="img" aria-label={same ? "Same" : "Different"}>{same ? "✓" : "✗"}</span>
                             <code>{other?.text ?? "(no line)"}</code>
                         </span>
                     </Fragment>
@@ -307,7 +307,7 @@ export function StepView({ trace, index, frames, lanes, compare } : ViewProps & 
     const before = trace.steps.slice(0, index).reduce((sum, item) => sum + item.lookups.length, 0);
     const compareLookups = compare?.steps.flatMap(item => item.lookups) ?? [];
     return (
-        <div className={styles.stepText} aria-live="polite" style={laneStyle(lanes.get(step.lane))}>
+        <div className={styles.stepText} style={laneStyle(lanes.get(step.lane))}>
             <p className={styles.stepTitle}><i aria-hidden="true" />{text.title}</p>
             <ul>
                 {text.sentences.map((sentence, key) => <li key={key}>{sentence}</li>)}

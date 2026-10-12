@@ -181,16 +181,16 @@ export function Playground() {
                     <button type="button" className="button" data-variant="primary" onClick={() => void start(code)}>Run the code</button>
                 </span>
             </div>
-            <CodeEditor value={code} onChange={setCode} onRun={() => void start(code)} lines={lines} errorLine={problem?.line} label="The code of the playground" describedBy={helpId} />
-            <p id={helpId} className={styles.help}>
-                Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to start the code. The Tab key indents: press <kbd>Esc</kbd> and then <kbd>Tab</kbd> to move out of the editor.
-                The code can use <code>log()</code>, <code>sleep(ms)</code>, <code>fetchUser(id)</code> and <code>save(value)</code> without an import.
-            </p>
             {run.kind === "linked" ? (
                 <p className={styles.notice} role="status">
                     This code comes from a link. The page did not start it. Read the code, then select &quot;Run the code&quot; to start it in this page.
                 </p>
             ) : null}
+            <CodeEditor value={code} onChange={setCode} onRun={() => void start(code)} lines={lines} errorLine={problem?.line} label="The code of the playground" describedBy={helpId} />
+            <p id={helpId} className={styles.help}>
+                Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to start the code. The Tab key indents: press <kbd>Esc</kbd> and then <kbd>Tab</kbd> to move out of the editor.
+                The code can use <code>log()</code>, <code>sleep(ms)</code>, <code>fetchUser(id)</code> and <code>save(value)</code> without an import.
+            </p>
             {problem ? (
                 <p className={styles.error} role="alert">
                     {problem.line === undefined ? null : <strong>Line {problem.line}: </strong>}{problem.message}

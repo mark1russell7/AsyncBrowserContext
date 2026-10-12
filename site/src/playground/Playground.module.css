@@ -170,7 +170,7 @@
 
 .notice {
     max-width: var(--measure);
-    margin: var(--space-3) 0 0;
+    margin: 0 0 var(--space-3);
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--status-warning);
     border-left-width: 4px;

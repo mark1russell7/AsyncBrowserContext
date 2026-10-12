@@ -33,3 +33,13 @@
         opacity: 1;
     }
 }
+
+/*
+ * Without a mouse (for example on a touch screen), the button always shows.
+ * The code starts below the button, so the button does not cover the first line.
+ */
+@media (hover: none) {
+    .block.block > pre {
+        padding-top: 2.4rem;
+    }
+}
