@@ -53,6 +53,7 @@ The shared files are in `test/rules/`, `test/regression/`, `test/api/`, `test/in
 | Test tools | `test/vitest/` | The port of the browser API server and the check for lost test files. |
 | Legacy | `test/legacy/` | The tests of the first test runner that were kept. `legacy-test-triage.md` gives the result for each test. |
 | Smoke | `test/smoke/run.ts` | `pnpm smoke` packs the package, installs it in a new Vite application, and examines the build and the dev server in Chromium. |
+| Babel versions | `test/babel/run.ts` | `pnpm test:babel` packs the package and installs it with Babel 7.22, the newest Babel 7 and Babel 8. Each version transforms `test/babel/program.js` with the preset, and the test starts the output on the browser runtime. |
 | Mutation | `stryker.config.mjs` | `pnpm mutation` changes the source in small ways. The tests must find each change. |
 
 ## Rules for each test

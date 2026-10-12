@@ -15,6 +15,7 @@ Thus, a value cannot go from one request to another request. Where your code mee
 | The other code | What happens | What to do |
 | --- | --- | --- |
 | Gives a promise, and your code awaits it | After the `await`, your code gets its context again. | Nothing |
+| Is async code that a compiler changed before the publish, for example with the `__awaiter` helper of TypeScript or the `_asyncToGenerator` helper of Babel | The helpers continue the function in `then` callbacks, and the patch of `then` keeps the context. | Nothing |
 | Starts your callback before its first `await` | The callback gets the context of your code. | Nothing |
 | Starts your callback from a timer, an observer or a promise that it registers before its first `await` | The patched API gives the callback the context of the registration. | Nothing |
 | Adds your callback as an event listener | The listener gets the context of the dispatch, or the context of the registration for a dispatch from the root context (rule C13). | Nothing |
@@ -22,7 +23,7 @@ Thus, a value cannot go from one request to another request. Where your code mee
 | Keeps your callback in a list, and starts it from other code later | The callback gets the context of the code that starts the list. | Bind the callback |
 | Reads the context itself after its own native `await`, for example a logger | These reads get no value. | Give the values as arguments, or transform the code |
 
-The tests in `test/rules/c07-boundaries.test.ts` examine each row on Node.js and in the browsers.
+The tests in `test/rules/c07-boundaries.test.ts` and `test/rules/c07-compiled-dependencies.test.ts` examine each row on Node.js and in the browsers.
 
 ## Bind a callback
 

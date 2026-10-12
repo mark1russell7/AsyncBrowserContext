@@ -25,6 +25,7 @@ const PATCHES : readonly { group : string; apis : readonly string[] }[] = [
 /** The boundaries with code without the transform, and what to do at each (refer to the page Boundaries). */
 const BOUNDARIES : readonly { other : string; action : string; tool? : string }[] = [
     { other : "Gives a promise that your code awaits", action : "Nothing to do" },
+    { other : "Is async code that a compiler changed", action : "Nothing to do", tool : "__awaiter, _asyncToGenerator" },
     { other : "Starts your callback from a patched API", action : "Nothing to do" },
     { other : "Starts your callback after its own await", action : "Bind the callback", tool : "AsyncLocalStorage.bind(callback)" },
     { other : "Keeps your callback in a list for later", action : "Bind the callback", tool : "AsyncLocalStorage.bind(callback)" },

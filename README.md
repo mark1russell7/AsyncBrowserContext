@@ -95,7 +95,7 @@ The plugin transforms the modules of the application and of its dependencies, al
 
 2. Make sure that Babel transforms the dependencies too. With webpack, do not exclude `node_modules` from `babel-loader`.
 
-The preset operates with Babel 7.22 and later, and with Babel 8.
+The preset operates with Babel 7.22 and later, and with Babel 8. CI examines Babel 7.22, the newest Babel 7 and the newest Babel 8 with the packed package (`pnpm test:babel`).
 
 ### Node.js
 
@@ -201,6 +201,7 @@ In transformed code, each step gets the context of its own operation. Code witho
 | The other code | What to do |
 | --- | --- |
 | Gives a promise, and your code awaits it | Nothing. After the `await`, your code gets its context again. |
+| Is async code that a compiler changed before the publish (`__awaiter` of TypeScript, `_asyncToGenerator` of Babel) | Nothing. The helpers continue in `then` callbacks, and the patch of `then` keeps the context. |
 | Starts your callback synchronously, or from a timer, an observer or a promise that it registers before its first `await` | Nothing. The patched APIs keep the context. Event listeners follow rule C13. |
 | Starts your callback after its own native `await` | `AsyncLocalStorage.bind(callback)` or `AsyncContext.Snapshot.wrap(callback)` |
 | Keeps your callback in a list and starts it later from other code | `AsyncLocalStorage.bind(callback)` when you give the callback |
@@ -213,7 +214,7 @@ untransformedLibrary.onDone(AsyncLocalStorage.bind((result) => {
 }));
 ```
 
-The Vite plugin transforms the dependencies in `node_modules` by default. Thus, these boundaries are usually only scripts from other servers, browser extensions and code from `eval()` or `new Function()`. The tests in `test/rules/c07-boundaries.test.ts` examine each row. The [boundaries page](https://mark1russell7.github.io/AsyncBrowserContext/docs/concepts/boundaries) of the website gives the details.
+The Vite plugin transforms the dependencies in `node_modules` by default. Thus, these boundaries are usually only scripts from other servers, browser extensions and code from `eval()` or `new Function()`. The tests in `test/rules/c07-boundaries.test.ts` and `test/rules/c07-compiled-dependencies.test.ts` examine each row. The [boundaries page](https://mark1russell7.github.io/AsyncBrowserContext/docs/concepts/boundaries) of the website gives the details.
 
 Do not use the library together with zone.js or with another library that patches `Promise.prototype.then`. The two libraries patch the same functions with different rules. For OpenTelemetry, use `AsyncContextManager` in place of the `ZoneContextManager`.
 
@@ -245,6 +246,7 @@ One read with `get()` takes approximately 4 ns. The [documentation website](http
 | `pnpm test:node` | The tests in Node.js only |
 | `pnpm test:browser` | The tests in Chromium, Firefox and WebKit |
 | `pnpm smoke` | Packs the package, installs it in a new Vite application, and examines the application in Chromium |
+| `pnpm test:babel` | Packs the package, transforms a program with the preset in Babel 7.22, the newest Babel 7 and Babel 8, and starts the output |
 | `pnpm mutation` | Mutation testing with Stryker |
 | `pnpm bench` | The benchmarks |
 | `pnpm lint:ste` | The STE linter of the documentation and the TSDoc comments |

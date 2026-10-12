@@ -112,6 +112,7 @@
     "mutation": "stryker run",
     "bench": "pnpm build && tsx bench/run.ts",
     "smoke": "pnpm build && tsx test/smoke/run.ts",
+    "test:babel": "pnpm build && tsx test/babel/run.ts",
     "lint:ste": "tsx tools/ste-lint/src/cli.ts",
     "site:dev": "pnpm --filter ./site dev",
     "site:build": "pnpm --filter ./site build",
