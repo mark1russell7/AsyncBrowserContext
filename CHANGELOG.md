@@ -1,5 +1,78 @@
 # Change history
 
+## 0.3.0
+
+This version changes some behaviors, so it is a minor version. The first section gives the changes that can affect existing code.
+
+### Changes that can affect existing code
+
+- `Snapshot.wrap()` gives the wrapper the name `wrapped` and the name of the function, for example `wrapped save`, as the TC39 draft specifies. In the browser, `AsyncLocalStorage.bind()` gives the same name. Before, the wrapper had the name of the function.
+- `Variable` and `Snapshot` have the `Symbol.toStringTag` of the TC39 draft. `Object.prototype.toString` gives `[object AsyncContext.Variable]` and `[object AsyncContext.Snapshot]`. Before, it gave `[object Object]`.
+- On Node.js, `Variable.run()` starts the function with the `this` value `undefined`, as the browser class and the TC39 draft do. Before, the native `run()` gave `null`.
+- A callback that a hook method schedules does not start the callback hooks, also when it operates later. Examples are a timer, a `then` callback and an event listener that a hook registers. Thus a hook cannot start itself without end. Before, only a callback that started synchronously in a hook did not start the hooks.
+- `addEventListener()` and `removeEventListener()` read the options as the DOM does. `null` and `undefined` give the default options, and another primitive value is the capture flag. `capture` and `once` use `ToBoolean`. Before, the patch read only `true` and `capture: true`. With another value, for example `{ capture: 1 }`, a second registration or a removal with `true` did not find the listener.
+- The patched functions have the form of native methods. They have no `prototype` property, they are not constructors, and they give the native function the same number of arguments. Thus `setTimeout()` without arguments and `addEventListener(type)` without a listener throw the native `TypeError`. Before, they did not throw.
+- OpenTelemetry: `bind(context, emitter)` and `bind(context, eventTarget)` patch the methods that add and remove listeners, as the context managers of OpenTelemetry do. Each listener that the program adds later operates with the context. Before, `bind()` gave such an object without a change. `bind(undefined, fn)` uses the active context. Before, it used the root context.
+- The Babel preset imports all four async generator helpers from the runtime: `asyncGenerator`, `OverloadYield`, `awaitAsyncGenerator` and `asyncGeneratorDelegate`. A module that the `runtime` option names must export them. Use the preset and the runtime of the same version. Before, Babel put `awaitAsyncGenerator` and `asyncGeneratorDelegate` into each module.
+- The Babel preset has eight plugins. A new plugin moves static class fields and static blocks with async arrow functions into static private methods. Thus `this` and `super` stay correct. Before, `this` was `undefined` in such a function, and `super` gave a `SyntaxError`.
+- The Babel preset changes `using` and `await using` declarations with `@babel/plugin-transform-explicit-resource-management`, a new dependency, before the async transform. This plugin operates with Babel 7.23.9 and later. Before, `await using` gave a `SyntaxError` in the generator of the transform.
+- The Vite plugin reads a module without a static `import` or `export`, for example a worker, as an ES module. Only `.cjs` and `.cts` files, and files with CommonJS marks and no static `import` or `export`, can be scripts. Before, Babel read such a module as a script and added a `require()` of the runtime, which a browser does not have.
+- The Vite plugin also transforms the JavaScript of Vue, Svelte, Astro and MDX components. It does not transform their styles. The `include` and `exclude` options also apply to these modules.
+- `package.json` has `main`, `types` and `typesVersions`. Thus TypeScript with the `moduleResolution` `node10` finds the types of each entry. This setting is the default for `module: commonjs`. Before, TypeScript found no types, so a project can get new type errors.
+
+### Changes
+
+- On Node.js, all `Variable` objects share one native `AsyncLocalStorage`. Node.js 22 keeps each storage that operated in a global list of `async_hooks`, and each new async resource examines that list. Thus a `Variable` for each request made each async operation slower. `AsyncLocalStorage` is the native class, as before.
+- On Node.js, `Snapshot`, `Snapshot.wrap()` and the generator drivers of the transform (`bindGenerator` and `asyncGenerator`) record the context with an `AsyncResource`. Before, they used `AsyncLocalStorage.snapshot()`. The hooks of `async_hooks` see these resources with the types `AsyncContext.Snapshot` and `async-browser-context:generator`.
+- `addCallbackHook()` writes a warning on the console one time when a copy of version 0.1 installed some patches first. The callbacks of those patches do not start the hooks.
+- The steps of an async generator after an `await` give the name of the async generator to the callback hooks (`callback.name`), as async functions do.
+
+### Corrections
+
+- The patch of `Promise.prototype.then` starts the `then` that it replaces, as the other patches do. Thus a patch of `then` that another tool installed before the library stays in effect. Before, the patch started the native `then`.
+- The preset does not change the native async generator of the runtime, also when a bundler applies the preset to `node_modules`. The plugin of Babel for async generators changes async generators and `for await` loops in its own traversal. The preset makes that traversal skip the functions with the directive of the runtime too. Before, the runtime then imported itself, and its async generator objects did not inherit `Symbol.asyncDispose`.
+- Events:
+  - A listener with a `signal` does not stay in memory. The map of the listeners is weak, and the abort listener of a registration keeps only weak references. Before, a signal that lived long kept the target, the listener and its context in memory, also on Node.js.
+  - A removed registration and a `once` listener that operated remove their abort listener. A failed native `addEventListener()` keeps no registration.
+  - A registration with an aborted signal, or a `once` listener that operated, gets a new registration at the next add.
+  - The `on...` getters give the handler also from another property that reflects it, for example `window.onload` for the handler of `body.onload`.
+  - `MediaQueryList.addListener()` and `removeListener()` accept listener objects with a `handleEvent` method, as the native methods do.
+- Streams, and the options of `startViewTransition()` and `NavigateEvent.intercept()`: the patch gives the browser a Proxy in place of a copy of the object. Thus frozen objects, getters, private fields and inherited members operate. The Proxy also answers the `in` operator, which the streams of WebKit use.
+- `Element.startViewTransition()` and the `precommitHandler` of `NavigateEvent.intercept()` keep the context.
+- `Array.fromAsync()` wraps only its map function. Before, it also wrapped `items` and `thisArg` when they were functions.
+- Callback hooks: an error of a getter of a hook method, or an error of `reportError()`, does not stop the callback.
+- The wrappers start each callback with `Reflect.apply`. Thus a callback with its own `call` or `apply` property operates.
+- A frame of the same variable replaces its parent. Thus many uses of `enterWith()` in one context do not make a long chain, and do not keep old stores in memory.
+- Node.js: the probe of the native options also examines `exit()`, and it disables itself after the probe. With `--no-async-context-frame` on Node.js 24, `exit()` thus gives `undefined`, as in the browser.
+- Babel preset:
+  - A generator parameter that the body declares again with `var` keeps its value.
+  - The generator of a Babel helper in a compiled dependency gets a binding (rule C5). The generators that `coroutine` and `asyncGenerator` operate do not get a second binding.
+  - A generator declaration in a block of a script stays in the block.
+  - The plugin of the async generator helpers sets its helpers in `Program` enter. Thus `@babel/plugin-transform-runtime` and the presets earlier in the list do not break the markers of the driver.
+  - The traversals of the preset skip the functions with the directive of the runtime. The preset finds the runtime functions also in CommonJS output. A file counts as changed only when the preset changes it.
+  - TypeScript wrappers, for example `as` and `satisfies`, and accessor fields keep the name of an async function for the hooks. A function that Babel gives no named wrapper, for example in a class field, keeps its name and its length.
+- Vite plugin: no input source map, because the map of Vite describes the code that the plugin gets. The option `compact: false` keeps the format of large modules. One presets array for all modules lets the configuration cache of Babel operate.
+
+### Performance
+
+- Node.js: an `AsyncResource` records the context in 30 to 40 ns, and `AsyncLocalStorage.snapshot()` takes approximately 3 µs. The drivers record the context after each step. Thus a step of `bindGenerator` takes 0.11 µs in place of 2.3 µs, and a step of `asyncGenerator` 0.45 µs in place of 2.6 µs (Node.js 24).
+- `pnpm bench:size` measures a minified bundle with all exports of the runtime. The runtime is 17.5 kB minified, 6.0 kB with gzip and 5.4 kB with brotli. The earlier values (19.0, 5.9 and 5.1 kB) came from a library build that kept the white space, and that did not contain `asyncGenerator` and `OverloadYield`.
+- `pnpm bench:browsers` repeats each workload until at least 100 ms have passed, and divides the time by the repetitions. Before, one pair of `performance.now()` calls measured 50,000 steps, with a resolution of 0.1 ms to 1 ms.
+
+### Tests
+
+- New tests for the cases that the review found without a test. An `await` in a `finally` block keeps the context after a `return` and after a `throw` (rule C3). A string callback of `setTimeout` goes to the native function as it is (rule C6). Two copies of the library read and keep the variables of each other (rule C10). A capture listener and a listener without capture stay apart (rule C13).
+- Memory tests for event listeners: after `removeEventListener()`, after a `once` listener operated, and with a signal that lives long. The memory tests fail without `--expose-gc`.
+- Browser tests for each correction of the events, the streams and the callback APIs.
+- CI also starts the Node.js tests on Node.js 22.18.0 and 24.11.0, the minimum versions, and starts the tests of the STE linter (`pnpm test:ste-lint`).
+
+### Documentation
+
+- The documents tell the eight plugins of the preset and the six exports of the runtime.
+- New limits: a transformed generator function is a plain function for libraries that examine it, and a top-level `enterWith()` stays as a default store. A minifier can remove the directive of the runtime.
+- The webpack examples add `@babel/preset-typescript` and `@babel/preset-react` for TypeScript and JSX files.
+- The pages tell where the tests examine each rule and each boundary.
+
 ## 0.2.4
 
 ### Corrections

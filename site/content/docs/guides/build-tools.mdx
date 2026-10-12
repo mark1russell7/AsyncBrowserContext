@@ -38,7 +38,7 @@ Add the plugin `asyncContext()` to `vite.config.ts`. The [get started](/docs/get
 
 ## webpack
 
-1. Install `babel-loader`.
+1. Install `babel-loader`. For TypeScript and JSX files, also install `@babel/preset-typescript` and `@babel/preset-react`.
 2. Add a rule for all JavaScript and TypeScript files, with the preset of the library.
 3. Do not exclude `node_modules`. Then the preset also transforms the dependencies.
 
@@ -48,13 +48,18 @@ export default {
     module : {
         rules : [{
             test : /\.[cm]?[jt]sx?$/,
-            use : { loader : "babel-loader", options : { presets : ["async-browser-context/babel-preset"] } },
+            use : {
+                loader : "babel-loader",
+                options : {
+                    presets : ["@babel/preset-react", "@babel/preset-typescript", "async-browser-context/babel-preset"],
+                },
+            },
         }],
     },
 };
 ```
 
-If your configuration has other presets, put the preset of the library last.
+Babel cannot read TypeScript and JSX without `@babel/preset-typescript` and `@babel/preset-react`. For a project with JavaScript only, remove them. If your configuration has other presets, put the preset of the library last.
 
 ## Rspack
 
@@ -179,6 +184,12 @@ Apply SWC also to the dependencies in `node_modules`.
 
 A tool that reads a Babel configuration file can use the preset, for example Parcel. CI does not examine these tools. Use the checks of the test (`test/smoke/fixture/checks.js`) to examine your setup.
 
+## Minifiers
+
+The preset does not change the runtime of the library. It finds the native async functions of the runtime by the directive `"async-browser-context runtime"`. Terser and other minifiers can remove directives. Thus apply the preset before the minifier. Do not apply the preset to a copy of the runtime that a minifier changed. An example is a dependency that bundles and minifies this library.
+
+The setups on this page minify after the transform of each module, so they are correct. The Vite plugin also skips the files of the runtime by their path.
+
 ## The dependencies
 
 A dependency with native async functions continues after its own `await` without the context. A callback that the dependency starts after that `await` gets the root context (rule C7). It does not get the context of a different operation. Each setup on this page also transforms `node_modules`, except Next.js, which needs `transpilePackages`.
@@ -193,4 +204,4 @@ The target ES2016 changes each async function into a generator with `then` callb
 - **The names of the callback hooks.** The hooks get each step after an `await` as a `then` callback of the helper of the compiler. The source is `"Promise.then"`, and the function is the helper.
 - **The size.** The target also changes the syntax that is newer than ES2016, for example `?.` and object spread. The [size](/testing/performance#size) table shows the cost.
 
-The esbuild project does not start the probes, because esbuild cannot change their top-level `for await` for the target ES2016.
+The esbuild project does not start the test file of probe P10, because esbuild cannot change its top-level `for await` for the target ES2016.

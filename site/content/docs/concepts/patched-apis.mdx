@@ -6,6 +6,12 @@ order: 13
 
 The runtime patches these APIs when it loads. It patches each API one time for each global object, also when the page loads two copies of the library. Each patched function keeps its name, its length and its other properties. `Function.prototype.toString` shows the source text of the original function.
 
+Each patched function is a method, as the native function: it has no `prototype` property and it is not a constructor. It gives the native function the same number of arguments. Thus `setTimeout()` without arguments throws the native `TypeError`, as without the library. Each patch, except the patch of `Function.prototype.toString`, starts the function that it replaces. Thus a patch of another tool that loads first stays in effect.
+
+<Callout type="caution" title="Import the library first">
+  Import `async-browser-context` before all other modules. Code that keeps a reference to a native function before the library loads does not get the context. A listener that code adds before the library loads, and adds again after, operates two times. The browser then has the listener and a wrapper of it.
+</Callout>
+
 ## Promises
 
 | API | Callback context |
@@ -33,10 +39,15 @@ A `setTimeout` callback in text form does not change.
 | API | Callback context |
 | --- | --- |
 | `EventTarget.prototype.addEventListener` and `removeEventListener` | Rule C13: the context of the dispatch, or the registration context. |
-| Each `on...` property of each `EventTarget` class and of `window` | The same. The getter gives the original handler. |
-| `MediaQueryList.prototype.addListener` and `removeListener` | The same. |
+| Each `on...` property of each `EventTarget` class and of `window` | The same. The getter gives the original handler, also from another property that reflects it, for example `window.onload` for `body.onload`. |
+| `MediaQueryList.prototype.addListener` and `removeListener` | The same, also for a listener object with a `handleEvent` method. |
 
-The patch keeps the rules of the DOM: a second registration of the same listener has no effect, and `once` and `signal` remove the listener.
+The patch keeps the rules of the DOM:
+
+- It reads the options as the DOM does. `null` and `undefined` give the default options, and another primitive value is the capture flag. `capture` and `once` use `ToBoolean`.
+- A second registration of the same listener with the same capture flag has no effect. The first registration keeps its context.
+- `once` and `signal` remove the listener. The patch then also forgets the registration, so a later add makes a new registration in the current context.
+- A listener with a `signal` does not stay in memory. The abort listener of the patch keeps only weak references to the target, the listener and the context.
 
 The patch of the `on...` properties reads only the interfaces in `src/patches/handler-interfaces.ts`. When code reads a global for the first time, the browser makes its interface object. A page has approximately 1,000 interfaces. The list contains the 138 interfaces that have `on...` properties. A browser test reads all globals of Chromium, Firefox and WebKit, and fails if an `on...` property does not have the patch.
 
@@ -53,6 +64,8 @@ These constructors get a callback. The callback gets the context of the construc
 ## Streams
 
 The constructors `ReadableStream`, `WritableStream` and `TransformStream` get an object with methods. The stream uses these methods later, from its own queue. Each method gets the context of the construction.
+
+The patch gives the constructor a Proxy of the object. The Proxy wraps only the methods in the table, and the methods get the object as their `this` value. The other members come from the object, so frozen objects, getters, private fields and inherited members operate. The Proxy also answers the `in` operator, which the streams of WebKit use.
 
 | Constructor | Methods |
 | --- | --- |
@@ -75,9 +88,11 @@ Each function argument of these methods gets the context of the method use.
 | `MediaSession` | `setActionHandler` |
 | `RTCPeerConnection` | The old callback forms of `createOffer`, `createAnswer`, `setLocalDescription`, `setRemoteDescription`, `addIceCandidate` and `getStats` |
 | `Notification` | `requestPermission` |
-| `Array` | `fromAsync` |
-| `Document` | `startViewTransition`, also with an object that has an `update` callback |
-| `NavigateEvent` | `intercept`, for the `handler` callback |
+| `Array` | `fromAsync`, only for the map function. The `items` and `thisArg` arguments do not change. |
+| `Document`, `Element` | `startViewTransition`, also with an object that has an `update` callback |
+| `NavigateEvent` | `intercept`, for the `handler` and `precommitHandler` callbacks |
+
+For `startViewTransition` and `intercept`, the browser gets a Proxy of the options object, as for the streams.
 
 ## The wrappers
 

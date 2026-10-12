@@ -16,7 +16,10 @@ export interface AsyncContextPluginOptions {
     readonly include? : ModuleFilter | undefined;
     /** The modules not to transform. */
     readonly exclude? : ModuleFilter | undefined;
-    /** The runtime module. The default is `async-browser-context/runtime`. */
+    /**
+     * The runtime module. It must export the six names of `async-browser-context/runtime`.
+     * The default is `async-browser-context/runtime`.
+     */
     readonly runtime? : string | undefined;
     /**
      * Give the name of each async function to the callback hooks. The default

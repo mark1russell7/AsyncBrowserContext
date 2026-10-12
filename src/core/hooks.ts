@@ -31,7 +31,8 @@ function warnAboutOldPatches() : void {
  * A tool can use the hook to measure the time of each callback, with the
  * name of the callback and the values of its context. An error in a hook goes
  * to `reportError()`, and the callback operates as usual. A callback that
- * starts synchronously in a hook does not start the hook methods.
+ * starts synchronously in a hook does not start the hook methods. A callback
+ * that a hook schedules does not start them either, also later.
  */
 export function addCallbackHook(hook : CallbackHook) : () => void {
     assertCallbackHook(hook);

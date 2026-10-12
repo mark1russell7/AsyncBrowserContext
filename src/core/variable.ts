@@ -50,7 +50,8 @@ export class Variable<T> {
 
     /**
      * This method starts `fn` with `args` in a new context in which `get()`
-     * gives `value`. After `fn` ends, also with an error, the previous context is
+     * gives `value`. As in the TC39 draft, `fn` gets `undefined` as its `this`
+     * value. After `fn` ends, also with an error, the previous context is
      * current again. The method gives the result of `fn`.
      */
     run<R, A extends unknown[]>(value : T, fn : (...args : A) => R, ...args : A) : R {

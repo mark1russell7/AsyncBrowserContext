@@ -52,21 +52,23 @@ The first version of the frames used one `WeakMap` for each variable. The garbag
 
 ## Size
 
-The command `pnpm bench:size` measures the size of the code that the library adds. It installs a set of npm packages in `node_modules/.cache/abc-size`, builds minified bundles with Vite, and writes `bench/results/size.json`.
+The command `pnpm bench:size` measures the size of the code that the library adds. It installs a set of npm packages in `node_modules/.cache/abc-size`, builds minified bundles with Vite, and writes `bench/results/size.json`. Vite builds each bundle as an application, because a library build of Vite keeps the white space. The bundle of the runtime keeps all exports of `async-browser-context` and `async-browser-context/runtime`.
 
 | Code | gzip |
 | --- | --- |
-| The runtime: the classes, the patches and the runtime of the transform | 5.9 kB |
-| zone.js 0.16.3, for comparison | 13.3 kB |
-| An application with React DOM, TanStack Query, supabase-js and ky, without the transform | 161.9 kB |
-| The same application with the Vite plugin, without the runtime | 166.5 kB (+2.9%) |
-| The same application with the target ES2016 and no plugin | 171.2 kB (+5.8%) |
+| The runtime: the classes, the patches and the runtime of the transform | 6.0 kB |
+| zone.js 0.16.3, for comparison | 11.8 kB |
+| An application with React DOM, TanStack Query, supabase-js and ky, without the transform | 144.5 kB |
+| The same application with the Vite plugin, without the runtime | 147.9 kB (+2.4%) |
+| The same application with the target ES2016 and no plugin | 151.9 kB (+5.2%) |
 
-The transform adds 3 to 8 percent to packages with much async code, and nothing to React DOM. Babel adds its helper for `for await` to each module with such a loop, approximately 0.5 kB. The async generators use the driver of the runtime, so the modules do not contain the async generator helper of Babel. The option `names: false` of the preset removes the names of the async functions: 0.1 to 1.6 percent. The page "Performance" of the website has the table of each package.
+The transform adds 3 to 8.5 percent to packages with much async code, and nothing to React DOM. Babel adds its helper for `for await` to each module with such a loop, approximately 0.5 kB. The async generators use the driver of the runtime, so the modules do not contain the async generator helper of Babel. The option `names: false` of the preset removes the names of the async functions: 0.1 to 1.8 percent. The page "Performance" of the website has the table of each package.
 
 ## Browsers
 
-The command `pnpm bench:browsers` measures `await` and `then` in Chromium, Firefox and WebKit with Playwright. Each value is the median time of 50,000 steps, in ms. "Babel helper" is the async transform of Babel with its own helper, without the library. Many compiled packages use such a helper.
+The command `pnpm bench:browsers` measures `await` and `then` in Chromium, Firefox and WebKit with Playwright. One run repeats a workload until at least 100 ms have passed, and divides the time by the number of repetitions. Each value is the time of 50,000 steps in ms, as the median of 7 runs. Each case has its own page, and the order of the cases changes in each run. "Babel helper" is the async transform of Babel with its own helper, without the library. Many compiled packages use such a helper.
+
+<!-- TODO(bench): the values of this table -->
 
 | Browser | Workload | Native | Babel helper | Library |
 | --- | --- | --- | --- | --- |
@@ -85,5 +87,5 @@ The command `pnpm bench:browsers` measures `await` and `then` in Chromium, Firef
 
 - **Async generators.** Since version 0.2.3, the driver of the runtime operates each async generator with a native `await`. Before, the helper of Babel was in each module, and each step was a `then` callback. With version 0.2.2, the async generator workload took 11.2 ms in Chromium, 560 ms in Firefox and 16 ms in WebKit.
 - **The coroutine.** Since version 0.2.2, the coroutine operates each async function with a native `await`. Before, each step was a `then` callback, as in the Babel helper. In Firefox, 50,000 awaits of `null` took 292 ms with version 0.2.1.
-- **Firefox and the patch of `then`.** Firefox has a fast path for `await` of a promise. A patch of `Promise.prototype.then` stops this fast path, also for code without the transform. Each `await` of a promise then takes approximately 0.8 µs more. zone.js also patches the promises, so it has the same cost.
-- **Playwright and Firefox.** Playwright controls Firefox with the debugger API. Firefox then records an async stack for each `then` callback. Thus, `then` callbacks take more time in this measurement than in a Firefox without Playwright. With the preference `javascript.options.asyncstack` set to `false`, a chain of steps in `then` callbacks was 7 times faster.
+- **Firefox and the patch of `then`.** Firefox has a fast path for `await` of a promise. A patch of `Promise.prototype.then` stops this fast path, also for code without the transform. Each `await` of a promise then takes approximately 0.8 µs more. <!-- TODO(bench) --> zone.js also patches the promises, so it has the same cost.
+- **Playwright and Firefox.** Playwright controls Firefox with the debugger API. Firefox then records an async stack for each `then` callback. Thus, `then` callbacks take more time in this measurement than in a Firefox without Playwright. With the preference `javascript.options.asyncstack` set to `false`, a chain of steps in `then` callbacks was 7 times faster. <!-- TODO(bench) -->

@@ -6,7 +6,7 @@ order: 7
 
 ## The parts of the runtime
 
-```mermaid title="The parts of the runtime" caption="The variables read the current frame. The coroutine, the generator binder and the patches set the current frame for one step at a time."
+```mermaid title="The parts of the runtime" caption="The variables read the current frame. The coroutine, the async generator driver, the generator binder and the patches set the current frame for one step at a time."
 flowchart TB
     subgraph api["Public API"]
         variable["AsyncContext.Variable"]
@@ -17,6 +17,7 @@ flowchart TB
         store["Store: the current frame"]
         frames["Frames: one variable and one value each"]
         coroutine["coroutine()"]
+        asyncgen["asyncGenerator()"]
         bind["bindGenerator()"]
         patches["Patches: then, timers, events, observers, streams"]
     end
@@ -25,6 +26,7 @@ flowchart TB
     variable -->|"get() reads"| store
     snapshot -->|"records"| store
     coroutine -->|"sets for each step"| store
+    asyncgen -->|"sets for each step"| store
     bind -->|"sets for each step"| store
     patches -->|"sets for each callback"| store
     store --> frames
@@ -42,7 +44,7 @@ sequenceDiagram
     Coroutine->>Body: step 1 in the frame of the function
     Body-->>Coroutine: yield (was await)
     Coroutine->>Coroutine: set the previous frame
-    Coroutine->>Queue: then() on the value
+    Coroutine->>Queue: native await of the value
     Queue->>Coroutine: the value settles
     Coroutine->>Body: step 2 in the frame of the function
     Body-->>Coroutine: the function is complete
@@ -51,12 +53,16 @@ sequenceDiagram
 
 ## The transform pipeline
 
-```mermaid title="The transform pipeline" caption="The Vite plugin gives each module to the preset. The preset does not change the runtime of the library."
+```mermaid title="The transform pipeline" caption="The Vite plugin gives each module to the preset, in the order of the eight plugins of the preset. The preset does not change the runtime of the library."
 flowchart TB
     module["Module (also in node_modules)"] --> plugin["Vite plugin, after the other plugins"]
-    plugin --> bind["Bind the generators"]
+    plugin --> skip["Skip the functions of the runtime"]
+    skip --> bind["Bind the generators"]
     bind --> names["Name the async functions, for the hooks"]
-    names --> asyncgen["Async generators and for await"]
+    names --> statics["Move static members with async arrows"]
+    statics --> helpers["Async generator helpers from the runtime"]
+    helpers --> resources["using and await using"]
+    resources --> asyncgen["Async generators and for await"]
     asyncgen --> asyncfn["Async functions with coroutine()"]
     asyncfn --> out["Module that imports the runtime"]
 ```

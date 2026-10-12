@@ -28,7 +28,8 @@ export class Snapshot {
     /**
      * This method records the current context and gives a wrapper of `fn`. The
      * wrapper starts `fn` in the recorded context, with the `this` value and the arguments of
-     * each call.
+     * each call. The name of the wrapper is "wrapped" and the name of `fn`, and its length is
+     * the length of `fn`.
      */
     static wrap<T, A extends unknown[], R>(fn : (this : T, ...args : A) => R) : (this : T, ...args : A) => R {
         if (typeof fn !== "function") {

@@ -35,9 +35,11 @@ A value that is different in each context. This class is `AsyncContext.Variable`
 | `constructor(options)` | `name` is for debug tools only. The default is the empty string. `defaultValue` is the value outside a context. |
 | `name` | The name of the variable. |
 | `get()` | Gives the value of the variable in the current context, or the default value. |
-| `run(value, fn, ...args)` | Starts `fn` with `args` in a new context in which `get()` gives `value`. Gives the result of `fn`. After `fn`, the previous context is current again. |
+| `run(value, fn, ...args)` | Starts `fn` with `args` in a new context in which `get()` gives `value`. The `this` value of `fn` is `undefined`. Gives the result of `fn`. After `fn`, the previous context is current again. |
 
-`AsyncVariable` is another name for `Variable`.
+`AsyncVariable` is another name for `Variable`. `Object.prototype.toString` gives `[object AsyncContext.Variable]` for a variable, as in the TC39 draft.
+
+On Node.js, all `Variable` objects share one native `AsyncLocalStorage`. A `Variable` for each request thus does not make the async operations of Node.js 22 slower.
 
 ## Snapshot
 
@@ -54,10 +56,10 @@ A record of the current context. This class is `AsyncContext.Snapshot` of the TC
 | Member | What it does |
 | --- | --- |
 | `constructor()` | Records the current context. |
-| `run(fn, ...args)` | Starts `fn` with `args` in the recorded context. Gives the result of `fn`. |
-| `Snapshot.wrap(fn)` | Records the current context and gives a wrapper of `fn`. The wrapper starts `fn` in the recorded context, with its `this` value and its arguments. If `fn` is not a function, `wrap` throws a `TypeError`. |
+| `run(fn, ...args)` | Starts `fn` with `args` in the recorded context. The `this` value of `fn` is `undefined`. Gives the result of `fn`. |
+| `Snapshot.wrap(fn)` | Records the current context and gives a wrapper of `fn`. The wrapper starts `fn` in the recorded context, with its `this` value and its arguments. The name of the wrapper is `wrapped` and the name of `fn`, for example `"wrapped save"`, and its length is the length of `fn`. If `fn` is not a function, `wrap` throws a `TypeError`. |
 
-`AsyncSnapshot` is another name for `Snapshot`.
+`AsyncSnapshot` is another name for `Snapshot`. `Object.prototype.toString` gives `[object AsyncContext.Snapshot]` for a snapshot, as in the TC39 draft.
 
 ## AsyncLocalStorage
 
@@ -80,7 +82,7 @@ The class of `node:async_hooks`, for browsers. On Node.js, the package gives the
 | Member | What it does |
 | --- | --- |
 | `constructor(options)` | The options of Node.js 24: `defaultValue` and `name`. |
-| `getStore()` | Gives the store of the current context. Outside `run()`, it gives the default value. After `disable()`, it gives `undefined`. |
+| `getStore()` | Gives the store of the current context. Outside `run()`, it gives the `defaultValue` of the options, or `undefined`. After `disable()`, it gives `undefined`. |
 | `run(store, callback, ...args)` | Starts `callback` in a new context in which `getStore()` gives `store`. |
 | `exit(callback, ...args)` | Starts `callback` in a new context in which `getStore()` gives `undefined`. |
 | `enterWith(store)` | Sets `store` for the rest of the current step, and for the code that this step starts later. |
@@ -89,8 +91,16 @@ The class of `node:async_hooks`, for browsers. On Node.js, the package gives the
 | `AsyncLocalStorage.snapshot()` | Records the current context and gives a function that starts a function in that context. |
 
 <Callout type="caution" title="enterWith()">
-  Use `run()` if possible. `enterWith()` also changes the store of the code that started the current function, until the end of the current step.
+  Use `run()` if possible. `enterWith()` operates as on Node.js, so it can change the store of other code. In the synchronous part of an async function, it also changes the store of the caller, until the end of the step of the caller.
 </Callout>
+
+`enterWith()` outside all `run()` calls, for example at the top level of a module, sets a default store. No code sets the root context again, as on Node.js. Thus the store stays after a top-level `await`, and the callbacks that the later code registers get it. This has these effects in the browser:
+
+- Between tasks, the current context is not the root context (rule C1).
+- An event that the browser dispatches gives the context of the `enterWith()` to each listener, in place of the registration context (rule C13).
+- Code without the transform also gets the default store after its native `await`.
+
+A timer or a `then` callback that the code registered before the `enterWith()` keeps the context of its registration.
 
 ## addCallbackHook
 
@@ -110,11 +120,11 @@ Adds a hook. The library starts the hook methods before and after each callback 
 The library starts the hook methods for these callbacks:
 
 - The callbacks of the [patched APIs](/docs/concepts/patched-apis).
-- Each step of a transformed async function after an `await`. The first step is a direct call, thus it does not start the hook methods.
+- Each step of a transformed async function or async generator after an `await`. The first step is a direct call, thus it does not start the hook methods.
 
 | Argument | Value |
 | --- | --- |
-| `callback` | The function that the library starts. For an event listener object, it is the `handleEvent` method. For a step after an `await`, it is the body of the async function, with the name of the async function. |
+| `callback` | The function that the library starts. For an event listener object, it is the `handleEvent` method. For a step after an `await`, it is the body of the async function or the async generator, with its name. |
 | `source` | The API that got the callback. The next table gives the values. |
 
 | Callback | `source` |
@@ -125,7 +135,7 @@ The library starts the hook methods for these callbacks:
 | `on...` properties | The name of the property, for example `"onclick"` |
 | Observers | The name of the class, for example `"MutationObserver"` |
 | Streams | The class and the method, for example `"ReadableStream.pull"` |
-| Other callback APIs | The class and the method, for example `"LockManager.request"` |
+| Other callback APIs | The class and the method, for example `"LockManager.request"` or `"Element.startViewTransition"` |
 | Steps after an `await` | `"await"` |
 
 The rules of the hooks:
@@ -134,9 +144,12 @@ The rules of the hooks:
 - `before` uses the order of registration. `after` uses the opposite order.
 - The library starts `after` also when the callback throws an error.
 - A hook cannot change the context of the callback.
-- An error in a hook goes to `reportError()`. The callback operates as usual.
+- An error in a hook goes to `reportError()`. An error of a getter of a hook method, or of `reportError()` itself, also stops at the hook. The callback operates as usual.
 - A callback that starts synchronously in a hook does not start the hook methods.
+- A callback that a hook schedules, for example a timer, a `then` callback or an event listener, does not start the hook methods, also later. Thus a hook cannot start itself without end.
 - `Snapshot.run()`, `Snapshot.wrap()`, `AsyncLocalStorage.bind()` and `AsyncLocalStorage.snapshot()` do not start the hook methods. Your code starts these functions.
+
+The patches of version 0.1 of the library do not start the hooks. If a copy of version 0.1 installed some patches before this copy, `addCallbackHook()` writes a warning on the console one time.
 
 On Node.js, `addCallbackHook()` does nothing, because the library does not wrap callbacks there. On Node.js, use `node:diagnostics_channel` or `node:async_hooks`.
 
@@ -152,7 +165,7 @@ import { AsyncContextManager } from "async-browser-context/opentelemetry";
 provider.register({ contextManager : new AsyncContextManager() });
 ```
 
-The OpenTelemetry `ContextManager` of the library. It keeps the active context with `AsyncLocalStorage`, also after `await` in transformed code. It needs the package `@opentelemetry/api`. The guide [OpenTelemetry without zone.js](/docs/guides/opentelemetry) tells more.
+The OpenTelemetry `ContextManager` of the library. It keeps the active context with `AsyncLocalStorage`, also after `await` in transformed code. `bind(context, target)` binds a function, an `EventTarget` or a Node.js `EventEmitter`. It needs the package `@opentelemetry/api`. The guide [OpenTelemetry without zone.js](/docs/guides/opentelemetry) tells more.
 
 ## The Vite plugin
 
@@ -168,17 +181,19 @@ function asyncContext(options? : {
 }) : Plugin;
 ```
 
-The plugin applies the Babel preset to each JavaScript and TypeScript module. It operates after the other plugins (`enforce: "post"`).
+The plugin applies the Babel preset to each JavaScript and TypeScript module, and to the JavaScript of Vue, Svelte, Astro and MDX components. It does not transform styles. It operates after the other plugins (`enforce: "post"`).
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `include` | All modules, also in `node_modules` | The modules to transform. |
+| `include` | All modules, also in `node_modules` | The modules to transform. The filter can select only from the modules above. |
 | `exclude` | No module | The modules not to transform. |
 | `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. |
 | `names` | `true` | Give the name of each async function to the callback hooks. The option of the preset tells more. |
 | `ssr` | `false` | Also transform the modules of server-side rendering. On Node.js, the native `AsyncLocalStorage` keeps the context, so the default is `false`. Set it to `true` for tests in the Node.js environment of Vitest. |
 
-The plugin does not change a module that has no async function, no generator and no `for await` loop. It does not transform the runtime of the library.
+The plugin does not change a module that has no async function, no generator and no `for await` loop. It does not transform the runtime of the library. The plugin skips the files in the `dist` folder of the package, and the preset skips the functions with the directive of the runtime.
+
+The plugin gives Babel the source type "module", because Vite serves each module as an ES module, also a worker. Only a `.cjs` or `.cts` file, or a file with CommonJS marks and no static `import` or `export`, can be a script. The plugin does not read an input source map, because the map of Vite describes the code that the plugin gets. It keeps the format of large modules (`compact: false`).
 
 ## The Babel preset
 
@@ -188,15 +203,26 @@ presets : [["async-browser-context/babel-preset", { runtime : "async-browser-con
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. |
-| `names` | `true` | Give the name of each async function to `coroutine`, for the callback hooks. With `false`, the code is smaller, and the hooks get no name for the steps after an `await`. |
+| `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. It must export the six names of [the runtime](#the-runtime). |
+| `names` | `true` | Give the name of each async function and async generator to the runtime, for the callback hooks. With `false`, the code is smaller, and the hooks get no name for the steps after an `await`. |
 
-The preset operates with Babel 7.22 and later and with Babel 8. Put it last in the `presets` list.
+The preset operates with Babel 7.22 and later and with Babel 8. Put it last in the `presets` list. The preset changes `using` and `await using` declarations only with Babel 7.23.9 and later. The [transform](/docs/concepts/transform) page gives the eight plugins of the preset.
 
-The preset gives the name of each async function to `coroutine`, for example `_coroutine(function* () {...}, "load")`. The callback hooks show this name for the steps after an `await`. A minifier does not change this name, because it is a string. The names add 0.1 to 1.6 percent to the gzip size of code with async functions ([size](/testing/performance#size)).
+The preset gives the name of each async function to `coroutine`, for example `_coroutine(function* () {...}, "load")`. It gives the name of each async generator to `asyncGenerator` in the same way. The callback hooks show this name for the steps after an `await`. A minifier does not change this name, because it is a string. The names add 0.1 to 1.8 percent to the gzip size of code with async functions ([size](/testing/performance#size)).
 
 The [build tools](/docs/guides/build-tools) guide shows the preset in webpack, Rspack, Rollup, esbuild and Next.js.
 
 ## The runtime
 
-`async-browser-context/runtime` exports `coroutine` and `bindGenerator`. The transformed code uses them. Do not use them in your code. The [transform](/docs/concepts/transform) page tells what they do.
+`async-browser-context/runtime` exports the six names that the transformed code imports:
+
+| Export | What it does |
+| --- | --- |
+| `coroutine` | Operates the generator of a transformed async function. |
+| `bindGenerator` | Binds a generator object to the context of its creation (rule C5). |
+| `asyncGenerator` | Makes the async generator objects of a transformed async generator. It replaces the `wrapAsyncGenerator` helper of Babel. |
+| `OverloadYield` | The class of the values that the body of an async generator gives for an `await` and for a step of `yield*`. |
+| `awaitAsyncGenerator` | The Babel helper of an `await` in an async generator. |
+| `asyncGeneratorDelegate` | The Babel helper of `yield*` in an async generator. |
+
+Do not use them in your code. The [transform](/docs/concepts/transform) page tells what they do. On Node.js, the `node` export condition selects a runtime with the same exports, for the native `AsyncLocalStorage`.

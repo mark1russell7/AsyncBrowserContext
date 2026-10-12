@@ -1,6 +1,6 @@
 ---
 title: Context rules
-description: The 13 rules that the library obeys. The tests examine each rule in Node.js and in browsers.
+description: The 13 rules that the library obeys, and the tests that examine each rule in Node.js and in browsers.
 order: 11
 ---
 
@@ -14,6 +14,8 @@ Outside a callback of the library, `get()` gives the default value. Between task
 const requestId = new AsyncContext.Variable<string>({ defaultValue : "none" });
 requestId.get(); // "none"
 ```
+
+An `AsyncLocalStorage.enterWith()` outside all `run()` calls changes this rule. Its store stays as a default store, as on Node.js (refer to the [API reference](/docs/api#asynclocalstorage)).
 
 ## C2: run() sets the value while fn operates
 
@@ -111,3 +113,20 @@ The [event demonstration](/explore/events) lets you examine the two cases with r
 ## The rules on Node.js
 
 On Node.js, the native `AsyncLocalStorage` keeps the context. The rules C1 to C4, C6 and C8 are true. Rules C9 to C12 are true because the Node.js entry installs no patch. Rule C7 is better on Node.js: all code keeps the context, also code that Babel does not transform. Rule C5 is true only in code that the preset transforms. A native generator of Node.js uses the context of the code that starts each step.
+
+## Where the tests examine the rules
+
+The tests of the rules are in `test/rules/`, one file for each rule. Each rule project of `vitest.config.ts` starts them in Node.js, and the browser projects start them in Chromium, Firefox and WebKit. The rule projects in Node.js are these:
+
+- The browser runtime with the preset, with SWC and with esbuild (the target ES2016).
+- The Node.js runtime with the preset and without a transform.
+
+| Rule | Exception |
+| --- | --- |
+| C5 | Only the projects with the preset examine the rule. The other projects examine that a generator body gets the context of each `next()` call. |
+| C9 | `test/rules/c09-c11-isolation.test.ts` examines the store of the browser runtime, in Node.js and in the browsers. |
+| C10 | `test/rules/c09-c11-isolation.test.ts` loads a second copy of the library, only on the browser runtime in Node.js. A browser cannot load a second copy of the same modules without a second bundle. |
+| C12 | `test/memory/memory.test.ts`, in the project `memory`: the browser runtime in Node.js with `--expose-gc`. |
+| C13 | `test/browser/c13-events.test.ts`, only in Chromium, Firefox and WebKit. |
+
+The [testing section](/testing) tells more about the projects.

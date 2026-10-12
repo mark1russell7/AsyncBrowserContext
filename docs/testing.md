@@ -33,7 +33,7 @@ Use `pnpm test:node` for the Node.js projects only, and `pnpm test:browser` for 
 | `unit` | Browser runtime in Node.js | Yes | `src/**/*.test.ts`, `test/vitest/**/*.test.ts` and `test/scripts/**/*.test.ts` |
 | `rules (browser runtime, Node.js)` | Browser runtime in Node.js | Yes | The shared files |
 | `rules (browser runtime, SWC ES2016)` | Browser runtime in Node.js | SWC with the target ES2016 in place of the preset | The shared files |
-| `rules (browser runtime, esbuild ES2016)` | Browser runtime in Node.js | esbuild with the target ES2016 in place of the preset | The shared files, without the probe P10 |
+| `rules (browser runtime, esbuild ES2016)` | Browser runtime in Node.js | esbuild with the target ES2016 in place of the preset | The shared files, without the test file of probe P10 |
 | `rules (node runtime)` | Node.js runtime | Yes | The shared files |
 | `rules (node runtime, no transform)` | Node.js runtime | No | The shared files |
 | `memory` | Browser runtime in Node.js, with `--expose-gc` | Yes | `test/memory/` |
@@ -41,18 +41,18 @@ Use `pnpm test:node` for the Node.js projects only, and `pnpm test:browser` for 
 
 The shared files are in `test/rules/`, `test/regression/`, `test/api/`, `test/interleave/` and `test/legacy/`. The library's own Vite plugin transforms the test files.
 
-The constant `__TEST_COMPILER__` tells a test file which compiler changed it. Only the preset binds generators to the context of their creation (rule C5), and gives the names of the async functions to the callback hooks. Thus the projects without the preset skip these tests. They start a test of the other behavior in place of the rule C5 tests: a generator body gets the context of each `next()` call. The esbuild project does not start the probe P10, because esbuild cannot change its top-level `for await` for the target ES2016. Thus P10 has its own file, `test/regression/probe-p10.test.ts`.
+The constant `__TEST_COMPILER__` tells a test file which compiler changed it. Only the preset binds generators to the context of their creation (rule C5), and gives the names of the async functions to the callback hooks. Thus the projects without the preset skip these tests. They start a test of the other behavior in place of the rule C5 tests: a generator body gets the context of each `next()` call. The esbuild project does not start the test file of probe P10 (`test/regression/probe-p10.test.ts`), because esbuild cannot change its top-level `for await` for the target ES2016.
 
 ## Test layers
 
 | Layer | Files | What the layer shows |
 | --- | --- | --- |
-| Rules | `test/rules/` | The context rules C1 to C13. |
+| Rules | `test/rules/` | The context rules C1 to C11. The memory tests examine rule C12, and the browser tests examine rule C13. |
 | Browser APIs | `test/browser/` | The event rule C13 and the patched browser APIs. A test makes sure that each `on...` property of the browser has the patch. |
-| Regression | `test/regression/` | The 23 probes of the review of 2026-10-08. |
+| Regression | `test/regression/` | The probes P01 to P23 of the review of 2026-10-08. Each test has the ID of its probe in its name. Probe P19 (two copies of the library) is in `test/rules/c09-c11-isolation.test.ts`. Probe P21 (the memory of a long `then` chain) is in `test/memory/memory.test.ts`. |
 | API | `test/api/` | The `AsyncLocalStorage` tests run against the native class on Node.js and against the browser class. Thus, the two classes agree. The tests of `addCallbackHook()` and of the OpenTelemetry context manager are also here. |
 | Order variation | `test/interleave/` | 40 tasks do random operations with 5 fixed seeds. Each task reads its context after each operation. |
-| Memory | `test/memory/` | Rule C12, with `WeakRef` and the garbage collector. |
+| Memory | `test/memory/` | Rule C12, with `WeakRef` and the garbage collector: promises, values, snapshots, timers and event listeners. The tests fail without `--expose-gc`. |
 | Units and transform | `src/**/*.test.ts` | The runtime parts, the Vite plugin, and output snapshots of the Babel preset. |
 | Test tools | `test/vitest/` | The port of the browser API server, the check for lost test files, and the filter that selects the test files for the transform. |
 | Script tools | `test/scripts/` | The parts of the smoke test, the build tool test and the Babel test: the results of a page, the server processes and the removal of the work folders. |
@@ -112,11 +112,18 @@ The check does not examine a run that stopped early, for example with `--bail` o
 
 ## Mutation testing
 
-Stryker examines the code that the tests can examine in Node.js. This code is the core, the patches of promises and timers, the patch helpers, the Babel preset, the Vite plugin and the OpenTelemetry context manager. The browser-only patches (events, observers, streams and callback APIs) are not in the scope of Stryker, because Stryker operates Vitest in Node.js only. The browser tests examine these patches. The Node.js runtime is also not in the scope, because the native `AsyncLocalStorage` does its work.
+Stryker examines the code that the tests can examine in Node.js. The `mutate` list of `stryker.config.mjs` gives these files:
+
+- `src/core/`: the frames, the store, the classes, the coroutine, the async generator driver and the callback hooks.
+- `src/patches/patch.ts`, `promise.ts`, `timers.ts` and `to-string.ts`: the patch helpers, and the patches of `then`, the timers and `Function.prototype.toString`.
+- `src/babel/`, `src/vite/` and `src/opentelemetry/`: the Babel preset, the Vite plugin and the OpenTelemetry context manager.
+
+The browser-only patches (events, observers, streams and callback APIs) are not in the scope of Stryker, because Stryker operates Vitest in Node.js only. The browser tests examine these patches. The Node.js runtime (`src/node/`) is also not in the scope, because the native `AsyncLocalStorage` does its work. The entry files (`src/index.ts`, `src/runtime.ts`, `src/install.ts` and `src/opentelemetry.ts`) only export and install the other parts.
 
 Stryker uses its command runner. For each mutant, it starts `vitest run` with the configuration `vitest.stryker.config.ts`. This configuration has no projects: it starts the unit tests and the shared tests on the browser runtime in Node.js. The Vitest runner of Stryker started almost no tests with Vitest 5, so each mutant seemed to survive.
 
 Some mutants cannot change the result of a test. Comments of the form `// Stryker disable` mark them, with the reason:
 
-- The cache of the frames. Without the cache, the search gives the same result, only slower.
-- The browser-only schedulers in `src/patches/timers.ts`. Node.js does not have these classes.
+- The cache of the frames in `src/core/store.ts`. Without the cache, the search gives the same result, only slower.
+- The directive `"async-browser-context runtime"` in `src/core/coroutine.ts` and `src/core/async-generator.ts`. The directive is important only when a bundler applies the preset to the runtime, and the tests do not transform the runtime.
+- The browser-only schedulers in `src/patches/timers.ts`. Node.js does not have these classes, and the browser tests examine them.

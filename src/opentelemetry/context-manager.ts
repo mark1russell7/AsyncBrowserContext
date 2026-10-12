@@ -87,7 +87,8 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
         /**
          * After this method, `active()` gives the root context in the current code. With the
          * browser runtime and with Node.js 22, it also gives the root context in all other code
-         * until the next `with()`. With Node.js 24, the native class changes only the current context.
+         * until the next `with()`. With Node.js 24 and its AsyncContextFrame, the native class
+         * changes only the current context, also for the callbacks that this context registered.
          */
         disable() : this {
             this.#storage.disable();

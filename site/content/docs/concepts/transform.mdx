@@ -10,22 +10,30 @@ A native `await` continues the function from the microtask queue of the engine. 
 
 ## The parts of the preset
 
-The preset `async-browser-context/babel-preset` contains six Babel plugins, in this order:
+The preset `async-browser-context/babel-preset` contains eight Babel plugins, in this order:
 
 1. A plugin of this library skips each function with the directive `"async-browser-context runtime"`. The native async functions of the runtime have this directive, so the other plugins do not change them.
 2. A plugin of this library binds each sync generator to the context of its creation (rule C5). It operates in the `Program` visitor, so it gets the generators before the other plugins change them.
-3. A plugin of this library gives the name of each async function to `coroutine`, for the callback hooks. The option `names: false` removes this plugin.
-4. A plugin of this library gives the async generators to the driver of the runtime. It replaces the helpers `wrapAsyncGenerator` and `OverloadYield` of the next plugin with `asyncGenerator` and `OverloadYield` of the runtime.
-5. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops.
-6. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
+3. A plugin of this library gives the name of each async function to `coroutine`, and of each async generator to `asyncGenerator`, for the callback hooks. The option `names: false` removes this plugin.
+4. A plugin of this library moves each static class field and static block with an async arrow function into a static private method. Thus `this` and `super` of the arrow function stay correct after the async transform.
+5. A plugin of this library gives the async generators to the driver of the runtime. The four async generator helpers of the next plugins come from the runtime: `asyncGenerator` in place of `wrapAsyncGenerator`, `OverloadYield`, `awaitAsyncGenerator` and `asyncGeneratorDelegate`.
+6. `@babel/plugin-transform-explicit-resource-management` changes `using` and `await using` declarations, because a generator cannot contain `await using`. The preset adds this plugin only with Babel 7.23.9 and later.
+7. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops. The preset makes its own traversal also skip the functions with the directive of the runtime.
+8. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
 
-The Babel transforms of steps 5 and 6 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
+The Babel transforms of steps 7 and 8 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
 
-```mermaid title="The transform pipeline" caption="The plugins of the library change the generators and record the names first. Then the two Babel plugins change the async code."
+The plugin of step 5 sets the helpers in the `Program` visitor. Thus the preset also operates with `@babel/plugin-transform-runtime`, which gives the other helpers of Babel from `@babel/runtime`.
+
+```mermaid title="The transform pipeline" caption="The plugins of the library skip the runtime, change the generators, record the names and prepare the helpers first. Then the Babel plugins change the resources and the async code."
 flowchart TB
-    input["Source module"] --> bind["Plugin of the library: bind each generator"]
+    input["Source module"] --> skip["Plugin of the library: skip the functions of the runtime"]
+    skip --> bind["Plugin of the library: bind each generator"]
     bind --> names["Plugin of the library: name each async function"]
-    names --> asyncgen["Babel: async generators and for await"]
+    names --> statics["Plugin of the library: move static members with async arrows"]
+    statics --> helpers["Plugin of the library: async generator helpers from the runtime"]
+    helpers --> resources["Babel: using and await using"]
+    resources --> asyncgen["Babel: async generators and for await"]
     asyncgen --> asyncfn["Babel: async functions, with coroutine()"]
     asyncfn --> output["Module that imports async-browser-context/runtime"]
 ```
@@ -50,22 +58,32 @@ The coroutine is a native async function, and it awaits the value of each step w
 
 Before the coroutine awaits an object, it reads the `then` property of the object in the frame of the function, as a native `await` does. An error in a parameter default or in a parameter destructuring rejects the promise, as with a native async function.
 
-The preset does not change the runtime of the library, because a directive marks its native async functions. Thus, a bundler can apply the preset to all of `node_modules`.
+The first step of the function operates in the step of the caller. Thus an `AsyncLocalStorage.enterWith()` in the synchronous part of an async function also changes the store of the caller, as on Node.js.
+
+The preset does not change the runtime of the library, because a directive marks its native async functions. Thus, a bundler can apply the preset to all of `node_modules`. The Vite plugin also skips the files of the runtime by their path.
+
+<Callout type="caution" title="Minifiers">
+  Terser and other minifiers can remove directives. Do not give the preset a copy of the runtime that a minifier changed. An example is a dependency that bundles and minifies this library. Bundlers minify after the transform of each module, so the usual setups are correct.
+</Callout>
 
 ## What asyncGenerator() does
 
-Babel changes each async generator into a sync generator. Each `await` becomes `yield new OverloadYield(value, 0)`, and each step of `yield*` becomes `yield new OverloadYield(promise, 1)`. `asyncGenerator(generatorFunction)` gives a function that makes an async generator object for that generator:
+Babel changes each async generator into a sync generator. Each `await` becomes `yield _awaitAsyncGenerator(value)`, which gives `new OverloadYield(value, 0)`. Each step of `yield*` becomes `yield new OverloadYield(promise, 1)`, through the helper `asyncGeneratorDelegate`. `asyncGenerator(generatorFunction)` gives a function that makes an async generator object for that generator:
 
 1. When the code makes the async generator, record the current frame.
 2. Queue each `next()`, `throw()` and `return()` of the consumer. Start one request at a time, as a native async generator does.
 3. Start each step of the body in the recorded frame, then make the previous frame current again.
 4. Continue after each `await` of the body with a native `await`. Give each yielded value to the consumer.
 
-The protocol is the protocol of the Babel 8 helper. The other helpers of Babel, `awaitAsyncGenerator` and `asyncGeneratorDelegate`, stay in the module and make the `OverloadYield` values of the runtime.
+The protocol is the protocol of the Babel 8 helper. The runtime also gives the helpers `awaitAsyncGenerator` and `asyncGeneratorDelegate`, so the markers are always the `OverloadYield` class of the runtime. The steps after an `await` give the name of the async generator to the callback hooks.
 
 ## What bindGenerator() does
 
 The plugin changes each sync generator function so that it gives `bindGenerator(generator)`. The function keeps its name, its parameters and its kind, so a declaration stays hoisted. The body moves into an inner generator. `bindGenerator` records the frame of the creation. Each `next()`, `throw()` and `return()` starts its step in that frame, and then makes the frame of the caller current again.
+
+<Callout type="note" title="A plain function">
+  After the transform, a generator function is a plain function that gives a generator object. `fn.constructor` is `Function`, not `GeneratorFunction`, and `fn.prototype` and `instanceof fn` do not operate as for a native generator function. A library that examines a function to find a generator function, for example `co` or `is-generator-function`, sees a plain function. The generator objects operate as native generator objects.
+</Callout>
 
 ## Transform the dependencies
 

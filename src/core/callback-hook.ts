@@ -8,9 +8,9 @@ export interface CallbackHook {
     /**
      * The library starts this method before the callback.
      *
-     * @param callback - The function that the library starts. For the step
-     *   of an async function after an `await`, it is the body of the async
-     *   function, with the name of the async function.
+     * @param callback - The function that the library starts. For a step
+     *   after an `await`, it is the body of the async function or the async
+     *   generator. It has the name of that function.
      * @param source - The API that got the callback, for example
      *   `"setTimeout"`, `"Promise.then"`, `"addEventListener:click"`,
      *   `"onclick"` or `"await"`.

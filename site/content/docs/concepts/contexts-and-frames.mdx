@@ -24,6 +24,8 @@ The *root context* is the context with no values. In the root context, `get()` g
 
 The runtime keeps a context as a chain of *frames*. Each `run()` makes a new frame. The frame sets the value of one variable, and its parent is the frame that was current before. The root frame has no parent.
 
+When the current frame sets the same variable, the new frame replaces it, and gets the parent of that frame. A search gives the same values. Thus many uses of `enterWith()` in one context do not make a long chain.
+
 `get()` examines the current frame, then its parent, then the parent of the parent. It gives the value of the nearest frame that sets the variable. If no frame sets the variable, it gives the default value.
 
 ```mermaid title="A chain of frames" caption="Two nested run() calls make two frames. userId.get() finds u-7 in F2. requestId.get() finds r-1 in F1."
@@ -46,7 +48,7 @@ The runtime changes the current frame only for one synchronous step at a time:
 2. The step operates. For example, a `then` callback, a timer callback or one step of an async function.
 3. After the step, the runtime makes the previous frame current again.
 
-Thus, the context of one operation does not stay current after its step. The next task starts in the root context.
+Thus, the context of one operation does not stay current after its step. The next task starts in the root context. The one exception is an `enterWith()` outside all `run()` calls: its store stays as a default store, as on Node.js.
 
 ## Registration context
 

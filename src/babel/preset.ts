@@ -13,15 +13,16 @@ export { METADATA_KEY } from "./bind-generators.js";
 /** The options of the preset. */
 export interface PresetOptions {
     /**
-     * The module that exports the runtime functions `coroutine` and
-     * `bindGenerator`. The default is `async-browser-context/runtime`.
+     * The module that exports the six names of the runtime: `coroutine`,
+     * `bindGenerator`, `asyncGenerator`, `OverloadYield`, `awaitAsyncGenerator`
+     * and `asyncGeneratorDelegate`. The default is `async-browser-context/runtime`.
      */
     readonly runtime? : string | undefined;
     /**
-     * Give the name of each async function to `coroutine`, for the callback
-     * hooks. The default is `true`. With `false`, the hooks get no name for the
-     * steps after an `await`. The code is then smaller by 0.1 to 1.6 percent
-     * of its gzip size (`pnpm bench:size`).
+     * Give the name of each async function and each async generator to the
+     * runtime, for the callback hooks. The default is `true`. With `false`, the
+     * hooks get no name for the steps after an `await`. The code is then smaller
+     * by 0.1 to 1.8 percent of its gzip size (`pnpm bench:size`).
      */
     readonly names? : boolean | undefined;
 }
@@ -42,8 +43,8 @@ export const DEFAULT_RUNTIME = "async-browser-context/runtime";
  * 2. A plugin of this library binds each sync generator to the context of
  *    its creation.
  * 3. A plugin of this library gives the name of each async function to
- *    `coroutine`, for the callback hooks. The option `names: false` removes
- *    this step.
+ *    `coroutine`, and of each async generator to `asyncGenerator`, for the
+ *    callback hooks. The option `names: false` removes this step.
  * 4. A plugin of this library moves the static class members with async arrow
  *    functions into static private methods. Thus `this` and `super` stay
  *    correct (static-members.ts).
@@ -52,7 +53,8 @@ export const DEFAULT_RUNTIME = "async-browser-context/runtime";
  * 6. `@babel/plugin-transform-explicit-resource-management` changes `using` and
  *    `await using` declarations, with Babel 7.23.9 and later.
  * 7. `@babel/plugin-transform-async-generator-functions` changes async
- *    generators and `for await` loops.
+ *    generators and `for await` loops. Its own traversal also skips the
+ *    functions of the runtime (skip-runtime.ts).
  * 8. `@babel/plugin-transform-async-to-generator` changes each async function
  *    into a generator that the `coroutine` function of the runtime operates.
  *

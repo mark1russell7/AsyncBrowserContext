@@ -14,11 +14,13 @@ The package has these entries:
 
 | Entry | What it gives |
 | --- | --- |
-| `async-browser-context` | `AsyncLocalStorage`, `AsyncContext`, `Variable` and `Snapshot`. On Node.js, the `node` export condition selects the Node.js entry. |
+| `async-browser-context` | `AsyncLocalStorage`, `AsyncContext`, `Variable`, `Snapshot` and `addCallbackHook`. On Node.js, the `node` export condition selects the Node.js entry. |
 | `async-browser-context/browser` | The browser entry, also on Node.js. |
-| `async-browser-context/vite` | The Vite plugin `asyncContext()`. |
+| `async-browser-context/runtime` | The runtime functions of transformed code. Do not import them in your code. On Node.js, the `node` export condition selects the runtime of the Node.js entry. |
+| `async-browser-context/browser/runtime` | The browser runtime, also on Node.js. Use it as the `runtime` option together with `async-browser-context/browser`. |
+| `async-browser-context/opentelemetry` | The OpenTelemetry context manager `AsyncContextManager`. It needs `@opentelemetry/api`. |
 | `async-browser-context/babel-preset` | The Babel preset. |
-| `async-browser-context/runtime` | The runtime functions of transformed code. Do not import them in your code. |
+| `async-browser-context/vite` | The Vite plugin `asyncContext()`. |
 
 ## Configure Vite
 
@@ -34,24 +36,27 @@ export default defineConfig({
 });
 ```
 
-The plugin operates after the other plugins, so it gets JavaScript after Vite compiles TypeScript and JSX. By default, it transforms the modules of the application and the modules in `node_modules`. The [API reference](/docs/api#the-vite-plugin) gives the options.
+The plugin operates after the other plugins, so it gets JavaScript after Vite compiles TypeScript and JSX. By default, it transforms the modules of the application and the modules in `node_modules`. It also transforms the JavaScript of Vue, Svelte, Astro and MDX components. The [API reference](/docs/api#the-vite-plugin) gives the options.
 
 ## Configure Babel
 
 1. Add `async-browser-context/babel-preset` to the `presets` list of your Babel configuration.
 2. Put the preset last in the list. Babel uses the presets in reverse order, so the last preset operates first.
+3. For TypeScript and JSX files, add `@babel/preset-typescript` and `@babel/preset-react` before the preset of the library. Babel cannot read these files without them.
 
 ```js
 // babel.config.js
 export default {
     presets : [
         "@babel/preset-env",
+        "@babel/preset-react",
+        "@babel/preset-typescript",
         "async-browser-context/babel-preset",
     ],
 };
 ```
 
-The preset operates with Babel 7.22 and later, and with Babel 8.
+The preset operates with Babel 7.22 and later, and with Babel 8. It changes `using` and `await using` declarations only with Babel 7.23.9 and later.
 
 <Callout type="caution" title="Dependencies">
   Make sure that Babel also transforms your dependencies. Code without the transform cannot get the context of a different operation, but after its own native `await` it gets no context. The [boundaries](/docs/concepts/boundaries) page gives the tools for that code.
@@ -61,7 +66,7 @@ The preset operates with Babel 7.22 and later, and with Babel 8.
 
 1. Use `babel-loader` for all JavaScript and TypeScript files.
 2. Do not exclude `node_modules`, so that the loader also transforms the dependencies.
-3. Put the preset of the library last in the `presets` list.
+3. Put the preset of the library last in the `presets` list. For TypeScript and JSX files, add `@babel/preset-typescript` and `@babel/preset-react` before it.
 
 ```js
 // webpack.config.js
@@ -72,7 +77,12 @@ export default {
             use : {
                 loader : "babel-loader",
                 options : {
-                    presets : ["@babel/preset-env", "async-browser-context/babel-preset"],
+                    presets : [
+                        "@babel/preset-env",
+                        "@babel/preset-react",
+                        "@babel/preset-typescript",
+                        "async-browser-context/babel-preset",
+                    ],
                 },
             },
         }],
@@ -86,12 +96,12 @@ The [build tools](/docs/guides/build-tools) guide shows the setup for Rspack, Ro
 
 ## Use Node.js
 
-Import the package as usual. On Node.js, the `node` export condition selects the Node.js entry. That entry uses the native `AsyncLocalStorage` of `node:async_hooks`, and it installs no patch. A transform is not necessary on Node.js.
+Import the package as usual. On Node.js, the `node` export condition selects the Node.js entry. That entry uses the native `AsyncLocalStorage` of `node:async_hooks`, and it installs no patch. A transform is not necessary on Node.js, except for rule C5. A generator keeps the context of its creation only in code that the preset transforms.
 
 The Node.js entry and the browser entry have the same API. Thus, code that uses the library can operate in the browser and on the server.
 
 <Callout type="note">
-  The package needs Node.js 22.18 or later, or Node.js 24.11 or later. These versions are the versions of Babel 8.
+  The package needs Node.js 22.18 or a later version of Node.js 22, or Node.js 24.11 or later. These versions are the versions of Babel 8.
 </Callout>
 
 ## Use the API
@@ -125,3 +135,5 @@ await requestId.run("r-1", async () => {
 ## Use TypeScript
 
 The package contains its type declarations. The two entries have the same types. `get()` and `getStore()` give `T | undefined`. Code outside a context gets the default value, and without a `defaultValue` option, the default value is `undefined`.
+
+TypeScript finds the types with the `moduleResolution` settings `node10`, `node16`, `nodenext` and `bundler`. The settings `node16`, `nodenext` and `bundler` read the `exports` of `package.json`. For `node10`, the default of `module: commonjs`, the fields `types` and `typesVersions` give the same declaration files.
