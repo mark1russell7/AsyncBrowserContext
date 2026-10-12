@@ -18,6 +18,15 @@ export interface PageErrors {
 }
 
 /**
+ * This function gives `true` for the console error of a module request that the dev server of
+ * Vite refuses after it pre-bundles new dependencies. The server then reloads the page, and
+ * `loadResults` waits again. Thus this error is part of a normal first load.
+ */
+export function isDependencyReload(text : string) : boolean {
+    return text.includes("(Outdated Optimize Dep)");
+}
+
+/**
  * This function listens for the errors of `page`: the uncaught errors
  * (`pageerror`) and the console errors. Start it before `page.goto()`, so it
  * also gets the errors during the load.
@@ -31,7 +40,7 @@ export function watchErrors(page : ErrorSource) : PageErrors {
     failed.catch(() => undefined);
     const onPageError = (error : Error) : void => fail(new Error(`Uncaught error on the page ${page.url()}: ${error.message}`));
     const onConsole = (message : ConsoleMessage) : void => {
-        if (message.type() === "error") {
+        if (message.type() === "error" && !isDependencyReload(message.text())) {
             fail(new Error(`Console error on the page ${page.url()}: ${message.text()}`));
         }
     };

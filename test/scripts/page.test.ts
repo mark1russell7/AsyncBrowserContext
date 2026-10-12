@@ -46,11 +46,13 @@ describe("the errors of a test page", () => {
         await expect(errors.failed).rejects.toThrow(`Uncaught error on the page ${URL}: runChecks failed`);
     });
 
-    it("reject at a console error, but not at the other console messages", async () => {
+    it("reject at a console error, but not at the other console messages or at the reload of the Vite dependencies", async () => {
         const page = new FakePage();
         const errors = watchErrors(page as unknown as ErrorSource);
         page.emit("console", message("log", "[vite] connected."));
         page.emit("console", message("warning", "a warning"));
+        // The dev server of Vite refuses an old module after it pre-bundles new dependencies, and reloads the page
+        page.emit("console", message("error", "Failed to load resource: the server responded with a status of 504 (Outdated Optimize Dep)"));
         expect(await state(errors.failed)).toBe("pending");
         page.emit("console", message("error", "Failed to load resource"));
         await expect(errors.failed).rejects.toThrow(`Console error on the page ${URL}: Failed to load resource`);
