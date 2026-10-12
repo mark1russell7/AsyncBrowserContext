@@ -1,3 +1,4 @@
+import { createAsyncGenerator, OverloadYield } from "./async-generator.js";
 import { applyWithHooks, store, type Frame } from "./store.js";
 
 /**
@@ -93,6 +94,58 @@ export function coroutine<T, A extends unknown[], R>(
     };
 }
 
+/** This function gives `true` for a value that can have a `then` property: an object or a function. */
+function isObject(value : unknown) : value is object {
+    return (typeof value === "object" && value !== null) || typeof value === "function";
+}
+
+/**
+ * This function gives a function that makes an async generator object, which operates
+ * `generatorFunction`. The preset gives this function in place of the helper
+ * `wrapAsyncGenerator` of `@babel/plugin-transform-async-generator-functions`.
+ *
+ * Each step of the body operates in the context of the call that made the generator
+ * (rule C5). The driver continues each step with a native `await` (`async-generator.ts`).
+ */
+export function asyncGenerator<T, A extends unknown[]>(
+    generatorFunction : (this : T, ...args : A) => Generator<unknown, unknown, unknown>,
+) : (this : T, ...args : A) => AsyncGenerator<unknown, unknown, unknown> {
+    const { Promise : NativePromise, promiseResolve } = store.intrinsics;
+    return function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
+        let frame : Frame = store.current;
+        const generator = generatorFunction.apply(this, args);
+        const methods : Record<ResumeMethod, (argument : unknown) => IteratorResult<unknown, unknown>> = {
+            next : (argument) => generator.next(argument),
+            throw : (argument) => generator.throw(argument),
+            return : (argument) => generator.return(argument),
+        };
+        const step = (key : ResumeMethod, argument : unknown, resumed : boolean) : IteratorResult<unknown, unknown> => {
+            const previous = store.current;
+            store.current = frame;
+            try {
+                const hooks = resumed ? store.hooks : undefined;
+                const result = hooks === undefined
+                    ? methods[key](argument)
+                    : applyWithHooks(hooks, generatorFunction, "await", methods[key], undefined, [argument]);
+                // Read the "then" property of an awaited or yielded object in the context of the body, as await and yield do
+                const value : unknown = result.value;
+                if (value instanceof OverloadYield) {
+                    if (isObject(value.v)) {
+                        value.v = promiseResolve(value.v);
+                    }
+                } else if (isObject(value)) {
+                    (result as { value : unknown }).value = promiseResolve(value);
+                }
+                return result;
+            } finally {
+                frame = store.current;
+                store.current = previous;
+            }
+        };
+        return createAsyncGenerator(step, NativePromise);
+    };
+}
+
 type AnyIterator = Iterator<unknown, unknown, unknown> | AsyncIterator<unknown, unknown, unknown>;
 type ResumeMethod = "next" | "throw" | "return";
 
@@ -102,9 +155,10 @@ type ResumeMethod = "next" | "throw" | "return";
  * proposal specifies (`GeneratorStart` and `GeneratorResume`). After each step,
  * the context of the caller is current again.
  *
- * The preset changes each generator function so that it gives
- * `bindGenerator(generator)`. The function works with sync generators and
- * with the async generators of `@babel/plugin-transform-async-generator-functions`.
+ * The preset changes each sync generator function so that it gives
+ * `bindGenerator(generator)`. An async generator does not need it, because
+ * `asyncGenerator` keeps the context itself. The function also works with
+ * async generator objects, for example in the output of older versions.
  */
 export function bindGenerator<I extends AnyIterator>(generator : I) : I {
     let frame : Frame = store.current;

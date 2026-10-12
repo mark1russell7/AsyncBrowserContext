@@ -24,6 +24,18 @@ async function* ticks() {
     yield store.getStore();
 }
 
+async function* delegated() {
+    await null;
+    yield store.getStore();
+    return "done";
+}
+
+async function* delegating() {
+    const result = yield* delegated();
+    await null;
+    yield `${result}:${store.getStore()}`;
+}
+
 class Base {
     async read() {
         await null;
@@ -56,8 +68,10 @@ export async function main() {
         });
         let fromAsyncGenerator;
         for await (const value of ticks()) fromAsyncGenerator = value;
+        const fromDelegate = [];
+        for await (const value of delegating()) fromDelegate.push(value);
         const fromSuper = await new Child().read();
-        return { fromAwait, fromGenerator, fromAsyncGenerator, fromSuper };
+        return { fromAwait, fromGenerator, fromAsyncGenerator, fromDelegate, fromSuper };
     });
     const requests = await Promise.all([request("a"), request("b")]);
     removeHook();

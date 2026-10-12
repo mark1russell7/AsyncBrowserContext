@@ -10,8 +10,12 @@ export interface BindGeneratorsOptions {
 /** The key of the file metadata that tells if the preset changed the file. */
 export const METADATA_KEY = "asyncBrowserContext";
 
-/** The names of the helper of `@babel/plugin-transform-async-generator-functions`. Babel gives them an underscore. */
-const ASYNC_GENERATOR_HELPER = /^_wrapAsyncGenerator\d*$/;
+/**
+ * The local names of the async generator helper: `wrapAsyncGenerator` of
+ * `@babel/plugin-transform-async-generator-functions`, or `asyncGenerator` of the runtime,
+ * which the preset gives in its place. Babel gives them an underscore.
+ */
+const ASYNC_GENERATOR_HELPER = /^_(wrapAsyncGenerator|asyncGenerator)\d*$/;
 /** The local names that `addNamed` gives to `bindGenerator`. */
 const BIND_GENERATOR_NAME = /^_bindGenerator\d*$/;
 
@@ -20,8 +24,15 @@ type FunctionPath = NodePath<types.Function>;
 /** This function gives `true` if `path` is the generator that Babel gives to its async generator helper. */
 function isAsyncGeneratorHelperArgument(path : FunctionPath) : boolean {
     const parent = path.parent;
-    // Stryker disable next-line LogicalOperator: without the call check, the name test also fails, because a member callee has no name
-    return types.isCallExpression(parent) && types.isIdentifier(parent.callee) && ASYNC_GENERATOR_HELPER.test(parent.callee.name);
+    if (!types.isCallExpression(parent)) {
+        return false;
+    }
+    if (types.isIdentifier(parent.callee)) {
+        return ASYNC_GENERATOR_HELPER.test(parent.callee.name);
+    }
+    // CommonJS output of the preset: _runtime.asyncGenerator or (0, _runtime.asyncGenerator)
+    const member = types.isSequenceExpression(parent.callee) ? parent.callee.expressions.at(-1) : parent.callee;
+    return types.isMemberExpression(member) && types.isIdentifier(member.property, { name : "asyncGenerator" });
 }
 
 /**
@@ -101,7 +112,8 @@ export function bindGeneratorsPlugin(_api : unknown, options : object) : PluginO
                         if (node.async) {
                             changed = true;
                         }
-                        if (!node.generator || isAsyncGeneratorHelperArgument(path) || isAlreadyBound(path, runtime)) {
+                        // The driver of the runtime keeps the context of an async generator (asyncGenerator)
+                        if (!node.generator || node.async || isAsyncGeneratorHelperArgument(path) || isAlreadyBound(path, runtime)) {
                             return;
                         }
                         changed = true;

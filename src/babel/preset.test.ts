@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { transformAsync } from "@babel/core";
+import { transformAsync, types, type PluginObject } from "@babel/core";
 import { describe, expect, it } from "vitest";
 import preset, { DEFAULT_RUNTIME, METADATA_KEY } from "./preset.js";
 
@@ -91,11 +91,13 @@ describe("the Babel preset", () => {
         expect(output.changed).toBe(true);
     });
 
-    it("binds a generator one time when it transforms its own output again", async () => {
+    it("binds a generator one time when it transforms its own output again, and gives an async generator to the driver", async () => {
         const first = await transform("function* g() { yield 1; } async function* h() { yield 2; }");
         const second = await transform(first.code);
-        expect(countBindCalls(first.code)).toBe(2);
-        expect(countBindCalls(second.code)).toBe(2);
+        // The driver of the runtime keeps the context of the async generator, so bindGenerator does not wrap it
+        expect(countBindCalls(first.code)).toBe(1);
+        expect(countBindCalls(second.code)).toBe(1);
+        expect(second.code.split("_asyncGenerator(")).toHaveLength(2);
     });
 
     it("binds a generator one time when it transforms its own CommonJS output again", async () => {
@@ -103,6 +105,41 @@ describe("the Babel preset", () => {
         const second = await transform(first.code, { sourceType : "script" });
         expect(countBindCalls(first.code)).toBe(1);
         expect(countBindCalls(second.code)).toBe(1);
+    });
+
+    it("does not bind the generator of the driver when it transforms its own CommonJS output again", async () => {
+        const first = await transform("module.exports = async function* g() { await null; yield 1; };", { sourceType : "script" });
+        const second = await transform(first.code, { sourceType : "script" });
+        expect(first.code).toContain("_asyncGenerator(function* ()");
+        expect(countBindCalls(first.code)).toBe(0);
+        expect(countBindCalls(second.code)).toBe(0);
+    });
+
+    it("gives the async generators to asyncGenerator and OverloadYield of the runtime, in place of the Babel helper", async () => {
+        const output = await transform("export async function* g(items) { for await (const item of items) { yield* item; } }");
+        expect(output.code).toMatch(/import \{[^}]*asyncGenerator as _asyncGenerator[^}]*\} from "async-browser-context\/runtime"/);
+        expect(output.code).toMatch(/import \{[^}]*OverloadYield as _OverloadYield[^}]*\} from "async-browser-context\/runtime"/);
+        expect(output.code).not.toMatch(/function AsyncGenerator\(|function _wrapAsyncGenerator\(|function _OverloadYield\(/);
+        // The other helpers stay in the file, and they make the OverloadYield values of the runtime
+        expect(output.code).toContain("function _awaitAsyncGenerator(e) { return new _OverloadYield(e, 0); }");
+        expect(output.code).toMatch(/function _asyncGeneratorDelegate\(/);
+    });
+
+    it("keeps the helperGenerator of an earlier plugin for the other helpers", async () => {
+        const earlier = () : PluginObject => ({
+            pre(file) {
+                file.set("helperGenerator", (name : string) => (name === "asyncIterator" ? types.identifier("customAsyncIterator") : undefined));
+            },
+        });
+        const result = await transformAsync("export async function* g(items) { for await (const item of items) yield item; }", {
+            filename : "input.js",
+            babelrc : false,
+            configFile : false,
+            plugins : [earlier],
+            presets : [preset],
+        });
+        expect(result?.code).toContain("customAsyncIterator(items)");
+        expect(result?.code).toContain("_asyncGenerator(function* (items)");
     });
 
     it("does not bind a generator again that an import of bindGenerator with another name binds", async () => {

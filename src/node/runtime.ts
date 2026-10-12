@@ -7,6 +7,9 @@
  * @packageDocumentation
  */
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createAsyncGenerator, type ResumeKey } from "../core/async-generator.js";
+
+export { OverloadYield } from "../core/async-generator.js";
 
 /**
  * This function gives an async function that operates `generatorFunction`. The function is
@@ -30,6 +33,30 @@ export function coroutine<T, A extends unknown[], R>(generatorFunction : (this :
             result = generator.next(value);
         }
         return result.value;
+    };
+}
+
+/**
+ * This function gives a function that makes an async generator object, which operates
+ * `generatorFunction`. The preset gives it in place of the helper `wrapAsyncGenerator` of
+ * Babel. The driver starts in a snapshot of the context of the creation (rule C5). The
+ * native `AsyncLocalStorage` keeps that context through the `await` of the driver.
+ */
+export function asyncGenerator<T, A extends unknown[]>(
+    generatorFunction : (this : T, ...args : A) => Generator<unknown, unknown, unknown>,
+) : (this : T, ...args : A) => AsyncGenerator<unknown, unknown, unknown> {
+    return function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
+        let snapshot = AsyncLocalStorage.snapshot();
+        const generator = generatorFunction.apply(this, args);
+        const step = (key : ResumeKey, argument : unknown) : IteratorResult<unknown, unknown> => {
+            try {
+                return generator[key](argument);
+            } finally {
+                // The body can change its context with enterWith before it stops
+                snapshot = AsyncLocalStorage.snapshot();
+            }
+        };
+        return createAsyncGenerator(step, Promise, (start) => snapshot(start));
     };
 }
 

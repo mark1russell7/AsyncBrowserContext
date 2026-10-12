@@ -111,6 +111,29 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         ]);
     });
 
+    it.skipIf(!preset)("calls the hooks for each step of an async generator after an await, in the context of the generator", async () => {
+        const variable = new Variable<string>();
+        const calls = record(variable);
+        async function* ticks() : AsyncGenerator<string | undefined> {
+            await null;
+            yield variable.get();
+        }
+        const values : unknown[] = [];
+        const consume = async () : Promise<void> => {
+            for await (const value of ticks()) {
+                values.push(value);
+            }
+        };
+        await variable.run("g", consume);
+        expect(values).toEqual(["g"]);
+        // The step after the await of the generator body. The generator has no name, and the steps of consume have its name.
+        const steps = calls.filter((call) => call.source === "await" && call.name === "");
+        expect(steps).toEqual([
+            { phase : "before", source : "await", name : "", value : "g" },
+            { phase : "after", source : "await", name : "", value : "g" },
+        ]);
+    });
+
     it.skipIf(!preset)("gives the name of an async method and of an async arrow function in a variable", async () => {
         const variable = new Variable<string>();
         const calls = record(variable);
