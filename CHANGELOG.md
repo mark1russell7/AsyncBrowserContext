@@ -51,7 +51,7 @@ This version changes some behaviors, so it is a minor version. The first section
   - A generator declaration in a block of a script stays in the block.
   - The plugin of the async generator helpers sets its helpers in `Program` enter. Thus `@babel/plugin-transform-runtime` and the presets earlier in the list do not break the markers of the driver.
   - The traversals of the preset skip the functions with the directive of the runtime. The preset finds the runtime functions also in CommonJS output. A file counts as changed only when the preset changes it.
-  - TypeScript wrappers, for example `as` and `satisfies`, and accessor fields keep the name of an async function for the hooks. A function that Babel gives no named wrapper, for example in a class field, keeps its name and its length.
+  - TypeScript wrappers, for example `as` and `satisfies`, and accessor fields keep the name of an async function for the hooks. A function that Babel gives no named wrapper, for example in a class field, keeps its name and its length. This is also true on Node.js and for async generators. An anonymous async function has the empty name, as a native one. Before, it had the name `asyncFunction`.
 - Vite plugin: no input source map, because the map of Vite describes the code that the plugin gets. The option `compact: false` keeps the format of large modules. One presets array for all modules lets the configuration cache of Babel operate.
 
 ### Performance

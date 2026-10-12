@@ -285,6 +285,18 @@ describe("rule C3 in static class members", () => {
         expect([service.save.name, service.save.length]).toEqual(["save", 1]);
     });
 
+    it.skipIf(lowered)("gives async functions and async generators the names and lengths of native functions (not with SWC or esbuild)", () => {
+        class Names {
+            load = async () : Promise<number> => 1;
+            gen = async function* (_first : number, _second : number) : AsyncGenerator<number> {
+                yield 1;
+            };
+        }
+        const anonymous = [async () : Promise<number> => 3][0] as () => Promise<number>;
+        const names = new Names();
+        expect([names.load.name, names.gen.name, names.gen.length, anonymous.name]).toEqual(["load", "gen", 2, ""]);
+    });
+
     it.skipIf(lowered)("keeps the result and the name of class fields with the names _ref, eval, arguments and a string key (not with SWC or esbuild)", async () => {
         class Fields {
             _ref = async (value : number) : Promise<number> => value + 1;

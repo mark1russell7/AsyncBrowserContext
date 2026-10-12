@@ -1,4 +1,5 @@
 import { createAsyncGenerator, PlainValue, unbox } from "./async-generator.js";
+import { copyNameAndLength } from "./function-name.js";
 import { applyQuietly, applyWithHooks, store, type Frame } from "./store.js";
 
 /**
@@ -146,12 +147,7 @@ export function coroutine<T, A extends unknown[], R>(
         return drive();
     };
     // Where Babel gives no named wrapper, for example in a class field, the function keeps the name and the length of the source
-    if (name !== undefined && name !== "") {
-        Object.defineProperty(asyncFunction, "name", { value : name, configurable : true });
-    }
-    if (generatorFunction.length > 0) {
-        Object.defineProperty(asyncFunction, "length", { value : generatorFunction.length, configurable : true });
-    }
+    copyNameAndLength(asyncFunction, name, generatorFunction.length);
     return asyncFunction;
 }
 
@@ -169,7 +165,7 @@ export function asyncGenerator<T, A extends unknown[]>(
     name? : string,
 ) : (this : T, ...args : A) => AsyncGenerator<unknown, unknown, unknown> {
     const NativePromise = store.intrinsics.Promise;
-    return function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
+    const makeAsyncGenerator = function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
         let frame : Frame = store.current;
         // An async generator that a hook makes does not start the hooks (store.ts, applyQuietly)
         const quiet = store.inHook === true;
@@ -208,6 +204,8 @@ export function asyncGenerator<T, A extends unknown[]>(
         };
         return createAsyncGenerator(step, NativePromise, undefined, prepare);
     };
+    copyNameAndLength(makeAsyncGenerator, name, generatorFunction.length);
+    return makeAsyncGenerator;
 }
 
 type AnyIterator = Iterator<unknown, unknown, unknown> | AsyncIterator<unknown, unknown, unknown>;

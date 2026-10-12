@@ -13,6 +13,7 @@
  */
 import { AsyncResource } from "node:async_hooks";
 import { createAsyncGenerator, type ResumeKey } from "../core/async-generator.js";
+import { copyNameAndLength } from "../core/function-name.js";
 
 export { asyncGeneratorDelegate, awaitAsyncGenerator, OverloadYield } from "../core/async-generator.js";
 
@@ -22,10 +23,14 @@ const RESOURCE_TYPE = "async-browser-context:generator";
 /**
  * This function gives an async function that operates `generatorFunction`. The function is
  * a native async function: each `await` of the source becomes one native `await`, with
- * the same microtask turns. An error of the parameters rejects the promise.
+ * the same microtask turns. An error of the parameters rejects the promise. The function has the
+ * name and the length of the source, as in the browser runtime.
  */
-export function coroutine<T, A extends unknown[], R>(generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>) : (this : T, ...args : A) => Promise<R> {
-    return async function asyncFunction(this : T, ...args : A) : Promise<R> {
+export function coroutine<T, A extends unknown[], R>(
+    generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>,
+    name? : string,
+) : (this : T, ...args : A) => Promise<R> {
+    const asyncFunction = async function asyncFunction(this : T, ...args : A) : Promise<R> {
         // The directive tells the Babel preset not to change this function (src/babel/skip-runtime.ts)
         "async-browser-context runtime";
         const generator = generatorFunction.apply(this, args);
@@ -42,6 +47,8 @@ export function coroutine<T, A extends unknown[], R>(generatorFunction : (this :
         }
         return result.value;
     };
+    copyNameAndLength(asyncFunction, name, generatorFunction.length);
+    return asyncFunction;
 }
 
 /**
@@ -52,9 +59,9 @@ export function coroutine<T, A extends unknown[], R>(generatorFunction : (this :
  */
 export function asyncGenerator<T, A extends unknown[]>(
     generatorFunction : (this : T, ...args : A) => Generator<unknown, unknown, unknown>,
-    _name? : string,
+    name? : string,
 ) : (this : T, ...args : A) => AsyncGenerator<unknown, unknown, unknown> {
-    return function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
+    const makeAsyncGenerator = function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
         let context = new AsyncResource(RESOURCE_TYPE);
         const generator = generatorFunction.apply(this, args);
         const step = (key : ResumeKey, argument : unknown) : IteratorResult<unknown, unknown> => {
@@ -67,6 +74,8 @@ export function asyncGenerator<T, A extends unknown[]>(
         };
         return createAsyncGenerator(step, Promise, (start) => context.runInAsyncScope(start));
     };
+    copyNameAndLength(makeAsyncGenerator, name, generatorFunction.length);
+    return makeAsyncGenerator;
 }
 
 type AnyIterator = Iterator<unknown, unknown, unknown> | AsyncIterator<unknown, unknown, unknown>;
