@@ -107,6 +107,9 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
         /** This method patches the methods of a Node.js event emitter, as `AsyncLocalStorageContextManager` of OpenTelemetry does. */
         #bindEmitter(context : Context, emitter : object) : void {
             const methods = emitter as Record<string, unknown>;
+            // `once` of Node.js adds its own wrapper with `this.on`. That inner add must not wrap again,
+            // else `removeListener` does not find the listener. OpenTelemetry has the same guard.
+            let adding = false;
             for (const name of ADD_LISTENER_METHODS) {
                 const original = methods[name];
                 if (typeof original !== "function") {
@@ -114,7 +117,7 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
                 }
                 const manager = this;
                 methods[name] = function (this : unknown, event : unknown, listener : unknown) : unknown {
-                    if (typeof listener !== "function") {
+                    if (adding || typeof listener !== "function") {
                         return Reflect.apply(original as Method, this, arguments);
                     }
                     const listeners = listenersOf(emitter, event);
@@ -123,7 +126,12 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
                         wrapper = manager.#bindFunction(context, listener as Listener);
                         listeners.set(listener, wrapper);
                     }
-                    return Reflect.apply(original as Method, this, [event, wrapper]);
+                    adding = true;
+                    try {
+                        return Reflect.apply(original as Method, this, [event, wrapper]);
+                    } finally {
+                        adding = false;
+                    }
                 };
             }
             for (const name of ["removeListener", "off"] as const) {

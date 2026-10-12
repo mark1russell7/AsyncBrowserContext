@@ -1,7 +1,7 @@
 import { context, createContextKey, ROOT_CONTEXT, trace, type ContextManager } from "@opentelemetry/api";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AsyncContextManager } from "async-browser-context/opentelemetry";
-import { delay, runtime, turns } from "../helpers.js";
+import { delay, inBrowser, runtime, turns } from "../helpers.js";
 
 const REQUEST = createContextKey("request");
 const valueOf = () : unknown => context.active().getValue(REQUEST);
@@ -125,6 +125,24 @@ describe(`AsyncContextManager (${runtime} runtime)`, () => {
         emitter.removeListener("data", listener);
         emitter.emit("data", "b");
         expect(seen).toEqual(["a request"]);
+    });
+
+    it.skipIf(inBrowser)("removes a once listener of a Node.js EventEmitter with removeListener, and starts it one time", () => {
+        const { EventEmitter } = process.getBuiltinModule("node:events");
+        const emitter = context.bind(ROOT_CONTEXT.setValue(REQUEST, "once"), new EventEmitter());
+        const seen : unknown[] = [];
+        const listener = () : void => { seen.push(valueOf()); };
+        emitter.once("removed", listener);
+        emitter.prependOnceListener("removed", listener);
+        emitter.removeListener("removed", listener);
+        emitter.removeListener("removed", listener);
+        expect(emitter.listenerCount("removed")).toBe(0);
+        emitter.emit("removed");
+        emitter.once("kept", listener);
+        context.with(ROOT_CONTEXT.setValue(REQUEST, "emit-time"), () => emitter.emit("kept"));
+        emitter.emit("kept");
+        expect(seen).toEqual(["once"]);
+        expect(emitter.listenerCount("kept")).toBe(0);
     });
 
     it("binds the listeners of an event target, and removes them with removeEventListener", () => {
