@@ -34,7 +34,7 @@ Browsers do not have `AsyncLocalStorage`. A native `await` does not use code tha
 1. **A runtime.** It keeps the current context. It patches `Promise.prototype.then`, the timers, the event listeners, the observers and other callback APIs. Thus, each callback gets the context of the code that registered it.
 2. **A Babel preset and a Vite plugin.** They change each async function into a generator that the runtime operates. Before each step of the function, the runtime sets the context of the function. After the step, the runtime sets the previous context again.
 
-On Node.js, the package uses the native `AsyncLocalStorage` of `node:async_hooks`. No transform and no patch is necessary on Node.js.
+On Node.js, the package uses the native `AsyncLocalStorage` of `node:async_hooks`, and it installs no patch. On Node.js, the transform is necessary only for rule C5 of generators.
 
 ## Compared with other tools
 
@@ -53,11 +53,11 @@ Thus, code that uses `AsyncLocalStorage` on the server can use the same API in t
 npm install async-browser-context
 ```
 
-The package needs Node.js 22.18 or later, or 24.11 or later, for the build tools. The runtime operates in the current versions of Chrome, Edge, Firefox and Safari.
+The build tools of the package need Node.js 22.18 or a later version of Node.js 22, or Node.js 24.11 or later. The runtime operates in the current versions of Chrome, Edge, Firefox and Safari.
 
 ## Set up the transform
 
-> **CAUTION:** Transform all the code that awaits in a context, also the code in `node_modules`. In code that the transform does not change, the browser runtime cannot set the context after `await`. That code gets the root context: `getStore()` gives `undefined`. It does not get the context of a different operation at any time.
+> **CAUTION:** Transform all the code that awaits in a context, also the code in `node_modules`. In code that the transform does not change, the browser runtime cannot set the context after `await`. That code gets the root context: `getStore()` gives `undefined`, or the `defaultValue` of the storage. It does not get the context of a different operation at any time.
 
 ### Vite
 
@@ -74,14 +74,14 @@ The package needs Node.js 22.18 or later, or 24.11 or later, for the build tools
 
 2. Build or start the application as usual.
 
-The plugin transforms the modules of the application and of its dependencies, also in the dev server. It operates after the other plugins, so it gets JavaScript after TypeScript and JSX are compiled. The plugin does not transform the modules of server-side rendering, because Node.js has the native `AsyncLocalStorage`.
+The plugin transforms the modules of the application and of its dependencies, also in the dev server. It also transforms the JavaScript of Vue, Svelte, Astro and MDX components, but not their styles. It operates after the other plugins, so it gets JavaScript after TypeScript and JSX are compiled. The plugin does not transform the modules of server-side rendering, because Node.js has the native `AsyncLocalStorage`.
 
 | Option | Default | Function |
 | --- | --- | --- |
-| `include` | All JavaScript and TypeScript modules | A regular expression or a function that selects the modules to transform. |
+| `include` | All JavaScript and TypeScript modules, and the JavaScript of Vue, Svelte, Astro and MDX components | A regular expression or a function that selects the modules to transform. |
 | `exclude` | None | A regular expression or a function that selects the modules not to transform. |
-| `runtime` | `async-browser-context/runtime` | The module that the transformed code imports. |
-| `names` | `true` | Set `false` to remove the names of the async functions for the callback hooks. The code is then smaller by 0.1 to 1.6 percent. |
+| `runtime` | `async-browser-context/runtime` | The module that the transformed code imports. It must export the six names of `async-browser-context/runtime`. |
+| `names` | `true` | Set `false` to remove the names of the async functions for the callback hooks. The code is then smaller by 0.1 to 1.8 percent. |
 | `ssr` | `false` | Set `true` to also transform the modules of server-side rendering, for example for Vitest in Node.js. |
 
 ### Babel
@@ -96,7 +96,11 @@ The plugin transforms the modules of the application and of its dependencies, al
 
 2. Make sure that Babel transforms the dependencies too. With webpack, do not exclude `node_modules` from `babel-loader`.
 
-The preset operates with Babel 7.22 and later, and with Babel 8. CI examines Babel 7.22, the newest Babel 7 and the newest Babel 8 with the packed package (`pnpm test:babel`).
+For TypeScript and JSX files, also add `@babel/preset-typescript` and `@babel/preset-react`. Babel cannot read these files without them. Put them before the preset of the library in the `presets` list.
+
+The preset operates with Babel 7.22 and later, and with Babel 8. The transform of `using` and `await using` declarations needs Babel 7.23.9 or later. CI examines Babel 7.22, the newest Babel 7 and the newest Babel 8 with the packed package (`pnpm test:babel`).
+
+The preset does not change the runtime of the library. A directive, `"async-browser-context runtime"`, marks its native async functions. Terser and other minifiers can remove directives. Thus do not give the preset a copy of the runtime that a minifier changed, for example a dependency that bundles and minifies this library. Bundlers minify after the transform of each module, so the usual setups are correct.
 
 ### Other build tools
 
@@ -114,7 +118,7 @@ With the target ES2016, the patch of `then` keeps the context through `await`. A
 
 ### Node.js
 
-Do not set up a transform. The `node` export condition selects the Node.js entry, which uses the native `AsyncLocalStorage`.
+The `node` export condition selects the Node.js entry, which uses the native `AsyncLocalStorage`. A transform is not necessary, except for rule C5. A generator keeps the context of its creation only in code that the preset transforms. Without the preset, a generator body gets the context of each `next()` call, as a native generator does.
 
 ## Use the API
 
@@ -131,6 +135,8 @@ storage.getStore(); // "none"
 ```
 
 The class has `getStore()`, `run()`, `exit()`, `enterWith()`, `disable()`, the static `bind()` and `snapshot()`, and the `name` and `defaultValue` options of Node.js 24.
+
+`enterWith()` operates as on Node.js. In the synchronous part of an async function, it also changes the store of the caller. Outside all `run()` calls, for example at the top level of a module, the store stays as a default store. The later code of the module and the callbacks that it registers get it. Use `run()` if possible.
 
 **`AsyncContext.Variable` and `AsyncContext.Snapshot`**, the API of the TC39 proposal:
 
@@ -164,7 +170,7 @@ addCallbackHook({
 });
 ```
 
-`source` names the API, for example `"setTimeout"`, `"addEventListener:click"` or `"await"`. For a step after an `await`, `callback.name` is the name of the async function. The guide [Find the operation of a long task](https://mark1russell7.github.io/AsyncBrowserContext/docs/guides/long-tasks) tells more.
+`source` names the API, for example `"setTimeout"`, `"addEventListener:click"` or `"await"`. For a step after an `await`, `callback.name` is the name of the async function or of the async generator. A callback that a hook schedules does not start the hooks, so a hook cannot start itself without end. The guide [Find the operation of a long task](https://mark1russell7.github.io/AsyncBrowserContext/docs/guides/long-tasks) tells more.
 
 ## Entry points
 
@@ -194,7 +200,7 @@ On Node.js, `AsyncContextManager` uses the native `AsyncLocalStorage`. Do not us
 
 ## Context rules
 
-The tests examine each rule on the browser runtime, on the Node.js runtime and in Chromium, Firefox and WebKit.
+The tests of the rules are in `test/rules/`, one file for each rule. Each rule project in Node.js starts them, and Chromium, Firefox and WebKit start them too. The rule projects are the browser runtime with the preset, with SWC and with esbuild, and the Node.js runtime with and without the preset. The table after the rules gives the exceptions.
 
 | Rule | The library keeps this rule |
 | --- | --- |
@@ -212,34 +218,42 @@ The tests examine each rule on the browser runtime, on the Node.js runtime and i
 | C12 | The library does not keep promises or values in memory after the program has no reference to them. |
 | C13 | An event listener gets the context of the code that dispatches the event. If that code has the root context, the listener gets the registration context. This is the context of the `addEventListener()` call or of the assignment to the `on...` property. An event that the browser dispatches, for example a click of the user, also gives the registration context. |
 
+| Rule | Where the tests examine the rule |
+| --- | --- |
+| C5 | Only the projects with the preset examine the rule. The projects without the preset examine the other behavior: a generator body gets the context of each `next()` call. |
+| C9 | `test/rules/c09-c11-isolation.test.ts`, only on the browser runtime. The Node.js runtime has no store of its own. |
+| C10 | `test/rules/c09-c11-isolation.test.ts`, only on the browser runtime in Node.js. A browser cannot load a second copy of the same modules without a second bundle. |
+| C12 | `test/memory/memory.test.ts`, in the project `memory`: the browser runtime in Node.js with `--expose-gc`. |
+| C13 | `test/browser/c13-events.test.ts`, only in Chromium, Firefox and WebKit. |
+
 ## Patched APIs
 
-> **CAUTION:** Import `async-browser-context` before all other modules in the entry file of the application. The library patches global functions when it loads. Code that keeps a reference to `setTimeout` or to another patched function before the library loads does not get the context.
+> **CAUTION:** Import `async-browser-context` before all other modules in the entry file of the application. The library patches global functions when it loads. Code that keeps a reference to `setTimeout` or to another patched function before the library loads does not get the context. A listener that code adds before the library loads, and adds again after, operates two times. The browser then has the listener and a wrapper of it.
 
 | Group | APIs |
 | --- | --- |
 | Promises | `Promise.prototype.then`, thus also `catch`, `finally` and the combinators |
 | Timers | `setTimeout`, `setInterval`, `setImmediate`, `queueMicrotask`, `requestAnimationFrame`, `requestIdleCallback`, `scheduler.postTask`, `requestVideoFrameCallback`, `XRSession.requestAnimationFrame` |
-| Events | `addEventListener`, `removeEventListener`, all `on...` properties, `MediaQueryList.addListener` |
+| Events | `addEventListener`, `removeEventListener`, all `on...` properties, `MediaQueryList.addListener` and `removeListener` |
 | Observers | `MutationObserver`, `ResizeObserver`, `IntersectionObserver`, `PerformanceObserver`, `ReportingObserver`, `PressureObserver`, `FinalizationRegistry` |
 | Streams | The methods of the underlying objects of `ReadableStream`, `WritableStream` and `TransformStream` |
-| Callback APIs | `navigator.locks.request`, `HTMLCanvasElement.toBlob`, `Array.fromAsync`, geolocation, `DataTransferItem.getAsString`, the APIs of file system entries, `decodeAudioData`, `MediaSession.setActionHandler`, `Notification.requestPermission`, the callbacks of `RTCPeerConnection`, `startViewTransition`, `NavigateEvent.intercept` |
+| Callback APIs | `navigator.locks.request`, `HTMLCanvasElement.toBlob`, the map function of `Array.fromAsync`, geolocation, `DataTransferItem.getAsString`, the APIs of file system entries, `decodeAudioData`, `MediaSession.setActionHandler`, `Notification.requestPermission`, the callbacks of `RTCPeerConnection`, `startViewTransition` of `Document` and `Element`, `NavigateEvent.intercept` |
 
-The patches keep the names, the lengths and the source text of the native functions. `Function.prototype.toString` gives the source text of the original function.
+The patches keep the names, the lengths and the source text of the native functions. `Function.prototype.toString` gives the source text of the original function. The patched functions are methods, as the native functions: they have no `prototype` property and they are not constructors. They read the options of `addEventListener()` as the DOM does. For streams and option objects, the patches give the browser a Proxy of your object, so frozen objects, getters and private fields operate.
 
 ## Boundaries
 
 In transformed code, each step gets the context of its own operation. Code without the transform cannot get the context of a different operation (rule C7). At most, that code gets no context after its own native `await`. Where your code meets that code, one function of the library keeps the context:
 
-| The other code | What to do |
-| --- | --- |
-| Gives a promise, and your code awaits it | Nothing. After the `await`, your code gets its context again. |
-| Is async code that a compiler changed before the publish (`__awaiter` of TypeScript, `_asyncToGenerator` of Babel) | Nothing. The helpers continue in `then` callbacks, and the patch of `then` keeps the context. |
-| Starts your callback synchronously, or from a timer, an observer or a promise that it registers before its first `await` | Nothing. The patched APIs keep the context. Event listeners follow rule C13. |
-| Starts your callback after its own native `await` | `AsyncLocalStorage.bind(callback)` or `AsyncContext.Snapshot.wrap(callback)` |
-| Keeps your callback in a list and starts it later from other code | `AsyncLocalStorage.bind(callback)` when you give the callback |
-| Reads the context itself after its own native `await` | Give the values as arguments, or transform the code. |
-| Operates in a worker or an iframe | Send the values in the message, and use `run()` on the other side. |
+| The other code | What to do | Tests |
+| --- | --- | --- |
+| Gives a promise, and your code awaits it | Nothing. After the `await`, your code gets its context again. | `c07-boundaries`, `c07-untransformed` |
+| Is async code that a compiler changed before the publish (`__awaiter` of TypeScript, `_asyncToGenerator` of Babel) | Nothing. The helpers continue in `then` callbacks, and the patch of `then` keeps the context. | `c07-compiled-dependencies` |
+| Starts your callback synchronously, or from a timer, an observer or a promise that it registers before its first `await` | Nothing. The patched APIs keep the context. Event listeners follow rule C13. | `c07-boundaries`, `c04-then`, `c06-timers`, `browser/patched-apis`, `browser/c13-events` |
+| Starts your callback after its own native `await` | `AsyncLocalStorage.bind(callback)` or `AsyncContext.Snapshot.wrap(callback)` | `c07-boundaries` |
+| Keeps your callback in a list and starts it later from other code | `AsyncLocalStorage.bind(callback)` when you give the callback | `c07-boundaries` |
+| Reads the context itself after its own native `await` | Give the values as arguments, or transform the code. | `c07-untransformed`: the read gets no value |
+| Operates in a worker or an iframe | Send the values in the message, and use `run()` on the other side. | No test |
 
 ```ts
 untransformedLibrary.onDone(AsyncLocalStorage.bind((result) => {
@@ -247,13 +261,13 @@ untransformedLibrary.onDone(AsyncLocalStorage.bind((result) => {
 }));
 ```
 
-The Vite plugin transforms the dependencies in `node_modules` by default. Thus, these boundaries are usually only scripts from other servers, browser extensions and code from `eval()` or `new Function()`. The tests in `test/rules/c07-boundaries.test.ts` and `test/rules/c07-compiled-dependencies.test.ts` examine each row. The [boundaries page](https://mark1russell7.github.io/AsyncBrowserContext/docs/concepts/boundaries) of the website gives the details.
+The Vite plugin transforms the dependencies in `node_modules` by default. Thus, these boundaries are usually only scripts from other servers, browser extensions and code from `eval()` or `new Function()`. The "Tests" column names the test files in `test/rules/` and `test/browser/`, without `.test.ts`. The [boundaries page](https://mark1russell7.github.io/AsyncBrowserContext/docs/concepts/boundaries) of the website gives the details.
 
 Do not use the library together with zone.js or with another library that patches `Promise.prototype.then`. The two libraries patch the same functions with different rules. For OpenTelemetry, use `AsyncContextManager` in place of the `ZoneContextManager`.
 
 ### Other differences of transformed code
 
-- **Generator functions.** A transformed generator function is an ordinary function that gives a generator. `fn.prototype` and `instanceof fn` do not operate as for a native generator function. The generator objects operate as native generator objects.
+- **Generator functions.** A transformed generator function is an ordinary function that gives a bound generator. `fn.prototype` and `instanceof fn` do not operate as for a native generator function. `fn.constructor` is `Function`, not `GeneratorFunction`. Thus a library that examines a function to find a generator function, for example `co` or `is-generator-function`, sees a plain function. The generator objects operate as native generator objects.
 - **Stack traces.** In transformed code, a stack trace shows the generator and the `coroutine` function of the runtime.
 - **Profilers.** Between the browser and each callback of a patched API, stack traces and profilers show the wrapper `asyncBrowserContextWrapper`. The Long Animation Frames API of Chromium shows this name in place of your function. `addCallbackHook()` gives the function and the context of each callback.
 
@@ -272,18 +286,18 @@ These results are from `pnpm bench`: the mean time of each scenario, on Node.js 
 
 One read with `get()` takes approximately 4 ns. The [documentation website](https://mark1russell7.github.io/AsyncBrowserContext/) shows the full results.
 
-When the page loads, the library installs its patches in approximately 8 ms: the median of Chromium, Firefox and WebKit on the same computer.
+When the page loads, the library installs its patches in approximately 8 ms: the median of Chromium, Firefox and WebKit on the same computer. <!-- TODO(bench) -->
 
-In Chromium, Firefox and WebKit, an `await` in transformed code takes approximately the time of a native `await` (`pnpm bench:browsers`). In Firefox, the patch of `then` adds approximately 0.8 µs to each `await` of a promise. The performance page of the website tells more.
+In most cases, an `await` in transformed code takes more time than a native `await`. In Firefox, the patch of `then` adds approximately 0.8 µs to each `await` of a promise, also in code without the transform. <!-- TODO(bench) --> The performance page of the website gives the time of each workload in Chromium, Firefox and WebKit (`pnpm bench:browsers`).
 
-The runtime is 5.9 kB with gzip, and zone.js 0.16.3 is 13.3 kB. The transform adds 3 to 8 percent to packages with much async code, and nothing to React DOM. In an example application with React DOM, TanStack Query, supabase-js and ky, it adds 2.9 percent (`pnpm bench:size`).
+The runtime is 6.0 kB with gzip, and zone.js 0.16.3 is 11.8 kB. The transform adds 3 to 8.5 percent to packages with much async code, and nothing to React DOM. In an example application with React DOM, TanStack Query, supabase-js and ky, it adds 2.4 percent (`pnpm bench:size`).
 
 ## Tests
 
 | Command | Function |
 | --- | --- |
 | `pnpm test` | All test projects: unit tests, the rules on the browser runtime and on the Node.js runtime, memory tests, and the browser tests |
-| `pnpm test:node` | The tests in Node.js only |
+| `pnpm test:node` | The test projects in Node.js, without the memory tests |
 | `pnpm test:browser` | The tests in Chromium, Firefox and WebKit |
 | `pnpm smoke` | Packs the package, installs it in a new Vite application, and examines the application in Chromium |
 | `pnpm test:babel` | Packs the package, transforms a program with the preset in Babel 7.22, the newest Babel 7 and Babel 8, and starts the output |

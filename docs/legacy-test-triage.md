@@ -17,7 +17,7 @@ Each old test has one of these results:
 | Remove | 65 |
 | Total | 217 |
 
-The new tests are in `test/legacy/`. There are 155 new tests in 15 files. Each Vitest project includes them. On Node.js, the 12 tests that need a browser do not operate, and the report shows them as skipped tests.
+The new tests are in `test/legacy/`. There are 155 new tests in 15 files. The five rule projects in Node.js and the browser projects include them, because `test/legacy/` is one of the shared folders of `vitest.config.ts`. The projects `unit` and `memory` do not include them. On Node.js, the 12 tests that need a browser do not operate, and the report shows them as skipped tests.
 
 In the tables, a name in the "New test or reason" column is a test of the new file. A reason that names `c01` to `c06` refers to the rule tests in `test/rules/`.
 
