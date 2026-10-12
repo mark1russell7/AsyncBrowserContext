@@ -16,6 +16,9 @@ type Method = (this : unknown, ...args : unknown[]) => unknown;
 /** The methods of a Node.js EventEmitter that add a listener. */
 const ADD_LISTENER_METHODS = ["addListener", "on", "once", "prependListener", "prependOnceListener"] as const;
 
+/** The emitters and event targets that bind() patched. A second bind() keeps the first context, as the context managers of OpenTelemetry do. */
+const boundTargets = new WeakSet<object>();
+
 /** The bound listeners of each emitter or event target, for each event name, so that a remove method finds the bound listener. */
 const boundListeners = new WeakMap<object, Map<unknown, WeakMap<object, Listener>>>();
 
@@ -58,7 +61,8 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
          * - A function gives a wrapper that starts it with `context` as the active context.
          * - An event target (`addEventListener`) or a Node.js event emitter (`on`) gets a patch of
          *   its methods. Each listener that the program adds later operates with `context`, and the
-         *   remove methods find the bound listener.
+         *   remove methods find the bound listener. A second `bind()` of the same object keeps the
+         *   first context.
          * - Other values stay as they are.
          *
          * Without a context, the method uses the active context.
@@ -68,11 +72,13 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
             if (typeof target === "function") {
                 return this.#bindFunction(bound, target as unknown as Listener) as T;
             }
-            if (typeof target === "object" && target !== null) {
+            if (typeof target === "object" && target !== null && !boundTargets.has(target)) {
                 const methods = target as unknown as Record<string, unknown>;
                 if (typeof methods["addEventListener"] === "function") {
+                    boundTargets.add(target);
                     this.#bindEventTarget(bound, target);
                 } else if (typeof methods["on"] === "function" || typeof methods["addListener"] === "function") {
+                    boundTargets.add(target);
                     this.#bindEmitter(bound, target);
                 }
             }

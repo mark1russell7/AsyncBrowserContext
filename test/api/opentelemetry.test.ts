@@ -145,6 +145,18 @@ describe(`AsyncContextManager (${runtime} runtime)`, () => {
         expect(emitter.listenerCount("kept")).toBe(0);
     });
 
+    it("keeps the first context when bind() gets the same event target again, as OpenTelemetry does", () => {
+        const target = context.bind(ROOT_CONTEXT.setValue(REQUEST, "first"), new EventTarget());
+        expect(context.bind(ROOT_CONTEXT.setValue(REQUEST, "second"), target)).toBe(target);
+        const seen : unknown[] = [];
+        const listener = () : void => { seen.push(valueOf()); };
+        target.addEventListener("ping", listener);
+        target.dispatchEvent(new Event("ping"));
+        target.removeEventListener("ping", listener);
+        target.dispatchEvent(new Event("ping"));
+        expect(seen).toEqual(["first"]);
+    });
+
     it("binds the listeners of an event target, and removes them with removeEventListener", () => {
         const target = context.bind(ROOT_CONTEXT.setValue(REQUEST, "target"), new EventTarget());
         const seen : unknown[] = [];
