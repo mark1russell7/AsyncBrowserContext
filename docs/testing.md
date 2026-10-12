@@ -54,7 +54,7 @@ The constant `__TEST_COMPILER__` tells a test file which compiler changed it. On
 | Order variation | `test/interleave/` | 40 tasks do random operations with 5 fixed seeds. Each task reads its context after each operation. |
 | Memory | `test/memory/` | Rule C12, with `WeakRef` and the garbage collector. |
 | Units and transform | `src/**/*.test.ts` | The runtime parts, the Vite plugin, and output snapshots of the Babel preset. |
-| Test tools | `test/vitest/` | The port of the browser API server and the check for lost test files. |
+| Test tools | `test/vitest/` | The port of the browser API server, the check for lost test files, and the filter that selects the test files for the transform. |
 | Legacy | `test/legacy/` | The tests of the first test runner that were kept. `legacy-test-triage.md` gives the result for each test. |
 | Smoke | `test/smoke/run.ts` | `pnpm smoke` packs the package, installs it in a new Vite application, and examines the build and the dev server in Chromium. |
 | Babel versions | `test/babel/run.ts` | `pnpm test:babel` packs the package and installs it with Babel 7.22, the newest Babel 7 and Babel 8. Each version transforms `test/babel/program.js` with the preset, and the test starts the output on the browser runtime. The test also examines the names that the callback hooks get for the steps after an `await`. |
