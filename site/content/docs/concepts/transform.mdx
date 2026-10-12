@@ -10,7 +10,7 @@ A native `await` continues the function from the microtask queue of the engine. 
 
 ## The parts of the preset
 
-The preset `async-browser-context/babel-preset` contains eight Babel plugins, in this order:
+The preset `async-browser-context/babel-preset` contains nine Babel plugins, in this order:
 
 1. A plugin of this library skips each function with the directive `"async-browser-context runtime"`. The native async functions of the runtime have this directive, so the other plugins do not change them.
 2. A plugin of this library binds each sync generator to the context of its creation (rule C5). It operates in the `Program` visitor, so it gets the generators before the other plugins change them.
@@ -18,10 +18,11 @@ The preset `async-browser-context/babel-preset` contains eight Babel plugins, in
 4. A plugin of this library moves each static class field and static block with an async arrow function into a static private method. Thus `this` and `super` of the arrow function stay correct after the async transform.
 5. A plugin of this library gives the async generators to the driver of the runtime. The four async generator helpers of the next plugins come from the runtime: `asyncGenerator` in place of `wrapAsyncGenerator`, `OverloadYield`, `awaitAsyncGenerator` and `asyncGeneratorDelegate`.
 6. `@babel/plugin-transform-explicit-resource-management` changes `using` and `await using` declarations, because a generator cannot contain `await using`. The preset adds this plugin only with Babel 7.23.9 and later.
-7. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops. The preset makes its own traversal also skip the functions with the directive of the runtime.
-8. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
+7. A plugin of this library starts the plugin of step 6 on each async generator first. The plugin of step 8 changes the async generators in its own traversal, before step 6 gets their blocks.
+8. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops. The preset makes its own traversal also skip the functions with the directive of the runtime.
+9. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
 
-The Babel transforms of steps 7 and 8 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
+The Babel transforms of steps 8 and 9 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
 
 The plugin of step 5 sets the helpers in the `Program` visitor. Thus the preset also operates with `@babel/plugin-transform-runtime`, which gives the other helpers of Babel from `@babel/runtime`.
 

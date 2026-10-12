@@ -51,7 +51,7 @@ An `enterWith()` outside all steps, for example at the top level of a module, st
 
 ### The transform
 
-The Babel preset has eight plugins, in this order:
+The Babel preset has nine plugins, in this order:
 
 1. A plugin of this library skips the native async functions of the runtime. The directive `"async-browser-context runtime"` marks them.
 2. A plugin of this library changes each sync generator function. The function gives `bindGenerator(generator)`. The generator then keeps the context of its creation, as the TC39 draft specifies.
@@ -59,8 +59,9 @@ The Babel preset has eight plugins, in this order:
 4. A plugin of this library moves each static class field and static block with an async arrow function into a static private method. The async transform keeps `this` and `super` of an arrow function in the nearest function, but it does not stop at a static member. The method has the `this` and the `super` of the static member.
 5. A plugin of this library takes the four async generator helpers of the next plugins from the runtime. These are `asyncGenerator` in place of `wrapAsyncGenerator`, `OverloadYield`, `awaitAsyncGenerator` and `asyncGeneratorDelegate`. It sets the helpers in `Program` enter, so `@babel/plugin-transform-runtime` does not replace them.
 6. `@babel/plugin-transform-explicit-resource-management` changes `using` and `await using` declarations. An `await using` declaration in a generator is a `SyntaxError`, so this plugin must operate before the async transform. The preset adds it only with Babel 7.23.9 and later.
-7. `@babel/plugin-transform-async-generator-functions` changes async generators and `for await` loops.
-8. `@babel/plugin-transform-async-to-generator` changes each async function into a generator. The `coroutine` function of the runtime operates the generator. Before each step, `coroutine` sets the frame of the call. After the step, it sets the previous frame again.
+7. A plugin of this library starts the plugin of step 6 on each async generator in `Program` enter. The plugin of step 8 changes the async generators in its own traversal from `Program`, before step 6 gets their blocks. The preset adds it with step 6.
+8. `@babel/plugin-transform-async-generator-functions` changes async generators and `for await` loops.
+9. `@babel/plugin-transform-async-to-generator` changes each async function into a generator. The `coroutine` function of the runtime operates the generator. Before each step, `coroutine` sets the frame of the call. After the step, it sets the previous frame again.
 
 The runtime exports the six names that the output imports: `coroutine`, `bindGenerator`, `asyncGenerator`, `OverloadYield`, `awaitAsyncGenerator` and `asyncGeneratorDelegate`.
 

@@ -14,8 +14,8 @@ This version changes some behaviors, so it is a minor version. The first section
 - The patched functions have the form of native methods. They have no `prototype` property, they are not constructors, and they give the native function the same number of arguments. Thus `setTimeout()` without arguments and `addEventListener(type)` without a listener throw the native `TypeError`. Before, they did not throw.
 - OpenTelemetry: `bind(context, emitter)` and `bind(context, eventTarget)` patch the methods that add and remove listeners, as the context managers of OpenTelemetry do. Each listener that the program adds later operates with the context. Before, `bind()` gave such an object without a change. `bind(undefined, fn)` uses the active context. Before, it used the root context.
 - The Babel preset imports all four async generator helpers from the runtime: `asyncGenerator`, `OverloadYield`, `awaitAsyncGenerator` and `asyncGeneratorDelegate`. A module that the `runtime` option names must export them. Use the preset and the runtime of the same version. Before, Babel put `awaitAsyncGenerator` and `asyncGeneratorDelegate` into each module.
-- The Babel preset has eight plugins. A new plugin moves static class fields and static blocks with async arrow functions into static private methods. Thus `this` and `super` stay correct. Before, `this` was `undefined` in such a function, and `super` gave a `SyntaxError`.
-- The Babel preset changes `using` and `await using` declarations with `@babel/plugin-transform-explicit-resource-management`, a new dependency, before the async transform. This plugin operates with Babel 7.23.9 and later. Before, `await using` gave a `SyntaxError` in the generator of the transform.
+- The Babel preset has nine plugins. A new plugin moves static class fields and static blocks with async arrow functions into static private methods. Thus `this` and `super` stay correct. Before, `this` was `undefined` in such a function, and `super` gave a `SyntaxError`.
+- The Babel preset changes `using` and `await using` declarations with `@babel/plugin-transform-explicit-resource-management`, a new dependency, before the async transform. A plugin of the preset applies it to async generators first. This plugin operates with Babel 7.23.9 and later. Before, `await using` gave a `SyntaxError` in the generator of the transform.
 - The Vite plugin reads a module without a static `import` or `export`, for example a worker, as an ES module. Only `.cjs` and `.cts` files, and files with CommonJS marks and no static `import` or `export`, can be scripts. Before, Babel read such a module as a script and added a `require()` of the runtime, which a browser does not have.
 - The Vite plugin also transforms the JavaScript of Vue, Svelte, Astro and MDX components. It does not transform their styles. The `include` and `exclude` options also apply to these modules.
 - `package.json` has `main`, `types` and `typesVersions`. Thus TypeScript with the `moduleResolution` `node10` finds the types of each entry. This setting is the default for `module: commonjs`. Before, TypeScript found no types, so a project can get new type errors.
@@ -69,7 +69,7 @@ This version changes some behaviors, so it is a minor version. The first section
 
 ### Documentation
 
-- The documents tell the eight plugins of the preset and the six exports of the runtime.
+- The documents tell the nine plugins of the preset and the six exports of the runtime.
 - New limits: a transformed generator function is a plain function for libraries that examine it, and a top-level `enterWith()` stays as a default store. A minifier can remove the directive of the runtime.
 - The webpack examples add `@babel/preset-typescript` and `@babel/preset-react` for TypeScript and JSX files.
 - The pages tell where the tests examine each rule and each boundary.

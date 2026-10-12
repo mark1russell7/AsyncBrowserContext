@@ -298,6 +298,14 @@ describe("the Babel preset", () => {
         expect(output.code).toContain("_asyncGenerator(");
     });
 
+    it("changes await using in an async generator before the plugin of async generators, so the output is valid", async () => {
+        const output = await transform("export async function* g(resource) { await using handle = resource(); yield handle; }");
+        expect(output.code).not.toContain("await using");
+        // An await in the generator of the transform is a SyntaxError: the dispose call is an await of the driver
+        expect(() => parseSync(output.code, { babelrc : false, configFile : false, sourceType : "module" })).not.toThrow();
+        expect(output.code).toMatch(/_awaitAsyncGenerator\(_usingCtx\w*\.d\(\)\)/);
+    });
+
     it("changes await using before the async transform, so the output has no await using in a generator", async () => {
         const output = await transform("export async function f(resource) { await using handle = resource(); await null; return handle; }");
         expect(output.code).not.toContain("await using");

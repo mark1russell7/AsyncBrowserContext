@@ -3,6 +3,7 @@ import asyncGeneratorFunctions from "@babel/plugin-transform-async-generator-fun
 import asyncToGenerator from "@babel/plugin-transform-async-to-generator";
 import explicitResourceManagement from "@babel/plugin-transform-explicit-resource-management";
 import { asyncGeneratorHelpersPlugin } from "./async-generator-helpers.js";
+import { asyncGeneratorResources } from "./async-generator-resources.js";
 import { bindGeneratorsPlugin } from "./bind-generators.js";
 import { nameCoroutinesPlugin } from "./name-coroutines.js";
 import { skipRuntimePlugin, withRuntimeSkipped, type PluginFactory } from "./skip-runtime.js";
@@ -30,6 +31,9 @@ export interface PresetOptions {
 /** The plugin of Babel for async generators, without a change of the functions of the runtime (skip-runtime.ts). */
 const asyncGeneratorFunctionsOutsideRuntime = withRuntimeSkipped(asyncGeneratorFunctions as unknown as PluginFactory);
 
+/** The plugin of `using` declarations for async generators, before the plugin of Babel for async generators (async-generator-resources.ts). */
+const asyncGeneratorResourcesPlugin = asyncGeneratorResources(explicitResourceManagement as unknown as PluginFactory);
+
 /** The default runtime module. */
 export const DEFAULT_RUNTIME = "async-browser-context/runtime";
 
@@ -52,10 +56,12 @@ export const DEFAULT_RUNTIME = "async-browser-context/runtime";
  *    runtime, in place of the Babel helpers.
  * 6. `@babel/plugin-transform-explicit-resource-management` changes `using` and
  *    `await using` declarations, with Babel 7.23.9 and later.
- * 7. `@babel/plugin-transform-async-generator-functions` changes async
+ * 7. A plugin of this library starts the plugin of step 6 on each async
+ *    generator, before step 8 changes it (async-generator-resources.ts).
+ * 8. `@babel/plugin-transform-async-generator-functions` changes async
  *    generators and `for await` loops. Its own traversal also skips the
  *    functions of the runtime (skip-runtime.ts).
- * 8. `@babel/plugin-transform-async-to-generator` changes each async function
+ * 9. `@babel/plugin-transform-async-to-generator` changes each async function
  *    into a generator that the `coroutine` function of the runtime operates.
  *
  * The preset operates with Babel 7.22 and later and with Babel 8. Put it last
@@ -66,7 +72,7 @@ export default function asyncBrowserContextPreset(api : PresetAPI, options : Pre
     const runtime = options.runtime ?? DEFAULT_RUNTIME;
     const names : PluginItem[] = options.names === false ? [] : [[nameCoroutinesPlugin, { runtime }]];
     // The async transform keeps an `await using` declaration, which is a SyntaxError in a generator
-    const resources : PluginItem[] = supportsResourceManagement(api.version) ? [explicitResourceManagement] : [];
+    const resources : PluginItem[] = supportsResourceManagement(api.version) ? [explicitResourceManagement, asyncGeneratorResourcesPlugin] : [];
     return {
         plugins : [
             skipRuntimePlugin,

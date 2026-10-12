@@ -206,7 +206,7 @@ presets : [["async-browser-context/babel-preset", { runtime : "async-browser-con
 | `runtime` | `"async-browser-context/runtime"` | The module that the transformed code imports. It must export the six names of [the runtime](#the-runtime). |
 | `names` | `true` | Give the name of each async function and async generator to the runtime, for the callback hooks. With `false`, the code is smaller, and the hooks get no name for the steps after an `await`. |
 
-The preset operates with Babel 7.22 and later and with Babel 8. Put it last in the `presets` list. The preset changes `using` and `await using` declarations only with Babel 7.23.9 and later. The [transform](/docs/concepts/transform) page gives the eight plugins of the preset.
+The preset operates with Babel 7.22 and later and with Babel 8. Put it last in the `presets` list. The preset changes `using` and `await using` declarations only with Babel 7.23.9 and later. The [transform](/docs/concepts/transform) page gives the nine plugins of the preset.
 
 The preset gives the name of each async function to `coroutine`, for example `_coroutine(function* () {...}, "load")`. It gives the name of each async generator to `asyncGenerator` in the same way. The callback hooks show this name for the steps after an `await`. A minifier does not change this name, because it is a string. The names add 0.1 to 1.8 percent to the gzip size of code with async functions ([size](/testing/performance#size)).
 

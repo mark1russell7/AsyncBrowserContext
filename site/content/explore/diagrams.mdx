@@ -53,7 +53,7 @@ sequenceDiagram
 
 ## The transform pipeline
 
-```mermaid title="The transform pipeline" caption="The Vite plugin gives each module to the preset, in the order of the eight plugins of the preset. The preset does not change the runtime of the library."
+```mermaid title="The transform pipeline" caption="The Vite plugin gives each module to the preset, in the order of the nine plugins of the preset. The preset does not change the runtime of the library."
 flowchart TB
     module["Module (also in node_modules)"] --> plugin["Vite plugin, after the other plugins"]
     plugin --> skip["Skip the functions of the runtime"]
@@ -62,7 +62,8 @@ flowchart TB
     names --> statics["Move static members with async arrows"]
     statics --> helpers["Async generator helpers from the runtime"]
     helpers --> resources["using and await using"]
-    resources --> asyncgen["Async generators and for await"]
+    resources --> genresources["using in async generators"]
+    genresources --> asyncgen["Async generators and for await"]
     asyncgen --> asyncfn["Async functions with coroutine()"]
     asyncfn --> out["Module that imports the runtime"]
 ```
