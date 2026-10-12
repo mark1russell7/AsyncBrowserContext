@@ -1,4 +1,4 @@
-import { applyWithHooks, store, type Frame } from "../core/store.js";
+import { applyQuietly, applyWithHooks, store, type Frame } from "../core/store.js";
 import { HANDLER_INTERFACES } from "./handler-interfaces.js";
 import { claim, globalPrototype, ownDataValue, rememberOriginal, replaceFunction } from "./patch.js";
 
@@ -87,7 +87,10 @@ function createWrapper(listener : Listener, frame : Frame, onCall : (() => void)
                 fn = listener.handleEvent as Handler;
                 thisValue = listener;
             }
-            const hooks = quiet ? undefined : store.hooks;
+            if (quiet) {
+                return applyQuietly(fn, thisValue, [event]);
+            }
+            const hooks = store.hooks;
             if (hooks === undefined || typeof fn !== "function") {
                 return Reflect.apply(fn, thisValue, [event]);
             }
@@ -237,7 +240,10 @@ function createHandlerWrapper(handler : Handler, frame : Frame, source : string)
         const previous = store.current;
         store.current = frameForCall(frame);
         try {
-            const hooks = quiet ? undefined : store.hooks;
+            if (quiet) {
+                return applyQuietly(handler, this, Array.prototype.slice.call(arguments) as unknown[]);
+            }
+            const hooks = store.hooks;
             if (hooks === undefined) {
                 // The arguments object gives the arguments without a new array
                 return Reflect.apply(handler, this, arguments);

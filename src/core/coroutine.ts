@@ -1,5 +1,5 @@
 import { createAsyncGenerator, PlainValue, unbox } from "./async-generator.js";
-import { applyWithHooks, store, type Frame } from "./store.js";
+import { applyQuietly, applyWithHooks, store, type Frame } from "./store.js";
 
 /**
  * The code from the Babel preset uses these runtime functions. Do not use them
@@ -87,6 +87,8 @@ export function coroutine<T, A extends unknown[], R>(
     const asyncFunction = function asyncFunction(this : T, ...args : A) : Promise<R> {
         // The context of the call. The body can change it with AsyncLocalStorage.enterWith.
         let frame : Frame = store.current;
+        // An async function that a hook starts does not start the hooks (store.ts, applyQuietly)
+        const quiet = store.inHook === true;
         let generator : Generator<unknown, R, unknown>;
         const next = (value : unknown) : IteratorResult<unknown, R> => generator.next(value);
         const throwInto = (error : unknown) : IteratorResult<unknown, R> => generator.throw(error);
@@ -102,10 +104,12 @@ export function coroutine<T, A extends unknown[], R>(
             const previous = store.current;
             store.current = frame;
             try {
-                const hooks = resumed ? store.hooks : undefined;
-                const result = hooks === undefined
-                    ? resume(argument)
-                    : applyWithHooks(hooks, namedForHooks(generatorFunction, name), "await", resume, undefined, [argument]);
+                const hooks = resumed && !quiet ? store.hooks : undefined;
+                const result = quiet
+                    ? applyQuietly(resume, undefined, [argument])
+                    : hooks === undefined
+                        ? resume(argument)
+                        : applyWithHooks(hooks, namedForHooks(generatorFunction, name), "await", resume, undefined, [argument]);
                 // The result object is new for each step, so the change is not visible to other code
                 (result as { value : unknown }).value = awaitable(result.value, NativePromise, result.done !== true);
                 return result;
@@ -167,6 +171,8 @@ export function asyncGenerator<T, A extends unknown[]>(
     const NativePromise = store.intrinsics.Promise;
     return function makeAsyncGenerator(this : T, ...args : A) : AsyncGenerator<unknown, unknown, unknown> {
         let frame : Frame = store.current;
+        // An async generator that a hook makes does not start the hooks (store.ts, applyQuietly)
+        const quiet = store.inHook === true;
         const generator = Reflect.apply(generatorFunction, this, args);
         const methods : Record<ResumeMethod, (argument : unknown) => IteratorResult<unknown, unknown>> = {
             next : (argument) => generator.next(argument),
@@ -178,6 +184,9 @@ export function asyncGenerator<T, A extends unknown[]>(
             const previous = store.current;
             store.current = frame;
             try {
+                if (quiet) {
+                    return applyQuietly(methods[key], undefined, [argument]);
+                }
                 const hooks = resumed ? store.hooks : undefined;
                 return hooks === undefined
                     ? methods[key](argument)

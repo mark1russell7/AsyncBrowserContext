@@ -278,6 +278,22 @@ export function applyWithHooks<T, A extends unknown[], R>(
     }
 }
 
+/**
+ * This function starts `fn` as a callback that a hook registered: the hooks do not operate for
+ * it. `store.inHook` stays `true` while it operates. Thus the callbacks and the async functions
+ * that it starts or registers do not start the hooks either. A hook cannot start itself without
+ * end, also through a chain of callbacks.
+ */
+export function applyQuietly<T, A extends unknown[], R>(fn : (this : T, ...args : A) => R, thisValue : T, args : A) : R {
+    const previous = store.inHook;
+    store.inHook = true;
+    try {
+        return Reflect.apply(fn, thisValue, args);
+    } finally {
+        store.inHook = previous;
+    }
+}
+
 /*
  * Each wrapper has the name `asyncBrowserContextWrapper`. Profilers, stack
  * traces and the Long Animation Frames API show the static name of a
@@ -298,7 +314,10 @@ export function bindToFrame<T, A extends unknown[], R>(frame : Frame, fn : (this
         const previous = store.current;
         store.current = frame;
         try {
-            const hooks = quiet ? undefined : store.hooks;
+            if (quiet) {
+                return applyQuietly(fn, this, args);
+            }
+            const hooks = store.hooks;
             if (hooks === undefined) {
                 return Reflect.apply(fn, this, args);
             }
@@ -320,7 +339,10 @@ export function bindOneArgument<T, A, R>(frame : Frame, fn : (this : T, argument
         const previous = store.current;
         store.current = frame;
         try {
-            const hooks = quiet ? undefined : store.hooks;
+            if (quiet) {
+                return applyQuietly(fn, this, [argument]);
+            }
+            const hooks = store.hooks;
             if (hooks === undefined) {
                 return Reflect.apply(fn, this, [argument]);
             }

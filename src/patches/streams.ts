@@ -1,4 +1,4 @@
-import { applyWithHooks, store, type Frame } from "../core/store.js";
+import { applyQuietly, applyWithHooks, store, type Frame } from "../core/store.js";
 import { claim, ownDataValue, rememberOriginal } from "./patch.js";
 
 /**
@@ -37,7 +37,10 @@ function wrapUnderlying(underlying : object, methods : readonly string[], frame 
             const previous = store.current;
             store.current = frame;
             try {
-                const hooks = quiet ? undefined : store.hooks;
+                if (quiet) {
+                    return applyQuietly(original, underlying, Array.prototype.slice.call(arguments) as unknown[]);
+                }
+                const hooks = store.hooks;
                 if (hooks === undefined) {
                     return Reflect.apply(original, underlying, arguments);
                 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { addCallbackHook, AsyncLocalStorage, Variable, type CallbackHook } from "async-browser-context";
-import { deferred, inBrowser, preset, runtime } from "../helpers.js";
+import { deferred, delay, inBrowser, preset, runtime } from "../helpers.js";
 
 /** The removers of the hooks of the current test. */
 const removers : (() => void)[] = [];
@@ -291,6 +291,46 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         await scheduled.promise;
         await new Promise((resolve) => setTimeout(resolve, 5));
         expect(sources).toEqual(["Promise.then"]);
+    });
+
+    it.skipIf(!preset)("does not start the hooks for the steps of an async function that a hook starts, so a hook cannot start itself without end", async () => {
+        let afterSend = 0;
+        async function send() : Promise<void> {
+            await null;
+            await null;
+        }
+        removers.push(addCallbackHook({
+            after(callback, source) {
+                if (source === "await" && callback.name === "send" && afterSend++ < 1000) {
+                    void send();
+                }
+            },
+        }));
+        await send();
+        await delay(10);
+        // The two steps of the first call start the hooks. The calls that the hook starts are quiet.
+        expect(afterSend).toBe(2);
+    });
+
+    it.skipIf(!preset)("does not start the hooks for an async function that a quiet callback starts, also through a chain of callbacks", async () => {
+        let afterSend = 0;
+        async function send() : Promise<void> {
+            await null;
+        }
+        removers.push(addCallbackHook({
+            after(callback) {
+                if (callback.name === "trigger") {
+                    // A then callback that a hook registers is quiet, and so is the async function that it starts
+                    void Promise.resolve().then(() => setTimeout(() => void send(), 0));
+                }
+                if (callback.name === "send") {
+                    afterSend++;
+                }
+            },
+        }));
+        setTimeout(function trigger() { /* the first callback */ }, 0);
+        await delay(30);
+        expect(afterSend).toBe(0);
     });
 
     it("tells one time on the console when an older copy without hooks installed some patches", () => {
