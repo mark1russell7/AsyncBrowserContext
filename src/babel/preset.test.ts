@@ -7,13 +7,13 @@ interface Output {
     readonly changed : boolean;
 }
 
-async function transform(code : string, options : { runtime? : string; sourceType? : "module" | "script" | "unambiguous" } = {}) : Promise<Output> {
+async function transform(code : string, options : { runtime? : string; names? : boolean; sourceType? : "module" | "script" | "unambiguous" } = {}) : Promise<Output> {
     const result = await transformAsync(code, {
         filename : "input.js",
         babelrc : false,
         configFile : false,
         sourceType : options.sourceType ?? "module",
-        presets : [[preset, options.runtime === undefined ? {} : { runtime : options.runtime }]],
+        presets : [[preset, { ...(options.runtime === undefined ? {} : { runtime : options.runtime }), ...(options.names === undefined ? {} : { names : options.names }) }]],
     });
     return {
         code : result?.code ?? "",
@@ -226,5 +226,14 @@ describe("the names of the async functions (for the callback hooks)", () => {
         const second = await transform(first.code);
         expect(coroutineNames(second.code)).toEqual(["load"]);
         expect(second.code).not.toMatch(/"load", "load"/);
+    });
+
+    it("gives no names with the option names: false, and changes the code in the same way", async () => {
+        const input = "async function load() { await null; } const o = { async m() { await null; } };";
+        const output = await transform(input, { names : false });
+        expect(coroutineNames(output.code)).toEqual([]);
+        expect(output.code).toMatch(/_coroutine\(function\* \(\) \{/);
+        expect(output.changed).toBe(true);
+        expect(output.code).toBe((await transform(input)).code.replace(/, "(load|m)"\)/g, ")"));
     });
 });

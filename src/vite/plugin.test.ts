@@ -68,6 +68,13 @@ describe("the Vite plugin", () => {
         expect(result?.code).toContain("/custom/runtime.js");
     });
 
+    it("gives the names of the async functions to the preset, unless the option names is false", async () => {
+        expect((await handlerOf()(ASYNC_CODE, "/app/src/load.ts"))?.code).toContain(`}, "load")`);
+        const result = await handlerOf({ names : false })(ASYNC_CODE, "/app/src/load.ts");
+        expect(result?.code).toContain("_coroutine(function*");
+        expect(result?.code).not.toContain(`"load"`);
+    });
+
     it("transforms .mjs, .cjs, .jsx and .tsx modules", async () => {
         const handler = handlerOf();
         for (const id of ["/app/a.mjs", "/app/b.cjs", "/app/c.jsx", "/app/d.tsx", "/app/e.mts"]) {

@@ -17,6 +17,11 @@ export interface AsyncContextPluginOptions {
     /** The runtime module. The default is `async-browser-context/runtime`. */
     readonly runtime? : string | undefined;
     /**
+     * Give the name of each async function to the callback hooks. The default
+     * is `true`. Refer to the option `names` of the Babel preset.
+     */
+    readonly names? : boolean | undefined;
+    /**
      * Also transform the modules of server-side rendering. The default is
      * `false`, because on Node.js the native `AsyncLocalStorage` keeps the
      * context.
@@ -84,7 +89,7 @@ export function asyncContext(options : AsyncContextPluginOptions = {}) : Plugin 
                     configFile : false,
                     sourceType : "unambiguous",
                     sourceMaps : true,
-                    presets : [[preset, { runtime }]],
+                    presets : [[preset, { runtime, names : options.names }]],
                 });
                 const changed = (result?.metadata as Record<string, unknown> | undefined)?.[METADATA_KEY] === true;
                 if (result?.code == null || !changed) {
