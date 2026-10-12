@@ -1,0 +1,304 @@
+{
+  "date": "2026-10-12T16:14:51.706Z",
+  "vite": "8.3.4",
+  "runtime": {
+    "entries": [
+      "async-browser-context",
+      "async-browser-context/runtime"
+    ],
+    "minifiedBytes": 18976,
+    "gzipBytes": 5863,
+    "brotliBytes": 5132
+  },
+  "zone": {
+    "version": "0.16.3",
+    "minifiedBytes": 45574,
+    "gzipBytes": 13344,
+    "brotliBytes": 11920
+  },
+  "transform": [
+    {
+      "name": "react-dom",
+      "version": "19.3.0",
+      "entries": [
+        "react-dom/client"
+      ],
+      "kind": "User interface",
+      "asyncFunctions": 0,
+      "generators": 0,
+      "native": {
+        "minifiedBytes": 298294,
+        "gzipBytes": 75954,
+        "brotliBytes": 63875
+      },
+      "transformed": {
+        "minifiedBytes": 298294,
+        "gzipBytes": 75954,
+        "brotliBytes": 63875
+      },
+      "transformedWithoutNames": {
+        "minifiedBytes": 298294,
+        "gzipBytes": 75954,
+        "brotliBytes": 63875
+      },
+      "loweredEs2016": {
+        "minifiedBytes": 298672,
+        "gzipBytes": 75980,
+        "brotliBytes": 63902
+      },
+      "gzipIncreasePercent": {
+        "transformed": 0,
+        "transformedWithoutNames": 0,
+        "loweredEs2016": 0
+      }
+    },
+    {
+      "name": "@tanstack/query-core",
+      "version": "5.104.2",
+      "entries": [
+        "@tanstack/query-core"
+      ],
+      "kind": "Data fetching and cache",
+      "asyncFunctions": 8,
+      "generators": 0,
+      "native": {
+        "minifiedBytes": 53553,
+        "gzipBytes": 13073,
+        "brotliBytes": 11777
+      },
+      "transformed": {
+        "minifiedBytes": 55650,
+        "gzipBytes": 13849,
+        "brotliBytes": 12411
+      },
+      "transformedWithoutNames": {
+        "minifiedBytes": 55597,
+        "gzipBytes": 13825,
+        "brotliBytes": 12368
+      },
+      "loweredEs2016": {
+        "minifiedBytes": 69985,
+        "gzipBytes": 16902,
+        "brotliBytes": 14970
+      },
+      "gzipIncreasePercent": {
+        "transformed": 5.9,
+        "transformedWithoutNames": 5.8,
+        "loweredEs2016": 29.3
+      }
+    },
+    {
+      "name": "ky",
+      "version": "2.2.0",
+      "entries": [
+        "ky"
+      ],
+      "kind": "HTTP client",
+      "asyncFunctions": 28,
+      "generators": 0,
+      "native": {
+        "minifiedBytes": 39658,
+        "gzipBytes": 12119,
+        "brotliBytes": 10816
+      },
+      "transformed": {
+        "minifiedBytes": 41365,
+        "gzipBytes": 12642,
+        "brotliBytes": 11242
+      },
+      "transformedWithoutNames": {
+        "minifiedBytes": 41081,
+        "gzipBytes": 12513,
+        "brotliBytes": 11131
+      },
+      "loweredEs2016": {
+        "minifiedBytes": 50545,
+        "gzipBytes": 14291,
+        "brotliBytes": 12705
+      },
+      "gzipIncreasePercent": {
+        "transformed": 4.3,
+        "transformedWithoutNames": 3.3,
+        "loweredEs2016": 17.9
+      }
+    },
+    {
+      "name": "idb",
+      "version": "8.0.4",
+      "entries": [
+        "idb"
+      ],
+      "kind": "IndexedDB with promises",
+      "asyncFunctions": 2,
+      "generators": 1,
+      "native": {
+        "minifiedBytes": 4712,
+        "gzipBytes": 1755,
+        "brotliBytes": 1568
+      },
+      "transformed": {
+        "minifiedBytes": 6269,
+        "gzipBytes": 2314,
+        "brotliBytes": 2086
+      },
+      "transformedWithoutNames": {
+        "minifiedBytes": 6259,
+        "gzipBytes": 2306,
+        "brotliBytes": 2081
+      },
+      "loweredEs2016": {
+        "minifiedBytes": 9235,
+        "gzipBytes": 3017,
+        "brotliBytes": 2719
+      },
+      "gzipIncreasePercent": {
+        "transformed": 31.9,
+        "transformedWithoutNames": 31.4,
+        "loweredEs2016": 71.9
+      }
+    },
+    {
+      "name": "@supabase/supabase-js",
+      "version": "2.117.3",
+      "entries": [
+        "@supabase/supabase-js"
+      ],
+      "kind": "Backend client",
+      "asyncFunctions": 358,
+      "generators": 1,
+      "native": {
+        "minifiedBytes": 273464,
+        "gzipBytes": 62634,
+        "brotliBytes": 51751
+      },
+      "transformed": {
+        "minifiedBytes": 300922,
+        "gzipBytes": 66094,
+        "brotliBytes": 54285
+      },
+      "transformedWithoutNames": {
+        "minifiedBytes": 296485,
+        "gzipBytes": 65066,
+        "brotliBytes": 53414
+      },
+      "loweredEs2016": {
+        "minifiedBytes": 308358,
+        "gzipBytes": 67331,
+        "brotliBytes": 55182
+      },
+      "gzipIncreasePercent": {
+        "transformed": 5.5,
+        "transformedWithoutNames": 3.9,
+        "loweredEs2016": 7.5
+      }
+    },
+    {
+      "name": "openai",
+      "version": "7.32.0",
+      "entries": [
+        "openai"
+      ],
+      "kind": "API client with streams",
+      "asyncFunctions": 145,
+      "generators": 19,
+      "native": {
+        "minifiedBytes": 479825,
+        "gzipBytes": 91708,
+        "brotliBytes": 73924
+      },
+      "transformed": {
+        "minifiedBytes": 522673,
+        "gzipBytes": 100062,
+        "brotliBytes": 77961
+      },
+      "transformedWithoutNames": {
+        "minifiedBytes": 520515,
+        "gzipBytes": 99395,
+        "brotliBytes": 77269
+      },
+      "loweredEs2016": {
+        "minifiedBytes": 521118,
+        "gzipBytes": 100921,
+        "brotliBytes": 80669
+      },
+      "gzipIncreasePercent": {
+        "transformed": 9.1,
+        "transformedWithoutNames": 8.4,
+        "loweredEs2016": 10
+      }
+    },
+    {
+      "name": "@aws-sdk/client-s3",
+      "version": "3.1149.0",
+      "entries": [
+        "@aws-sdk/client-s3"
+      ],
+      "kind": "API client, large",
+      "asyncFunctions": 210,
+      "generators": 11,
+      "native": {
+        "minifiedBytes": 407659,
+        "gzipBytes": 100799,
+        "brotliBytes": 82206
+      },
+      "transformed": {
+        "minifiedBytes": 445987,
+        "gzipBytes": 105701,
+        "brotliBytes": 85194
+      },
+      "transformedWithoutNames": {
+        "minifiedBytes": 444036,
+        "gzipBytes": 105187,
+        "brotliBytes": 84877
+      },
+      "loweredEs2016": {
+        "minifiedBytes": 448243,
+        "gzipBytes": 108111,
+        "brotliBytes": 87789
+      },
+      "gzipIncreasePercent": {
+        "transformed": 4.9,
+        "transformedWithoutNames": 4.4,
+        "loweredEs2016": 7.3
+      }
+    },
+    {
+      "name": "Example application",
+      "version": "",
+      "entries": [
+        "react-dom/client",
+        "@tanstack/query-core",
+        "@supabase/supabase-js",
+        "ky"
+      ],
+      "kind": "React DOM, TanStack Query, supabase-js and ky",
+      "asyncFunctions": 394,
+      "generators": 1,
+      "native": {
+        "minifiedBytes": 665232,
+        "gzipBytes": 161903,
+        "brotliBytes": 135170
+      },
+      "transformed": {
+        "minifiedBytes": 696364,
+        "gzipBytes": 166521,
+        "brotliBytes": 138415
+      },
+      "transformedWithoutNames": {
+        "minifiedBytes": 691590,
+        "gzipBytes": 165331,
+        "brotliBytes": 137457
+      },
+      "loweredEs2016": {
+        "minifiedBytes": 720850,
+        "gzipBytes": 171226,
+        "brotliBytes": 141631
+      },
+      "gzipIncreasePercent": {
+        "transformed": 2.9,
+        "transformedWithoutNames": 2.1,
+        "loweredEs2016": 5.8
+      }
+    }
+  ]
+}

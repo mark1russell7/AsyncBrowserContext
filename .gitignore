@@ -13,4 +13,5 @@ bench/.out/
 *.log
 bench/results/*
 !bench/results/latest.json
+!bench/results/size.json
 .claude/

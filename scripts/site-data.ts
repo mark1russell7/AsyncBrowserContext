@@ -150,14 +150,14 @@ function writeProbes() : void {
     writeData("probes", { ...probes, generated });
 }
 
-/** The size of the code that a browser application gets: the classes, the patches and the runtime of the transform. */
+/** The size of the code that a browser application gets: the classes, the patches, the callback hooks and the runtime of the transform. The same bundle as the runtime row of `pnpm bench:size`. */
 async function writeSize() : Promise<void> {
     execSync("npx tsc -p tsconfig.build.json", { cwd : root, stdio : "ignore" });
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "abc-size-"));
     const entry = path.join(directory, "entry.js");
     const dist = (file : string) : string => JSON.stringify(path.join(root, "dist", file).replace(/\\/g, "/"));
     fs.writeFileSync(entry, [
-        `export { AsyncLocalStorage, AsyncContext } from ${dist("index.js")};`,
+        `export { AsyncLocalStorage, AsyncContext, addCallbackHook } from ${dist("index.js")};`,
         `export { coroutine, bindGenerator } from ${dist("runtime.js")};`,
     ].join("\n"));
     try {
