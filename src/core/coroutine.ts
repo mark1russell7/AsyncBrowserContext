@@ -24,11 +24,6 @@ function namedForHooks(generatorFunction : Function, name : string | undefined) 
     return generatorFunction;
 }
 
-/**
- * This function gives an async function that operates `generatorFunction`. The preset gives
- * this function to `@babel/plugin-transform-async-to-generator` as its
- * `method` option, and adds `name`, the name of the async function, if it has one.
- */
 /** This function gives `true` for a value that can have a `then` property: an object or a function. */
 function isObject(value : unknown) : value is object {
     return (typeof value === "object" && value !== null) || typeof value === "function";
@@ -80,6 +75,9 @@ function awaitable(value : unknown, NativePromise : PromiseConstructor, box : bo
  * This function gives an async function that operates `generatorFunction`. The preset gives
  * this function to `@babel/plugin-transform-async-to-generator` as its
  * `method` option, and adds `name`, the name of the async function, if it has one.
+ *
+ * The first step of the body operates in the step of the caller. Thus an `enterWith()` of that
+ * step stays for the caller, as on Node.js.
  */
 export function coroutine<T, A extends unknown[], R>(
     generatorFunction : (this : T, ...args : A) => Generator<unknown, R, unknown>,

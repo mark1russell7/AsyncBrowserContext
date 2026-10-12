@@ -63,6 +63,9 @@ export class AsyncLocalStorage<T> {
      * This method sets `store` for the rest of the current synchronous step, and for the
      * code that this step starts later. Prefer `run()`: `enterWith()` can also
      * change the store of the code that called the current function.
+     *
+     * Outside all steps, for example at the top level of a module, the store stays after the
+     * task as a default store, as on Node.js. No code sets the root context again.
      */
     enterWith(store : T) : void {
         this.#enabled = true;

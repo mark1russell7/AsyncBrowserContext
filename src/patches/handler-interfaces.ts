@@ -2,8 +2,9 @@
  * The global interfaces whose prototype has its own `on...` properties. The
  * event patch reads only these globals. For each global that code reads for
  * the first time, the browser makes the interface object, and a page has
- * approximately 1,000 interfaces. Thus, a read of all globals costs 10 to 20
- * ms when the page loads, and this list costs 3 to 7 ms.
+ * approximately 1,000 interfaces. With a read of all globals (version 0.1),
+ * the patches took 16 to 22 ms when the page loaded. With this list, they
+ * take 7 to 8 ms (the medians in CHANGELOG.md, version 0.2.0).
  *
  * The list is the union of Chromium 156, Firefox 157 and WebKit 27.2 in a
  * secure context. It also has some interfaces of Safari, of mobile browsers

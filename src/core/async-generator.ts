@@ -2,9 +2,9 @@
  * The async generators of transformed code. `@babel/plugin-transform-async-generator-functions`
  * changes each async generator into a sync generator and its helper `wrapAsyncGenerator`.
  * The helper continued each step in a `then` callback, and a `then` callback is slow in
- * Firefox. The preset replaces the helper with `asyncGenerator` of the runtime, and the
- * helper `OverloadYield` with the class of this module. The driver in this module then
- * continues each step with a native `await`.
+ * Firefox. The preset replaces the helper with `asyncGenerator` of the runtime. It also takes
+ * the helpers `OverloadYield`, `awaitAsyncGenerator` and `asyncGeneratorDelegate` from this
+ * module. The driver in this module then continues each step with a native `await`.
  *
  * The protocol is the protocol of the Babel 8 helper: the body gives
  * `new OverloadYield(value, 0)` for an `await`, and `new OverloadYield(promise, 1)` for a
