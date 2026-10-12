@@ -59,7 +59,7 @@ The Vite plugin applies the preset to the modules of the application and of its 
 
 The runtime patches only `Promise.prototype.then` of the `Promise` API. `catch`, `finally` and the combinators use `then`, so they also get the context of the registration. The runtime does not replace the `Promise` constructor.
 
-The other patches wrap the callbacks of timers, events, observers, streams and other callback APIs. Each wrapper records the current frame when the code registers the callback. An event listener is a special case (rule C13): when code with a context dispatches the event synchronously, the listener gets the context of that code.
+The other patches wrap the callbacks of timers, events, observers, streams and other callback APIs. Each wrapper records the current frame when the code registers the callback. An event listener is a special case (rule C13): when code with a context dispatches the event synchronously, the listener gets the context of that code. When the browser or code in the root context dispatches the event, the listener gets the context of its registration.
 
 Each patch keeps the name, the length and the other properties of the native function. `Function.prototype.toString` gives the source text of the original function.
 

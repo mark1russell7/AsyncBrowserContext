@@ -61,10 +61,28 @@ Without the library, the code after the first `await` can get the root context. 
 
 On Node.js, the `node` export condition selects an entry with the native `AsyncLocalStorage`. Thus, code that runs on the server and in the browser can use one import.
 
+## Events
+
+An event listener gets its active span from rule C13 of the library:
+
+| The code that dispatches the event | The active span in the listener |
+| --- | --- |
+| Code with an active span, for example `dispatchEvent()` in `startActiveSpan()` | The span of the dispatch |
+| Code outside all `with()` calls, for example at the top level of a module | The span of the `addEventListener()` call |
+| The browser, for example for a click of the user | The span of the `addEventListener()` call |
+
+If the listener must have no span, start the dispatch in `context.with(ROOT_CONTEXT, ...)`. The `with()` method makes a context of the library, also for `ROOT_CONTEXT`. Thus, the listener gets `ROOT_CONTEXT`, and `trace.getActiveSpan()` gives `undefined`.
+
+```ts
+import { context, ROOT_CONTEXT } from "@opentelemetry/api";
+
+context.with(ROOT_CONTEXT, () => target.dispatchEvent(new Event("refresh")));
+```
+
 <Callout type="caution" title="zone.js">
   Do not use the library together with zone.js or with the `ZoneContextManager`. The two libraries patch the same functions with different rules.
 </Callout>
 
 ## Tests
 
-The tests in `test/api/opentelemetry.test.ts` use the context manager through the API of OpenTelemetry. They examine `await`, timers, `then` callbacks, two operations at the same time, `bind()` and the active span. The tests operate on Node.js and in Chromium, Firefox and WebKit.
+The tests in `test/api/opentelemetry.test.ts` use the context manager through the API of OpenTelemetry. They examine `await`, timers, `then` callbacks, two operations at the same time, `bind()` and the active span. The tests operate on Node.js and in Chromium, Firefox and WebKit. The tests in `test/browser/opentelemetry-events.test.ts` examine three dispatches in the browsers: in the root context, in a span, and in `context.with(ROOT_CONTEXT, ...)`.

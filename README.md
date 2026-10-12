@@ -177,7 +177,7 @@ The tests examine each rule on the browser runtime, on the Node.js runtime and i
 | C10 | Two copies of the library on one page use one context store. |
 | C11 | The library does not replace the `Promise` constructor. `Promise` subclasses operate as without the library. |
 | C12 | The library does not keep promises or values in memory after the program has no reference to them. |
-| C13 | An event listener gets the context of the code that dispatches the event. When the browser dispatches the event, the listener gets the context of the `addEventListener()` call or of the assignment to the `on...` property. |
+| C13 | An event listener gets the context of the code that dispatches the event. If that code has the root context, the listener gets the registration context. This is the context of the `addEventListener()` call or of the assignment to the `on...` property. An event that the browser dispatches, for example a click of the user, also gives the registration context. |
 
 ## Patched APIs
 

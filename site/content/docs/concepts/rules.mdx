@@ -101,7 +101,10 @@ The library does not keep a promise in memory after the program has no reference
 An event listener operates in the context of the code that dispatches the event, if that context is not the root context. Else, the listener operates in the context of the `addEventListener()` use, or of the assignment to the `on...` property.
 
 - `element.click()` and `dispatchEvent()` in context C give C to the listener.
+- `element.click()` and `dispatchEvent()` in the root context give the registration context to the listener. For example, code at the top level of a module has the root context.
 - An event that the browser dispatches gives the registration context to the listener. Examples are a click of the user and a `load` event of an `XMLHttpRequest`.
+
+Thus, a listener gets the root context only if its registration and the dispatch both have the root context. The [OpenTelemetry guide](/docs/guides/opentelemetry#events) shows how to give no span to a listener.
 
 The [event demonstration](/explore/events) lets you examine the two cases with real clicks.
 
