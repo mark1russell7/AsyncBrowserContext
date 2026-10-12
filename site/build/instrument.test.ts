@@ -65,4 +65,12 @@ describe("splitScenario", () => {
     it("needs the metadata comment", () => {
         expect(() => splitScenario("const a = 1;\n", "x")).toThrow(/no metadata comment/);
     });
+
+    it("gives the order 100 without @order, and refuses an @order that is not a number", () => {
+        const file = (order : string) : string => `/**\n * @title T\n * @summary S.\n${order}\n */\nconst a = 1;\n`;
+        expect(splitScenario(file(""), "x").meta.order).toBe(100);
+        expect(splitScenario(file(" * @order -2.5"), "x").meta.order).toBe(-2.5);
+        expect(() => splitScenario(file(" * @order first"), "x")).toThrow("The scenario \"x\" has the @order \"first\". Use a number");
+        expect(() => splitScenario(file(" * @order"), "x")).toThrow("has the @order \"\"");
+    });
 });

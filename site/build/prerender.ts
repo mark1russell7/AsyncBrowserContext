@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Browser, Page, Route } from "playwright";
 import { LOADING_SELECTOR } from "../src/lib/readiness.ts";
 import { OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH } from "./head-tags.ts";
-import { COLOR_ATTRIBUTES, replaceTokenColors, type Snapshot } from "./snapshot.ts";
+import { COLOR_ATTRIBUTES, REPLACE_TOKEN_COLORS_SOURCE, type Snapshot } from "./snapshot.ts";
 import type { StaticRoute } from "./static-routes.ts";
 
 export type PrerenderOptions = {
@@ -45,9 +45,9 @@ const CONTENT_TYPES : Readonly<Record<string, string>> = {
  * The browser gets the files of the build output with no server. Each
  * request below `baseUrl` gets a file, and each page request gets the
  * template. A request to another address stops, so the build does not use
- * the network.
+ * the network. A path with an incorrect escape gets the status 400.
  */
-async function answer(route : Route, outDir : string, baseUrl : string, template : string) : Promise<void> {
+export async function answerRequest(route : Route, outDir : string, baseUrl : string, template : string) : Promise<void> {
     const request = route.request();
     const url = new URL(request.url());
     if (!url.href.startsWith(baseUrl)) {
@@ -59,7 +59,15 @@ async function answer(route : Route, outDir : string, baseUrl : string, template
         return;
     }
     const root = path.resolve(outDir);
-    const file = path.resolve(root, decodeURIComponent(url.pathname.slice(new URL(baseUrl).pathname.length)));
+    let relative : string;
+    try {
+        relative = decodeURIComponent(url.pathname.slice(new URL(baseUrl).pathname.length));
+    } catch {
+        // The path has an incorrect escape, for example "%E0%A4%A".
+        await route.fulfill({ status : 400 });
+        return;
+    }
+    const file = path.resolve(root, relative);
     if (!file.startsWith(root + path.sep)) {
         await route.fulfill({ status : 404 });
         return;
@@ -102,9 +110,12 @@ const SETTLE_SCRIPT = `new Promise((resolve) => {
  * This script copies the root element and removes what must not be in a
  * static file: scripts. It changes the theme colors in style attributes and
  * style elements to `var(<token>)`, so the HTML follows the dark theme too.
+ * Charts, diagrams and legends get the colors of the theme as values (refer
+ * to `src/theme/colors.ts`). A fixed color stays: the site puts it into a
+ * custom property, for example the colors of the code (refer to `replaceTokenColors`).
  * The links that the app added to the head get paths without the origin.
  */
-function captureScript(tokens : ReadonlyArray<readonly [string, string]>) : string {
+export function captureScript(tokens : ReadonlyArray<readonly [string, string]>) : string {
     const args = JSON.stringify({ tokens, attributes : COLOR_ATTRIBUTES });
     return `((args, replaceColors) => {
     const clone = document.getElementById("root").cloneNode(true);
@@ -125,15 +136,18 @@ function captureScript(tokens : ReadonlyArray<readonly [string, string]>) : stri
         return copy.outerHTML;
     });
     return { body : clone.innerHTML, links, colorAttributes : [...pairs.values()], title : document.title };
-})(${args}, ${replaceTokenColors.toString()})`;
+})(${args}, ${REPLACE_TOKEN_COLORS_SOURCE})`;
 }
 
 type Capture = Snapshot & { title : string };
 
-async function renderRoute(page : Page, route : StaticRoute, options : PrerenderOptions, problems : string[]) : Promise<Snapshot> {
+/**
+ * This function renders one route in `page`. `problems` has the errors and
+ * the console errors of this page only, because each route gets a new page.
+ */
+async function renderRoute(page : Page, route : StaticRoute, options : PrerenderOptions, problems : readonly string[]) : Promise<Snapshot> {
     const timeout = options.timeoutMs ?? 30_000;
     const name = `/${route.path}`;
-    problems.length = 0;
     const response = await page.goto(new URL(route.path, options.baseUrl).href, { waitUntil : "load", timeout });
     if (!response?.ok()) throw new Error(`Prerender: the page ${name} did not load (HTTP ${response?.status() ?? "no response"}).`);
     try {
@@ -175,22 +189,23 @@ export async function prerenderRoutes(options : PrerenderOptions) : Promise<Map<
         timezoneId : "UTC",
     });
     try {
-        await context.route("**/*", route => answer(route, options.outDir, options.baseUrl, options.template));
+        await context.route("**/*", route => answerRequest(route, options.outDir, options.baseUrl, options.template));
         const results = new Map<string, Snapshot>();
         const queue = [...options.routes];
         const worker = async () : Promise<void> => {
-            const page = await context.newPage();
-            const problems : string[] = [];
-            page.on("pageerror", error => problems.push(`Error in the page: ${error.message}`));
-            page.on("console", message => {
-                if (message.type() === "error") problems.push(`Console error: ${message.text()}`);
-            });
-            try {
-                for (let route = queue.shift(); route !== undefined; route = queue.shift()) {
+            for (let route = queue.shift(); route !== undefined; route = queue.shift()) {
+                // Each route gets a new page. Thus, a late error of the page before cannot show as a problem of this route.
+                const page = await context.newPage();
+                const problems : string[] = [];
+                page.on("pageerror", error => problems.push(`Error in the page: ${error.message}`));
+                page.on("console", message => {
+                    if (message.type() === "error") problems.push(`Console error: ${message.text()}`);
+                });
+                try {
                     results.set(route.path, await renderRoute(page, route, options, problems));
+                } finally {
+                    await page.close();
                 }
-            } finally {
-                await page.close();
             }
         };
         await Promise.all(Array.from({ length : Math.max(1, options.concurrency ?? 4) }, worker));
