@@ -293,6 +293,7 @@ The runtime is 5.9 kB with gzip, and zone.js 0.16.3 is 13.3 kB. The transform ad
 | `pnpm bench:browsers` | The time of `await` and `then` in Chromium, Firefox and WebKit, without the library, with the Babel helper and with the library |
 | `pnpm bench:size` | The size of the runtime, and the size that the transform adds to a set of npm packages |
 | `pnpm lint:ste` | The STE linter of the documentation and the TSDoc comments |
+| `pnpm test:ste-lint` | The tests of the STE linter (`tools/ste-lint`) |
 
 Set `BROWSERS=chromium,firefox,webkit` to select the browsers. Playwright WebKit does not start on all Windows computers, so the default on Windows is Chromium and Firefox. `docs/testing.md` tells more.
 
