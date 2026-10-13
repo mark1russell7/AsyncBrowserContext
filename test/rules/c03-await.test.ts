@@ -345,6 +345,23 @@ describe("rule C3 in static class members", () => {
         }
     });
 
+    it.skipIf(lowered)("gives an async arrow function of a property or a static field the name of a key that is not a binding name (not with SWC or esbuild)", async () => {
+        const handlers = {
+            "a b" : async (value : number) : Promise<number> => value,
+            42 : async (value : number) : Promise<number> => value,
+            default : async (value : number) : Promise<number> => value,
+        };
+        class Statics {
+            static readonly #hidden = async (value : number) : Promise<number> => value;
+            static readonly "s t" = async (value : number) : Promise<number> => value;
+            static hidden() : (value : number) => Promise<number> {
+                return Statics.#hidden;
+            }
+        }
+        expect([handlers["a b"].name, handlers[42].name, handlers.default.name, Statics.hidden().name, Statics["s t"].name]).toEqual(["a b", "42", "default", "#hidden", "s t"]);
+        expect(await handlers["a b"](1) + await handlers[42](2) + await handlers.default(3) + await Statics["s t"](4)).toBe(10);
+    });
+
     it.skipIf(lowered)("keeps the result and the name of class fields with the names _ref, eval, arguments and a string key (not with SWC or esbuild)", async () => {
         class Fields {
             _ref = async (value : number) : Promise<number> => value + 1;

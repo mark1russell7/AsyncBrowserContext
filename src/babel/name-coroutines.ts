@@ -110,6 +110,10 @@ function nameReturnedWrapper(call : NodePath<types.CallExpression>, name : strin
     const declarator = call.parentPath as NodePath;
     const declaration = declarator.parentPath as NodePath;
     const next = declaration.getSibling((declaration.key as number) + 1);
+    if (next.isFunctionDeclaration()) {
+        nameDeclaredWrapper(next, declaration.getSibling((declaration.key as number) + 2), name);
+        return;
+    }
     if (!next.isReturnStatement() || !next.get("argument").isFunctionExpression()) {
         return;
     }
@@ -133,14 +137,42 @@ function nameReturnedWrapper(call : NodePath<types.CallExpression>, name : strin
         // The code has its own Object, so the global function is not available
         return;
     }
+    returnedPath.replaceWith(withName(returned, name));
+}
+
+/**
+ * A key is not always a binding name, for example `"a b"`, `42` or `default`. For such a key,
+ * the async transform gives a wrapper declaration with a binding name that it makes from the key:
+ *
+ * ```js
+ * function () { var _a_b = _coroutine(function* () {...}, "a b"); function a_b() {...} return a_b; }()
+ * ```
+ *
+ * This function gives that wrapper the name of the source with `Object.defineProperty`, if the
+ * two names are not the same.
+ */
+function nameDeclaredWrapper(wrapper : NodePath<types.FunctionDeclaration>, after : ReturnType<NodePath["getSibling"]>, name : string) : void {
+    const id = wrapper.node.id;
+    if (id === null || id === undefined || id.name === name || !after.isReturnStatement()) {
+        return;
+    }
+    const returned = after.node.argument;
+    if (!types.isIdentifier(returned, { name : id.name }) || after.scope.getBinding("Object") !== undefined) {
+        return;
+    }
+    after.get("argument").replaceWith(withName(returned, name));
+}
+
+/** This function gives `Object.defineProperty(fn, "name", { value : name, configurable : true })`, which gives `fn`. */
+function withName(fn : types.Expression, name : string) : types.CallExpression {
     const descriptor = types.objectExpression([
         types.objectProperty(types.identifier("value"), types.stringLiteral(name)),
         types.objectProperty(types.identifier("configurable"), types.booleanLiteral(true)),
     ]);
-    returnedPath.replaceWith(types.callExpression(
+    return types.callExpression(
         types.memberExpression(types.identifier("Object"), types.identifier("defineProperty")),
-        [returned, types.stringLiteral("name"), descriptor],
-    ));
+        [fn, types.stringLiteral("name"), descriptor],
+    );
 }
 
 /** The names that strict code cannot bind, also as the name of a function expression. */
