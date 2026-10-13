@@ -80,6 +80,62 @@ describe("the Vite plugin", () => {
         expect((await handlerOf()(ASYNC_CODE, "/app/node_modules/dep/index.cjs"))?.code).toContain("async-browser-context/runtime");
     });
 
+    it("uses require in a module with only one CommonJS mark", async () => {
+        const handler = handlerOf();
+        const RUNTIME_REQUIRE = `require("async-browser-context/runtime")`;
+        for (const code of [
+            "const fs = require('fs'); globalThis.read = async () => { await fs.promises.stat('.'); };",
+            "const fs = require ('fs'); globalThis.read = async () => { await fs.promises.stat('.'); };",
+            "exports.read = async function read() { await null; };",
+            "module.exports = async function read() { await null; };",
+        ]) {
+            expect((await handler(code, "/app/node_modules/dep/index.js"))?.code, code).toContain(RUNTIME_REQUIRE);
+        }
+    });
+
+    it("uses require in a .cjs or .cts module without CommonJS marks, and import in other modules", async () => {
+        const handler = handlerOf();
+        const code = "globalThis.read = async () => { await null; };";
+        for (const id of ["/app/src/read.cjs", "/app/src/read.cts"]) {
+            expect((await handler(code, id))?.code, id).toContain(`require("async-browser-context/runtime")`);
+        }
+        for (const id of ["/app/src/read.cjs.js", "/app/src/read.js", "/app/src/exports.js"]) {
+            expect((await handler(code, id))?.code, id).toContain(`from "async-browser-context/runtime"`);
+        }
+        // Words that are not CommonJS marks
+        expect((await handler(`${code} const required = "requires"; globalThis.exports_ = exports2;`, "/app/src/read.js"))?.code).toContain(`from "async-browser-context/runtime"`);
+    });
+
+    it("uses require in a CommonJS module with a line in a string that looks like an export", async () => {
+        const code = "const fs = require('fs');\nconst text = `\nexport const a = 1;\nimport b from 'b';\n`;\nmodule.exports = async function read() { await fs.promises.stat(text); };";
+        const result = await handlerOf()(code, "/app/node_modules/dep/index.js");
+        expect(result?.code).toContain(`require("async-browser-context/runtime")`);
+        expect(result?.code).not.toContain(`from "async-browser-context/runtime"`);
+    });
+
+    it("uses import in a module with CommonJS marks and a static import or export", async () => {
+        const handler = handlerOf();
+        for (const code of [
+            "import fs from 'fs';\nconst x = require('x');\nexport async function read() { await fs.promises.stat(x); }",
+            "  export const read = async () => { await require('fs').promises.stat('.'); };",
+        ]) {
+            const result = await handler(code, "/app/node_modules/dep/index.js");
+            expect(result?.code, code).toContain(`from "async-browser-context/runtime"`);
+            expect(result?.code, code).not.toContain(`require("async-browser-context/runtime")`);
+        }
+    });
+
+    it("gives null for a module without the words of async code, also when Babel cannot parse it", async () => {
+        expect(await handlerOf()("const value = ;", "/app/src/broken.js")).toBeNull();
+    });
+
+    it("keeps the format of a large module", async () => {
+        // Babel compacts a module of more than 500 KB, unless the option compact is false
+        const code = `export const data = "${"x".repeat(600_000)}";\n${ASYNC_CODE}\n`;
+        const result = await handlerOf()(code, "/app/node_modules/.vite/deps/large.js");
+        expect(result?.code).toMatch(/\nexport function load\(\) \{\n/);
+    });
+
     it("transforms the JavaScript of Vue, Svelte, Astro and MDX components, but not their styles", async () => {
         const handler = handlerOf();
         for (const id of ["/app/src/App.vue", "/app/src/App.vue?vue&type=script&setup=true&lang.ts", "/app/src/Card.svelte", "/app/src/page.astro", "/app/src/post.mdx"]) {
@@ -87,6 +143,11 @@ describe("the Vite plugin", () => {
         }
         expect(await handler(ASYNC_CODE, "/app/src/App.vue?vue&type=style&index=0&lang.css")).toBeNull();
         expect(await handler(ASYNC_CODE, "/app/src/Card.svelte?svelte&type=style&lang.scss")).toBeNull();
+        expect(await handler(ASYNC_CODE, "/app/src/App.vue?vue&type=style")).toBeNull();
+        expect(await handler(ASYNC_CODE, "/app/src/Card.svelte?svelte&lang.css")).toBeNull();
+        // Other files with the name of a component in the path
+        expect(await handler(ASYNC_CODE, "/app/src/App.vue.html")).toBeNull();
+        expect(await handler(ASYNC_CODE, "/app/src/post.mdx.txt")).toBeNull();
     });
 
     it("gives no input source map to Babel, so the map describes the code that the plugin gets", async () => {
@@ -116,14 +177,19 @@ describe("the Vite plugin", () => {
         expect(await handlerOf()("export const g = function * () { };", "/app/src/g.js")).not.toBeNull();
     });
 
-    it("ignores the Babel configuration files of the project", async () => {
-        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-babel-"));
-        fs.writeFileSync(path.join(directory, "babel.config.json"), JSON.stringify({ plugins : ["a-plugin-that-does-not-exist"] }));
-        fs.writeFileSync(path.join(directory, ".babelrc"), JSON.stringify({ plugins : ["another-plugin-that-does-not-exist"] }));
-        try {
-            expect(await handlerOf()(ASYNC_CODE, path.join(directory, "load.js"))).not.toBeNull();
-        } finally {
-            fs.rmSync(directory, { recursive : true, force : true });
-        }
-    });
+    for (const file of ["babel.config.json", ".babelrc"]) {
+        it(`ignores the Babel configuration file ${file} of the project`, async () => {
+            // Babel finds babel.config.json in its root, the working folder, and a .babelrc file only inside the root package
+            const directory = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-babel-"));
+            fs.writeFileSync(path.join(directory, file), JSON.stringify({ plugins : ["a-plugin-that-does-not-exist"] }));
+            const cwd = process.cwd();
+            process.chdir(directory);
+            try {
+                expect(await handlerOf()(ASYNC_CODE, path.join(directory, "load.js"))).not.toBeNull();
+            } finally {
+                process.chdir(cwd);
+                fs.rmSync(directory, { recursive : true, force : true });
+            }
+        });
+    }
 });

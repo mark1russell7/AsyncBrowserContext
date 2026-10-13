@@ -1,4 +1,5 @@
 import { types, type NodePath, type PluginObject, type PluginPass } from "@babel/core";
+import { keyName } from "./name-coroutines.js";
 
 /**
  * `@babel/plugin-transform-async-to-generator` keeps `this` and `super` of an async arrow
@@ -24,7 +25,10 @@ import { types, type NodePath, type PluginObject, type PluginPass } from "@babel
  * The object property keeps the name of the function (`A.load.name` is "load").
  */
 
-/** This function gives `true` if `element` is or contains an async arrow function whose `this` is the `this` of the class element. */
+/**
+ * This function gives `true` if `element` is or contains an async arrow function whose `this` is the `this` of the class element.
+ * It gives `false` for a path without a node, for example the value of `static x;`.
+ */
 function hasAsyncArrowOfElement(element : NodePath) : boolean {
     if (element.isArrowFunctionExpression() && element.node.async) {
         return true;
@@ -39,6 +43,7 @@ function hasAsyncArrowOfElement(element : NodePath) : boolean {
             }
             if (path.node.async) {
                 found = true;
+                // Stryker disable next-line CallExpression: the stop only ends the search early, and the result stays the same
                 path.stop();
             }
         },
@@ -49,22 +54,10 @@ function hasAsyncArrowOfElement(element : NodePath) : boolean {
     return found;
 }
 
-/** This function gives the name of a static class element for NamedEvaluation, or `undefined` for a computed key. */
+/** This function gives the name of a static class element for NamedEvaluation, or `undefined` for a computed key that is not a literal. */
 function staticName(node : types.ClassProperty | types.ClassPrivateProperty | types.ClassAccessorProperty) : string | undefined {
-    const key = node.key;
-    if (types.isPrivateName(key)) {
-        return `#${key.id.name}`;
-    }
-    if ("computed" in node && node.computed === true) {
-        return undefined;
-    }
-    if (types.isIdentifier(key)) {
-        return key.name;
-    }
-    if (types.isStringLiteral(key)) {
-        return key.value;
-    }
-    return types.isNumericLiteral(key) ? String(key.value) : undefined;
+    // A private property has no computed field
+    return keyName(node.key, (node as { computed? : boolean }).computed === true);
 }
 
 /** This function gives a private name that the class does not use. */
@@ -98,10 +91,11 @@ export function staticMembersPlugin() : PluginObject<PluginPass> {
                 programPath.traverse({
                     "ClassProperty|ClassPrivateProperty|ClassAccessorProperty"(path : NodePath<types.ClassProperty | types.ClassPrivateProperty | types.ClassAccessorProperty>) {
                         const node = path.node;
-                        if (node.static !== true || node.value === null || node.value === undefined || !hasAsyncArrowOfElement(path.get("value") as NodePath)) {
+                        if (node.static !== true || !hasAsyncArrowOfElement(path.get("value") as NodePath)) {
                             return;
                         }
-                        const value = node.value;
+                        // A field without a value has no async arrow function
+                        const value = node.value as types.Expression;
                         const name = staticName(node);
                         // An object property keeps the name of an anonymous function, as the static property did
                         const expression = name === undefined
