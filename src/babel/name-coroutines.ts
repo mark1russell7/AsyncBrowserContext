@@ -43,7 +43,6 @@ function isTypeWrapper(path : NodePath) : boolean {
 
 /** This function gives the name of an identifier, or `undefined` for a pattern or a member expression. */
 function identifierName(node : types.Node) : string | undefined {
-    // Stryker disable next-line ConditionalExpression: a pattern and a member expression have no name property, so they give undefined also without the check
     return types.isIdentifier(node) ? node.name : undefined;
 }
 
