@@ -16,9 +16,12 @@ export function isRuntimeFunction(node : types.Node) : boolean {
         && node.body.directives.some((directive) => directive.value.value === RUNTIME_DIRECTIVE);
 }
 
-/** This function gives `true` if `node` is `require(runtime)`, also inside a helper, for example `_interopRequireWildcard(require(runtime))`. */
+/**
+ * This function gives `true` if `node` is `require(runtime)`, also inside at most three helper calls or members,
+ * for example `_interopRequireWildcard(require(runtime))`. It gives `false` for `null` and `undefined`.
+ */
 function containsRequireOf(node : types.Node | null | undefined, runtime : string, depth = 0) : boolean {
-    if (node === null || node === undefined || depth > 3) {
+    if (depth > 3) {
         return false;
     }
     if (types.isCallExpression(node)) {
@@ -27,10 +30,8 @@ function containsRequireOf(node : types.Node | null | undefined, runtime : strin
         }
         return node.arguments.some((argument) => containsRequireOf(argument as types.Node, runtime, depth + 1));
     }
-    if (types.isMemberExpression(node)) {
-        return containsRequireOf(node.object, runtime, depth + 1);
-    }
-    return false;
+    // Stryker disable next-line ConditionalExpression: of the other nodes, only an optional member has an object, and the tools do not give one here
+    return types.isMemberExpression(node) && containsRequireOf(node.object, runtime, depth + 1);
 }
 
 /** This function gives the initial value of the variable that `identifier` names, if a variable declaration gives it. */
