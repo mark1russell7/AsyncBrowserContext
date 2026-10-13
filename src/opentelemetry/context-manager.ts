@@ -11,6 +11,11 @@ export interface ContextStorage {
 export type AsyncContextManagerClass = new () => ContextManager;
 
 type Listener = (...args : unknown[]) => unknown;
+
+/** The guard of one emitter against nested adds: `true` while a patched add method operates. */
+interface AddGuard {
+    adding : boolean;
+}
 type Method = (this : unknown, ...args : unknown[]) => unknown;
 
 /** The methods of a Node.js EventEmitter that add a listener. */
@@ -118,10 +123,21 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
             return this;
         }
 
-        #bindFunction(context : Context, fn : Listener) : Listener {
+        /** With `guard`, the listener of an emitter clears the guard against nested adds while it operates (`#bindEmitter`). */
+        #bindFunction(context : Context, fn : Listener, guard? : AddGuard) : Listener {
             const run = (call : () => unknown) : unknown => this.with(context, call);
             const wrapper = function (this : unknown, ...args : unknown[]) : unknown {
-                return run(() => Reflect.apply(fn, this, args));
+                if (guard === undefined) {
+                    return run(() => Reflect.apply(fn, this, args));
+                }
+                // A listener of "newListener" can add listeners during an add: they also get the context
+                const outer = guard.adding;
+                guard.adding = false;
+                try {
+                    return run(() => Reflect.apply(fn, this, args));
+                } finally {
+                    guard.adding = outer;
+                }
             };
             Object.defineProperty(wrapper, "length", { value : fn.length, configurable : true });
             return wrapper;
@@ -132,7 +148,7 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
             const methods = emitter as Record<string, unknown>;
             // `once` of Node.js adds its own wrapper with `this.on`. That inner add must not wrap again,
             // else `removeListener` does not find the listener. OpenTelemetry has the same guard.
-            let adding = false;
+            const guard : AddGuard = { adding : false };
             for (const name of ADD_LISTENER_METHODS) {
                 const original = methods[name];
                 if (typeof original !== "function") {
@@ -140,20 +156,20 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
                 }
                 const manager = this;
                 methods[name] = function (this : unknown, event : unknown, listener : unknown) : unknown {
-                    if (adding || typeof listener !== "function") {
+                    if (guard.adding || typeof listener !== "function") {
                         return Reflect.apply(original as Method, this, arguments);
                     }
                     const listeners = listenersOf(emitter, event);
                     let wrapper = listeners.get(listener);
                     if (wrapper === undefined) {
-                        wrapper = manager.#bindFunction(context, listener as Listener);
+                        wrapper = manager.#bindFunction(context, listener as Listener, guard);
                         listeners.set(listener, wrapper);
                     }
-                    adding = true;
+                    guard.adding = true;
                     try {
                         return Reflect.apply(original as Method, this, [event, wrapper]);
                     } finally {
-                        adding = false;
+                        guard.adding = false;
                     }
                 };
             }

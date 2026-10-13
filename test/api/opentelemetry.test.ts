@@ -148,6 +148,20 @@ describe(`AsyncContextManager (${runtime} runtime)`, () => {
         expect(seen).toEqual(["a request"]);
     });
 
+    it.skipIf(inBrowser)("binds a listener that a newListener listener adds during an add of a Node.js EventEmitter", () => {
+        const { EventEmitter } = process.getBuiltinModule("node:events");
+        const emitter = context.bind(ROOT_CONTEXT.setValue(REQUEST, "bound"), new EventEmitter());
+        const seen : unknown[] = [];
+        emitter.on("newListener", (event : string) => {
+            if (event === "first") {
+                emitter.on("second", () => { seen.push(valueOf()); });
+            }
+        });
+        emitter.once("first", () => undefined);
+        context.with(ROOT_CONTEXT.setValue(REQUEST, "emit-time"), () => emitter.emit("second"));
+        expect(seen).toEqual(["bound"]);
+    });
+
     it.skipIf(inBrowser)("removes a once listener of a Node.js EventEmitter with removeListener, and starts it one time", () => {
         const { EventEmitter } = process.getBuiltinModule("node:events");
         const emitter = context.bind(ROOT_CONTEXT.setValue(REQUEST, "once"), new EventEmitter());
