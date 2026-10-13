@@ -93,9 +93,14 @@ function createStore() : ContextStore {
     };
 }
 
-function getOrCreateStore() : ContextStore {
-    const holder = globalThis as unknown as Record<symbol, ContextStore | undefined>;
-    const existing = holder[STORE_KEY];
+/**
+ * This function gives the store of the global object `holder`. If `holder` has no store, the
+ * function makes one, and adds it as a property that code cannot change or remove.
+ *
+ * @internal
+ */
+export function getOrCreateStore(holder : object) : ContextStore {
+    const existing = (holder as Record<symbol, ContextStore | undefined>)[STORE_KEY];
     if (existing !== undefined) {
         // The stores of version 0.2 and later have the own property hooks from the start. Version 0.1 has no hooks.
         if (!Object.prototype.hasOwnProperty.call(existing, "hooks") && existing.oldCopyPatches === undefined) {
@@ -104,12 +109,12 @@ function getOrCreateStore() : ContextStore {
         return existing;
     }
     const created = createStore();
-    Object.defineProperty(globalThis, STORE_KEY, { value : created, writable : false, enumerable : false, configurable : false });
+    Object.defineProperty(holder, STORE_KEY, { value : created, writable : false, enumerable : false, configurable : false });
     return created;
 }
 
 /** The store of this global object. */
-export const store : ContextStore = getOrCreateStore();
+export const store : ContextStore = getOrCreateStore(globalThis);
 
 /** `true` while a record of the idle frame waits in the microtask queue. */
 let idleRecordQueued = false;
@@ -121,9 +126,11 @@ let idleRecordQueued = false;
  * goes to the native `then`, so no wrapper sets a frame for it.
  */
 export function recordIdleFrame() : void {
+    // Stryker disable next-line ConditionalExpression,BlockStatement: a second record in the same turn records the same frame, so the flag only prevents more microtasks
     if (idleRecordQueued) {
         return;
     }
+    // Stryker disable next-line BooleanLiteral: a second record in the same turn records the same frame, so the flag only prevents more microtasks
     idleRecordQueued = true;
     Reflect.apply(store.intrinsics.promiseThen, store.intrinsics.promiseResolve(undefined), [() : void => {
         idleRecordQueued = false;

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { AsyncLocalStorage } from "./async-local-storage.js";
-import { bindGenerator, coroutine } from "./coroutine.js";
+import { asyncGenerator, bindGenerator, coroutine } from "./coroutine.js";
 import { addCallbackHook } from "./hooks.js";
 import { Snapshot } from "./snapshot.js";
-import { bindOneArgument, bindToFrame, createFrame, enter, findValue, NOT_FOUND, store } from "./store.js";
+import { bindOneArgument, bindToFrame, createFrame, enter, findValue, getOrCreateStore, NOT_FOUND, store, type ContextStore, type Frame } from "./store.js";
 import { enterValue, Variable } from "./variable.js";
 
 describe("the context store", () => {
@@ -14,6 +14,36 @@ describe("the context store", () => {
         expect(descriptor?.writable).toBe(false);
         expect(descriptor?.configurable).toBe(false);
         expect(descriptor?.enumerable).toBe(false);
+    });
+
+    it("makes a store with the root frame for a global object without a store, and gives the same store later", () => {
+        const holder = {};
+        const created = getOrCreateStore(holder);
+        expect(created.current).toBe(created.root);
+        expect(created.idle).toBe(created.root);
+        expect(created.root.parent).toBeNull();
+        expect(Object.isFrozen(created.root)).toBe(true);
+        expect(Object.prototype.hasOwnProperty.call(created, "hooks")).toBe(true);
+        expect(created.inHook).toBe(false);
+        expect(created.oldCopyPatches).toBeUndefined();
+        expect(Object.getOwnPropertyDescriptor(holder, Symbol.for("async-browser-context/store/v1"))).toEqual({ value : created, writable : false, enumerable : false, configurable : false });
+        expect(getOrCreateStore(holder)).toBe(created);
+    });
+
+    it("records the patches of a store of version 0.1, which has no hooks, one time", () => {
+        const key = Symbol.for("async-browser-context/store/v1");
+        const old = { patches : new Set(["timers"]) } as unknown as ContextStore;
+        const holder = { [key] : old };
+        expect(getOrCreateStore(holder)).toBe(old);
+        expect([...(old.oldCopyPatches ?? [])]).toEqual(["timers"]);
+        // A patch that the old copy installs later does not change the record
+        old.patches.add("events");
+        getOrCreateStore(holder);
+        expect([...(old.oldCopyPatches ?? [])]).toEqual(["timers"]);
+        // The store of version 0.2 and later has the own property hooks
+        const newer = { patches : new Set(["timers"]), hooks : undefined } as unknown as ContextStore;
+        getOrCreateStore({ [key] : newer });
+        expect(newer.oldCopyPatches).toBeUndefined();
     });
 
     it("replaces a frame of the same variable, so many enterWith() calls do not make a long chain", () => {
@@ -135,9 +165,39 @@ describe("Variable lookup", () => {
             enter(previous);
         }
     });
+
+    it("records the frame of an enterValue in a task without a wrapper as the idle frame, also in a later task", async () => {
+        const variable = new Variable<string>();
+        // A native timer has no wrapper, as the evaluation of a module
+        const nativeSetTimeout = (store.originals.get(setTimeout) ?? setTimeout) as typeof setTimeout;
+        const enterInTask = (value : string) : Promise<Frame> => new Promise((resolve) => nativeSetTimeout(() => {
+            enterValue(variable, value);
+            resolve(store.current);
+        }, 0));
+        try {
+            const first = await enterInTask("first");
+            expect(store.idle).toBe(first);
+            const second = await enterInTask("second");
+            expect(store.idle).toBe(second);
+        } finally {
+            // Also in a task without a wrapper: a step of this test sets its previous frame again at its end
+            await new Promise<void>((resolve) => nativeSetTimeout(() => {
+                store.current = store.root;
+                store.idle = store.root;
+                resolve();
+            }, 0));
+        }
+    });
 });
 
 describe("coroutine", () => {
+    it("gives the functions of coroutine and asyncGenerator the name and the length of the source, or the empty name", () => {
+        const load = coroutine(function* (_id : number) : Generator<unknown, void, unknown> { /* No steps */ }, "load");
+        const rows = asyncGenerator(function* (_from : number, _to : number) : Generator<unknown, void, unknown> { /* No steps */ }, "rows");
+        const anonymous = asyncGenerator(function* () : Generator<unknown, void, unknown> { /* No steps */ });
+        expect([load.name, load.length, rows.name, rows.length, anonymous.name, anonymous.length]).toEqual(["load", 1, "rows", 2, "", 0]);
+    });
+
     it("gives this and the arguments to the generator function", async () => {
         const run = coroutine(function* (this : { id : number }, a : number) : Generator<unknown, string, unknown> {
             const value = (yield a) as number;

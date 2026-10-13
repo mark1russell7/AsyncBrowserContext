@@ -169,9 +169,9 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
     it.skipIf(!preset)("calls the hooks for a request of an async generator that waits in the queue, and for the step after a rejected await", async () => {
         const variable = new Variable<string>();
         const calls = record(variable);
-        async function* pair() : AsyncGenerator<number> {
-            yield 1;
-            yield 2;
+        async function* pair() : AsyncGenerator<unknown, void, unknown> {
+            const received : unknown = yield 1;
+            yield received;
         }
         async function* recovering() : AsyncGenerator<string> {
             try {
@@ -181,7 +181,7 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
             }
         }
         const queued = variable.run("q", () => pair());
-        expect(await Promise.all([queued.next(), queued.next()])).toEqual([{ value : 1, done : false }, { value : 2, done : false }]);
+        expect(await Promise.all([queued.next(), queued.next("x")])).toEqual([{ value : 1, done : false }, { value : "x", done : false }]);
         expect(await variable.run("q", () => recovering()).next()).toEqual({ value : "recovered", done : false });
         expect(calls.filter((call) => call.source === "await").map((call) => `${call.phase} ${call.name}`)).toEqual([
             "before pair",
@@ -421,6 +421,34 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         await delay(10);
         // The two steps of the first call start the hooks. The calls that the hook starts are quiet.
         expect(afterSend).toBe(2);
+    });
+
+    it.skipIf(!preset)("does not start the hooks for the steps of an async generator that a hook makes", async () => {
+        let afterTicks = 0;
+        let generator : AsyncGenerator<number> | undefined;
+        async function* ticks() : AsyncGenerator<number> {
+            await null;
+            yield 1;
+            await null;
+            yield 2;
+        }
+        removers.push(addCallbackHook({
+            before() {
+                generator ??= ticks();
+            },
+            after(callback, source) {
+                if (source === "await" && callback.name === "ticks") {
+                    afterTicks++;
+                }
+            },
+        }));
+        await Promise.resolve().then(() => undefined);
+        const values : number[] = [];
+        for await (const value of generator ?? ticks()) {
+            values.push(value);
+        }
+        expect(values).toEqual([1, 2]);
+        expect(afterTicks).toBe(0);
     });
 
     it.skipIf(!preset)("does not start the hooks for an async function that a quiet callback starts, also through a chain of callbacks", async () => {
