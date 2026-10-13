@@ -64,9 +64,12 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
             return this.#storage.getStore() ?? ROOT_CONTEXT;
         }
 
-        /** This method starts `fn` with `context` as the active context, also after each `await` in `fn`. */
+        /**
+         * This method starts `fn` with `context` as the active context, also after each `await` in `fn`.
+         * With `thisArg` `null` or `undefined`, `fn` gets `undefined` as its `this` value, as in OpenTelemetry.
+         */
         with<A extends unknown[], F extends (...args : A) => ReturnType<F>>(context : Context, fn : F, thisArg? : ThisParameterType<F>, ...args : A) : ReturnType<F> {
-            return this.#storage.run(context, () => Reflect.apply(fn, thisArg, args) as ReturnType<F>);
+            return this.#storage.run(context, () => Reflect.apply(fn, thisArg ?? undefined, args) as ReturnType<F>);
         }
 
         /**

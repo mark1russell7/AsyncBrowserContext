@@ -29,6 +29,7 @@ This version changes some behaviors, so it is a minor version. The first section
 
 ### Corrections
 
+- OpenTelemetry: a remove method finds a bound listener also when it gets the event name in another form, for example `1` in place of `"1"`. The emitter and the event target do the same. `with()` with the `this` value `null` starts the function with `undefined`, as OpenTelemetry does.
 - The patches of `Promise.prototype.then` and `Function.prototype.toString` start the function that they replace, as the other patches do. Thus a patch of `then` or `toString` that another tool installed before the library stays in effect. Before, these patches started the native functions.
 - The preset does not change the native async generator of the runtime, also when a bundler applies the preset to `node_modules`. The plugin of Babel for async generators changes async generators and `for await` loops in its own traversal. The preset makes that traversal skip the functions with the directive of the runtime too. Before, the runtime then imported itself, and its async generator objects did not inherit `Symbol.asyncDispose`.
 - Events:

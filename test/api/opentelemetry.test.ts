@@ -96,6 +96,8 @@ describe(`AsyncContextManager (${runtime} runtime)`, () => {
             return `${this.name} ${a + b} ${String(valueOf())}`;
         }, target, 2, 3);
         expect(result).toBe("target 5 r-2");
+        // With null, the function gets undefined as its this value, as in OpenTelemetry
+        expect(context.with(ROOT_CONTEXT, function (this : unknown) { return this; }, null as never)).toBeUndefined();
     });
 
     it("binds a function to a context, with its this value, its arguments and its length", async () => {
