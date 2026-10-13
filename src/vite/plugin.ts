@@ -43,8 +43,6 @@ const STYLE_QUERY = /[?&](?:type=style|lang\.(?:css|scss|sass|less|styl|stylus|p
 const MIGHT_CHANGE = /\basync\b|\byield\b|function\s*\*/;
 /** The runtime of this library. The plugin must not transform it. */
 const OWN_RUNTIME = /[\\/]async-browser-context[\\/]dist[\\/]/;
-/** A line that starts with a static import or export. */
-const MODULE_SYNTAX = /^\s*(?:import\s*[\w*{"']|export\s)/m;
 /** The marks of a CommonJS module. */
 const COMMONJS = /\brequire\s*\(|\bmodule\.exports\b|\bexports\.[A-Za-z_$]/;
 
@@ -56,14 +54,12 @@ function matches(filter : ModuleFilter, id : string) : boolean {
  * This function gives the source type for Babel. Vite serves each module as an ES module, also
  * a worker or a file with only a dynamic `import()`. With "unambiguous", Babel reads such a file
  * as a script and adds a `require()` of the runtime, which a browser does not have. Thus only a
- * `.cjs` or `.cts` file, or a file with CommonJS marks and no static import or export, gets
- * "unambiguous". Babel then reads it as a script, unless it has an import or an export.
+ * `.cjs` or `.cts` file, or a file with CommonJS marks, gets "unambiguous". Babel then reads it
+ * as a script, unless it has a static import or export. A text of the code that looks like an
+ * import, for example in a string, does not change this.
  */
 function sourceTypeOf(file : string, code : string) : "module" | "unambiguous" {
-    if (/\.c[jt]s$/.test(file)) {
-        return "unambiguous";
-    }
-    return COMMONJS.test(code) && !MODULE_SYNTAX.test(code) ? "unambiguous" : "module";
+    return /\.c[jt]s$/.test(file) || COMMONJS.test(code) ? "unambiguous" : "module";
 }
 
 /**
@@ -124,12 +120,13 @@ export function asyncContext(options : AsyncContextPluginOptions = {}) : Plugin 
                     compact : false,
                     presets,
                 });
-                const changed = (result?.metadata as Record<string, unknown> | undefined)?.[METADATA_KEY] === true;
-                if (result?.code == null || !changed) {
+                // Without the options ignore and only, Babel gives a result with code. With sourceMaps, it also gives a map.
+                const { code : output, map, metadata } = result as { code : string; map : object; metadata : Record<string, unknown> };
+                if (metadata[METADATA_KEY] !== true) {
                     return null;
                 }
                 // A source map in JSON text satisfies both Rollup and Rolldown
-                return { code : result.code, map : result.map == null ? null : JSON.stringify(result.map) };
+                return { code : output, map : JSON.stringify(map) };
             },
         },
     };
