@@ -1,4 +1,4 @@
-import { createAsyncGenerator, PlainValue, unbox } from "./async-generator.js";
+import { createAsyncGenerator, isObject, PlainValue, unbox } from "./async-generator.js";
 import { copyNameAndLength } from "./function-name.js";
 import { applyQuietly, applyWithHooks, store, type Frame } from "./store.js";
 
@@ -23,11 +23,6 @@ function namedForHooks(generatorFunction : Function, name : string | undefined) 
         Object.defineProperty(generatorFunction, "name", { value : name, configurable : true });
     }
     return generatorFunction;
-}
-
-/** This function gives `true` for a value that can have a `then` property: an object or a function. */
-function isObject(value : unknown) : value is object {
-    return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
 /**

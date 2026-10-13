@@ -44,6 +44,11 @@ This version changes some behaviors, so it is a minor version. The first section
 - Callback hooks: an error of a getter of a hook method, or an error of `reportError()`, does not stop the callback.
 - The wrappers start each callback with `Reflect.apply`. Thus a callback with its own `call` or `apply` property operates.
 - A frame of the same variable replaces its parent. Thus many uses of `enterWith()` in one context do not make a long chain, and do not keep old stores in memory.
+- `yield*` in a transformed async generator keeps the protocol of a native `yield*`:
+  - After `return()`, a `yield*` in a `finally` block operates to its end, also after `return()` through an earlier `yield*`. Before, a delegate that was complete at its first step ended the generator with the value of the delegate.
+  - A rejection of a step of the delegate goes into the body at the `yield*`, also when the delegate has no `throw` method. Before, the body got a `TypeError` in that case.
+  - A result of the delegate that is not an object throws a `TypeError` into the body at the `yield*`. Before, the request of the consumer failed for `undefined` and `null`, and the body did not get the error.
+  - In WebKit, the driver does not await the values of the delegate. Before, it awaited each value, because the `yield*` of WebKit makes a new result object. The driver reads `done` and `value` of each result one time, as a native `yield*` does.
 - Node.js: the probe of the native options also examines `exit()`, and it disables itself after the probe. With `--no-async-context-frame` on Node.js 24, `exit()` thus gives `undefined`, as in the browser.
 - Babel preset:
   - A generator parameter that the body declares again with `var`, or with a function declaration in a block of a sloppy script, keeps its value.

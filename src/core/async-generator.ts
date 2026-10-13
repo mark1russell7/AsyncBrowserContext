@@ -10,22 +10,36 @@
  * `new OverloadYield(value, 0)` for an `await`, and `new OverloadYield(promise, 1)` for a
  * step of `yield*`. Each other value is a `yield`. Where the helper differs from a native async
  * generator, the driver does as the native generator. Thus `return()` at a `yield` awaits its
- * value first, and a request on a complete generator settles at once.
+ * value first, and a request on a complete generator settles at once. The delegate of this
+ * module also gives kind 2 for a step of `yield*` after `return()`.
  */
 
 /** The Promise of the time when the module loads, for the rejections of the methods. */
 const NativePromise : PromiseConstructor = Promise;
 
 /**
- * The value that the body gives for an `await` (kind 0) or for a step of `yield*` (kind 1).
- * The Babel helpers `awaitAsyncGenerator` and `asyncGeneratorDelegate` make it with `new`.
+ * The value that the body gives for an `await` (kind 0), for a step of `yield*` (kind 1), or
+ * for a step of `yield*` after `return()` (kind 2). The helpers `awaitAsyncGenerator` and
+ * `asyncGeneratorDelegate` make it with `new`.
  */
 export class OverloadYield {
     readonly v : unknown;
-    readonly k : 0 | 1;
-    constructor(value : unknown, kind : 0 | 1) {
+    readonly k : 0 | 1 | 2;
+    constructor(value : unknown, kind : 0 | 1 | 2) {
         this.v = value;
         this.k = kind;
+    }
+}
+
+/**
+ * The error of a step of `yield*` that was rejected. The driver gives it back to the delegate,
+ * and the delegate throws the error. Thus the error goes into the body at the `yield*`, also
+ * when the delegate has no `throw` method.
+ */
+class DelegateRejection {
+    readonly error : unknown;
+    constructor(error : unknown) {
+        this.error = error;
     }
 }
 
@@ -40,8 +54,10 @@ export function awaitAsyncGenerator(value : unknown) : OverloadYield {
 
 /**
  * The helper `asyncGeneratorDelegate` of Babel 8: a sync iterator for `yield*` in an async
- * generator. Each step of the inner async iterator becomes `new OverloadYield(promise, 1)`.
- * The driver awaits the promise, and gives its result back to the iterator.
+ * generator. Each step of the inner async iterator becomes `new OverloadYield(promise, 1)`, or
+ * kind 2 after `return()`. The driver awaits the promise, and gives a copy of its result back to
+ * the iterator. After kind 2, the driver gives it back with `return()`. Thus a complete inner
+ * iterator ends the body, as with a native `yield*`.
  */
 export function asyncGeneratorDelegate(inner : AsyncIterator<unknown, unknown, unknown>) : Iterator<unknown, unknown, unknown> {
     const iterator = inner as unknown as Record<ResumeKey, ((value : unknown) => unknown) | undefined>;
@@ -51,26 +67,23 @@ export function asyncGeneratorDelegate(inner : AsyncIterator<unknown, unknown, u
         const promise = new NativePromise((resolve) => {
             resolve(Reflect.apply(iterator[key] as (value : unknown) => unknown, inner, [value]));
         });
-        return { done : false, value : new OverloadYield(promise, 1) };
+        return { done : false, value : new OverloadYield(promise, key === "return" ? 2 : 1) };
     };
     const delegate : Record<PropertyKey, unknown> = {
         [Symbol.iterator]() { return this; },
         next(value : unknown) : unknown {
-            if (waiting) {
-                waiting = false;
-                return value;
+            if (!waiting) {
+                return pump("next", value);
             }
-            return pump("next", value);
+            waiting = false;
+            if (value instanceof DelegateRejection) {
+                throw value.error;
+            }
+            return value;
         },
     };
     if (typeof iterator.throw === "function") {
-        delegate["throw"] = (value : unknown) : unknown => {
-            if (waiting) {
-                waiting = false;
-                throw value;
-            }
-            return pump("throw", value);
-        };
+        delegate["throw"] = (value : unknown) : unknown => pump("throw", value);
     }
     if (typeof iterator.return === "function") {
         delegate["return"] = (value : unknown) : unknown => {
@@ -100,6 +113,11 @@ export class PlainValue {
 /** This function gives the value in a box, or the value itself. */
 export function unbox(value : unknown) : unknown {
     return value instanceof PlainValue ? value.value : value;
+}
+
+/** This function gives `true` for a value that can have properties: an object or a function. */
+export function isObject(value : unknown) : value is object {
+    return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
 /** The methods of a generator that a request of the consumer starts. */
@@ -142,27 +160,31 @@ function request(target : unknown, key : ResumeKey, argument : unknown) : Promis
 }
 
 /**
- * This function gives %AsyncIteratorPrototype% of the engine, which gives `Symbol.asyncIterator`,
- * `Symbol.asyncDispose` and the async iterator helpers. If a compiler changed the async
- * generator below, the function gives `undefined`.
+ * This function gives %AsyncIteratorPrototype% of the engine from an async generator function.
+ * The prototype gives `Symbol.asyncIterator`, `Symbol.asyncDispose` and the async iterator
+ * helpers. If a compiler changed the async generator function, the function gives `undefined`.
+ *
+ * @internal
  */
-function asyncIteratorPrototype() : object | undefined {
+export function asyncIteratorPrototypeOf(generatorFunction : Function) : object | undefined {
+    let prototype : Record<symbol, unknown> | null;
     try {
-        const generatorFunction = async function* () {
-            // The directive tells the Babel preset not to change this function (src/babel/skip-runtime.ts)
-            // Stryker disable next-line all: the directive matters only when a bundler applies the preset to the runtime
-            "async-browser-context runtime";
-        };
-        const prototype = Object.getPrototypeOf(Object.getPrototypeOf(generatorFunction.prototype) as object) as Record<symbol, unknown> | null;
-        return prototype !== null && typeof prototype[Symbol.asyncIterator] === "function" ? prototype : undefined;
+        prototype = Object.getPrototypeOf(Object.getPrototypeOf(generatorFunction.prototype) as object) as Record<symbol, unknown> | null;
     } catch {
+        // A function without a prototype object, for example an arrow function
         return undefined;
     }
+    return prototype !== null && typeof prototype[Symbol.asyncIterator] === "function" ? prototype : undefined;
 }
 
-/** The prototype of the async generator objects of transformed code. Its methods are not enumerable, as native methods. */
-const AsyncGeneratorPrototype : object = (() => {
-    const parent = asyncIteratorPrototype();
+/**
+ * This function makes the prototype of the async generator objects of transformed code. Its
+ * methods are not enumerable, as native methods. Without `parent`, the prototype inherits from
+ * `Object.prototype` and gets its own `Symbol.asyncIterator` method.
+ *
+ * @internal
+ */
+export function makeAsyncGeneratorPrototype(parent : object | undefined) : object {
     const prototype = Object.create(parent ?? Object.prototype) as object;
     const methods : Record<ResumeKey, (this : unknown, argument? : unknown) => Promise<IteratorResult<unknown, unknown>>> = {
         next(value) { return request(this, "next", value); },
@@ -177,7 +199,14 @@ const AsyncGeneratorPrototype : object = (() => {
     }
     Object.defineProperty(prototype, Symbol.toStringTag, { value : "AsyncGenerator", configurable : true });
     return prototype;
-})();
+}
+
+/** The prototype of the async generator objects of transformed code. */
+const AsyncGeneratorPrototype : object = makeAsyncGeneratorPrototype(asyncIteratorPrototypeOf(async function* () {
+    // The directive tells the Babel preset not to change this function (src/babel/skip-runtime.ts)
+    // Stryker disable next-line all: the directive matters only when a bundler applies the preset to the runtime
+    "async-browser-context runtime";
+}));
 
 /**
  * This function makes an async generator object. The object queues the requests of the
@@ -192,8 +221,10 @@ export function createAsyncGenerator(
 ) : AsyncGenerator<unknown, unknown, unknown> {
     let first : Request | undefined;
     let last : Request | undefined;
-    /** The state of the body: not started, suspended at a `yield`, or complete. While a step operates, the requests wait in the queue. */
-    let state : "start" | "yield" | "done" = "start";
+    /** `true` after the first step of the body. While a step operates, the requests wait in the queue. */
+    let started = false;
+    /** `true` when the body is complete. */
+    let complete = false;
 
     /** This function starts the requests in the queue, one after the other, until the queue is empty. */
     const run = async (key : ResumeKey, argument : unknown) : Promise<void> => {
@@ -204,12 +235,10 @@ export function createAsyncGenerator(
         for (;;) {
             let failed = false;
             let settled : unknown;
-            let done = false;
             try {
-                if (state === "done" || (state === "start" && key !== "next")) {
+                if (complete || (!started && key !== "next")) {
                     // The body does not operate: it is complete, or return() or throw() came before the start
-                    state = "done";
-                    done = true;
+                    complete = true;
                     if (key === "throw") {
                         throw argument;
                     }
@@ -218,6 +247,7 @@ export function createAsyncGenerator(
                         settled = await argument;
                     }
                 } else {
+                    started = true;
                     if (key === "return") {
                         // At a yield, return() awaits its value first. A rejection goes into the body at the yield.
                         try {
@@ -236,36 +266,36 @@ export function createAsyncGenerator(
                         try {
                             value = unbox(await prepare(overloaded ? yielded.v : yielded));
                         } catch (error) {
-                            resumed = true;
-                            key = "throw";
-                            result = step("throw", error, true);
+                            // The error goes into the body at the await or the yield. The delegate of a yield* throws it.
+                            result = overloaded && yielded.k !== 0 ? step("next", new DelegateRejection(error), true) : step("throw", error, true);
                             continue;
                         }
                         resumed = true;
                         if (overloaded) {
-                            const nextKey : ResumeKey = key === "return" && yielded.k === 1 ? "return" : "next";
-                            if (yielded.k === 0 || Boolean((value as { done? : unknown }).done)) {
-                                key = nextKey;
-                                result = step(nextKey, value, true);
+                            const resumeKey : ResumeKey = yielded.k === 2 ? "return" : "next";
+                            if (yielded.k === 0 || !isObject(value)) {
+                                // The value of an await. For a result of yield* that is not an object, the body throws a TypeError.
+                                result = step(resumeKey, value, true);
                                 continue;
                             }
-                            // A step of yield*: the body gives the result of the delegate back without a change.
-                            // Its value is not awaited, as with a native yield*.
-                            const passed = step(nextKey, value, true);
-                            if (passed !== value) {
-                                result = passed;
+                            // A step of yield*. As a native yield*, the driver reads done and value one time, and the body gets a copy.
+                            // The driver does not compare the result of the body with the copy, because the yield* of WebKit makes a new object.
+                            const done = Boolean((value as { done? : unknown }).done);
+                            const item = (value as { value? : unknown }).value;
+                            result = step(resumeKey, { value : item, done }, true);
+                            if (done) {
                                 continue;
                             }
-                            value = passed.value;
+                            // The body gives the result back. Its value is not awaited, as with a native yield*.
+                            value = item;
                         }
                         settled = value;
-                        done = result.done === true;
+                        complete = result.done === true;
                         break;
                     }
-                    state = done ? "done" : "yield";
                 }
             } catch (error) {
-                state = "done";
+                complete = true;
                 failed = true;
                 settled = error;
             }
@@ -275,7 +305,7 @@ export function createAsyncGenerator(
             if (failed) {
                 current.reject(settled);
             } else {
-                current.resolve({ value : settled, done });
+                current.resolve({ value : settled, done : complete });
             }
             if (first === undefined) {
                 last = undefined;
