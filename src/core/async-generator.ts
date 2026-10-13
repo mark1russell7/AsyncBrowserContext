@@ -215,12 +215,27 @@ export function makeAsyncGeneratorPrototype(parent : object | undefined) : objec
     return prototype;
 }
 
+/**
+ * This function gives %AsyncIteratorPrototype% of the engine, or `undefined`. Another preset in
+ * the same Babel configuration, for example `next/babel` with its preset-env, can change the
+ * async generator below in the runtime itself. Its helper is then a module that loads at this
+ * time, and the call can throw. The catch keeps the runtime available, with a prototype
+ * without the parent of the engine.
+ */
+function engineAsyncIteratorPrototype() : object | undefined {
+    try {
+        return asyncIteratorPrototypeOf(async function* () {
+            // The directive tells the Babel preset not to change this function (src/babel/skip-runtime.ts)
+            // Stryker disable next-line all: the directive matters only when a bundler applies the preset to the runtime
+            "async-browser-context runtime";
+        });
+    } catch {
+        return undefined;
+    }
+}
+
 /** The prototype of the async generator objects of transformed code. */
-const AsyncGeneratorPrototype : object = makeAsyncGeneratorPrototype(asyncIteratorPrototypeOf(async function* () {
-    // The directive tells the Babel preset not to change this function (src/babel/skip-runtime.ts)
-    // Stryker disable next-line all: the directive matters only when a bundler applies the preset to the runtime
-    "async-browser-context runtime";
-}));
+const AsyncGeneratorPrototype : object = makeAsyncGeneratorPrototype(engineAsyncIteratorPrototype());
 
 /**
  * This function makes an async generator object. The object queues the requests of the
