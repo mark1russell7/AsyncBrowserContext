@@ -24,7 +24,10 @@ import { types, type NodePath, type PluginObject, type PluginPass } from "@babel
  * The object property keeps the name of the function (`A.load.name` is "load").
  */
 
-/** This function gives `true` if `element` is or contains an async arrow function whose `this` is the `this` of the class element. */
+/**
+ * This function gives `true` if `element` is or contains an async arrow function whose `this` is the `this` of the class element.
+ * It gives `false` for a path without a node, for example the value of `static x;`.
+ */
 function hasAsyncArrowOfElement(element : NodePath) : boolean {
     if (element.isArrowFunctionExpression() && element.node.async) {
         return true;
@@ -39,6 +42,7 @@ function hasAsyncArrowOfElement(element : NodePath) : boolean {
             }
             if (path.node.async) {
                 found = true;
+                // Stryker disable next-line CallExpression: the stop only ends the search early, and the result stays the same
                 path.stop();
             }
         },
@@ -98,10 +102,11 @@ export function staticMembersPlugin() : PluginObject<PluginPass> {
                 programPath.traverse({
                     "ClassProperty|ClassPrivateProperty|ClassAccessorProperty"(path : NodePath<types.ClassProperty | types.ClassPrivateProperty | types.ClassAccessorProperty>) {
                         const node = path.node;
-                        if (node.static !== true || node.value === null || node.value === undefined || !hasAsyncArrowOfElement(path.get("value") as NodePath)) {
+                        if (node.static !== true || !hasAsyncArrowOfElement(path.get("value") as NodePath)) {
                             return;
                         }
-                        const value = node.value;
+                        // A field without a value has no async arrow function
+                        const value = node.value as types.Expression;
                         const name = staticName(node);
                         // An object property keeps the name of an anonymous function, as the static property did
                         const expression = name === undefined
