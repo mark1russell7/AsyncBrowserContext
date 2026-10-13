@@ -20,8 +20,9 @@ type FunctionPath = NodePath<types.Function>;
  * The generator of a Babel helper, for example `_wrapAsyncGenerator`, gets a binding.
  */
 function isDriverArgument(path : FunctionPath, runtime : string) : boolean {
-    const call = path.parentPath;
-    if (call === null || !call.isCallExpression() || call.node.arguments[0] !== path.node) {
+    // A function always has a parent path: at least the program
+    const call = path.parentPath as NodePath;
+    if (!call.isCallExpression() || call.node.arguments[0] !== path.node) {
         return false;
     }
     const callee = call.get("callee");
@@ -50,17 +51,17 @@ function redeclaredParameters(path : FunctionPath) : string[] {
             parameters.add(name);
         }
     }
-    if (parameters.size === 0) {
-        return [];
-    }
     const redeclared = new Set<string>();
     path.get("body").traverse({
         Function(inner) {
             // A function declaration in a block of sloppy code is hoisted (Annex B.3.3), but not
             // over a parameter with the same name. In the inner generator, the name is no parameter.
-            const id = inner.isFunctionDeclaration() ? inner.node.id : null;
-            if (id !== null && id !== undefined && parameters.has(id.name)) {
-                redeclared.add(id.name);
+            if (inner.isFunctionDeclaration()) {
+                // A function declaration in a body always has a name
+                const { name } = inner.node.id as types.Identifier;
+                if (parameters.has(name)) {
+                    redeclared.add(name);
+                }
             }
             inner.skip();
         },
@@ -115,16 +116,16 @@ function bindGeneratorFunction(path : FunctionPath, bindGenerator : types.Expres
  * `let` at the start of its block, with the same name.
  */
 function keepBlockScope(path : FunctionPath) : void {
-    const block = path.parentPath;
-    if (!path.isFunctionDeclaration() || block === null || !block.isBlockStatement() || block.parentPath?.isFunction() === true || path.isInStrictMode()) {
+    // A function and a block always have a parent path: at least the program
+    const block = path.parentPath as NodePath;
+    if (!block.isBlockStatement() || (block.parentPath as NodePath).isFunction() || path.isInStrictMode()) {
         return;
     }
-    const { id, params, body } = path.node;
-    if (id === null || id === undefined) {
-        return;
-    }
+    // Only a function declaration is a statement of a block, and it always has a name
+    const { id, params, body } = path.node as types.FunctionDeclaration;
+    const name = (id as types.Identifier).name;
     const declaration = types.variableDeclaration("let", [
-        types.variableDeclarator(types.identifier(id.name), types.functionExpression(types.identifier(id.name), params, body)),
+        types.variableDeclarator(types.identifier(name), types.functionExpression(types.identifier(name), params, body)),
     ]);
     path.remove();
     block.unshiftContainer("body", declaration);
