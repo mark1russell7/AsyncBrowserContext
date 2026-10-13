@@ -376,7 +376,12 @@ describe("the Babel preset", () => {
         expect(supportsResourceManagement("7.23.9")).toBe(true);
         expect(supportsResourceManagement("7.29.7")).toBe(true);
         expect(supportsResourceManagement("8.0.0-rc.1")).toBe(true);
+        expect(supportsResourceManagement("6.26.3")).toBe(false);
         expect(supportsResourceManagement(undefined)).toBe(false);
+        // Without the plugin of explicit resource management, the preset gives seven plugins
+        const plugins = (version : string) : number => preset({ assertVersion : () => undefined, version } as never).plugins?.length ?? 0;
+        expect(plugins("7.23.8")).toBe(7);
+        expect(plugins("7.23.9")).toBe(9);
     });
 
     it("binds the generator that a Babel helper of a compiled dependency gets", async () => {
