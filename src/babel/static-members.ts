@@ -1,4 +1,5 @@
 import { types, type NodePath, type PluginObject, type PluginPass } from "@babel/core";
+import { keyName } from "./name-coroutines.js";
 
 /**
  * `@babel/plugin-transform-async-to-generator` keeps `this` and `super` of an async arrow
@@ -53,22 +54,10 @@ function hasAsyncArrowOfElement(element : NodePath) : boolean {
     return found;
 }
 
-/** This function gives the name of a static class element for NamedEvaluation, or `undefined` for a computed key. */
+/** This function gives the name of a static class element for NamedEvaluation, or `undefined` for a computed key that is not a literal. */
 function staticName(node : types.ClassProperty | types.ClassPrivateProperty | types.ClassAccessorProperty) : string | undefined {
-    const key = node.key;
-    if (types.isPrivateName(key)) {
-        return `#${key.id.name}`;
-    }
-    if ("computed" in node && node.computed === true) {
-        return undefined;
-    }
-    if (types.isIdentifier(key)) {
-        return key.name;
-    }
-    if (types.isStringLiteral(key)) {
-        return key.value;
-    }
-    return types.isNumericLiteral(key) ? String(key.value) : undefined;
+    // A private property has no computed field
+    return keyName(node.key, (node as { computed? : boolean }).computed === true);
 }
 
 /** This function gives a private name that the class does not use. */

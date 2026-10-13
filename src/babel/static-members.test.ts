@@ -44,11 +44,13 @@ describe("the static members with async arrow functions", () => {
             "    static #hidden = async () => { await null; return this; };",
             "    static 'a b' = async () => { await null; return this; };",
             "    static 42 = async () => { await null; return this; };",
+            "    static 1n = async () => { await null; return this; };",
+            "    static ['literal'] = async () => { await null; return this; };",
             "}",
         ].join("\n");
         const output = await transform(input, false);
-        expect(movedCount(output)).toBe(4);
-        for (const key of ["load", "#hidden", "a b", "42"]) {
+        expect(movedCount(output)).toBe(6);
+        for (const key of ["load", "#hidden", "a b", "42", "1", "literal"]) {
             expect(output).toContain(`}["${key}"];`);
         }
     });
