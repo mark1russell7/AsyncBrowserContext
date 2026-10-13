@@ -15,14 +15,12 @@ import type { PluginFactory } from "./skip-runtime.js";
  */
 export function asyncGeneratorResources(resources : PluginFactory) : PluginFactory {
     return function asyncGeneratorResourcesPlugin(api, options, dirname) : PluginObject<PluginPass> {
-        const visitor = resources(api, options, dirname).visitor;
+        // The empty visitor of a plugin without a visitor changes nothing
+        const visitor = resources(api, options, dirname).visitor ?? {};
         return {
             name : "async-browser-context/async-generator-resources",
             visitor : {
                 Program(programPath, state) {
-                    if (visitor === undefined) {
-                        return;
-                    }
                     programPath.traverse({
                         Function(functionPath : NodePath<types.Function>) {
                             if (isRuntimeFunction(functionPath.node)) {

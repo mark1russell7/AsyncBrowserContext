@@ -70,6 +70,7 @@ export const DEFAULT_RUNTIME = "async-browser-context/runtime";
 export default function asyncBrowserContextPreset(api : PresetAPI, options : PresetOptions = {}) : PresetObject {
     api.assertVersion("^7.22.0 || ^8.0.0");
     const runtime = options.runtime ?? DEFAULT_RUNTIME;
+    // Stryker disable next-line ObjectLiteral: the plugin also finds the local names that the preset gives, for example _coroutine, without the runtime
     const names : PluginItem[] = options.names === false ? [] : [[nameCoroutinesPlugin, { runtime }]];
     // The async transform keeps an `await using` declaration, which is a SyntaxError in a generator
     const resources : PluginItem[] = supportsResourceManagement(api.version) ? [explicitResourceManagement, asyncGeneratorResourcesPlugin] : [];

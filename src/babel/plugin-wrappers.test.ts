@@ -6,7 +6,7 @@ import { skipRuntimePlugin, withRuntimeSkipped, type PluginFactory } from "./ski
 /** Two functions with the directive of the runtime and two other functions. Each one starts `use` with its name. */
 const INPUT = [
     "async function* runtimeGenerator() { 'async-browser-context runtime'; use('runtimeGenerator'); }",
-    "async function runtimeFunction() { 'async-browser-context runtime'; use('runtimeFunction'); }",
+    "async function runtimeFunction() { 'async-browser-context runtime'; use('runtimeFunction'); async function* nested() { use('nested'); } }",
     "async function* userGenerator() { use('userGenerator'); }",
     "async function userFunction() { use('userFunction'); }",
     "function* syncGenerator() { use('syncGenerator'); }",
