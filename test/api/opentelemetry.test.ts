@@ -258,6 +258,34 @@ describe(`AsyncContextManager (${runtime} runtime)`, () => {
         expect(seen.sort()).toEqual(["capture options", "object", "older", "once options"]);
     });
 
+    it("finds the bound listener when the remove method of an event target gets the type as a string", () => {
+        const target = context.bind(ROOT_CONTEXT.setValue(REQUEST, "type"), new EventTarget());
+        const seen : string[] = [];
+        const listener = (event : Event) : void => { seen.push(`${event.type} ${String(valueOf())}`); };
+        // The event target changes the type to a string, thus 1 and "1" are the same type
+        target.addEventListener(1 as unknown as string, listener);
+        target.addEventListener("constructor", listener);
+        target.dispatchEvent(new Event("1"));
+        target.dispatchEvent(new Event("constructor"));
+        target.removeEventListener("1", listener);
+        target.removeEventListener("constructor", listener);
+        target.dispatchEvent(new Event("1"));
+        target.dispatchEvent(new Event("constructor"));
+        expect(seen).toEqual(["1 type", "constructor type"]);
+    });
+
+    it.skipIf(inBrowser)("finds the bound listener when the remove method of a Node.js EventEmitter gets the event name as a string", () => {
+        const { EventEmitter } = process.getBuiltinModule("node:events");
+        const emitter = context.bind(ROOT_CONTEXT.setValue(REQUEST, "name"), new EventEmitter());
+        const listener = () : void => {};
+        // The emitter keeps its listeners in an object, thus 1 and "1" are the same event name
+        emitter.on(1 as unknown as string, listener);
+        emitter.on("constructor", listener);
+        emitter.removeListener("1", listener);
+        emitter.removeListener("constructor", listener);
+        expect(emitter.eventNames()).toEqual([]);
+    });
+
     it.skipIf(inBrowser)("binds each add method of a Node.js EventEmitter, and removes the listeners with removeListener and off", () => {
         const { EventEmitter } = process.getBuiltinModule("node:events");
         const emitter = context.bind(ROOT_CONTEXT.setValue(REQUEST, "first"), new EventEmitter());

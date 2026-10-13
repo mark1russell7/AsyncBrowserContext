@@ -19,21 +19,35 @@ const ADD_LISTENER_METHODS = ["addListener", "on", "once", "prependListener", "p
 /** The emitters and event targets that bind() patched. A second bind() keeps the first context, as the context managers of OpenTelemetry do. */
 const boundTargets = new WeakSet<object>();
 
-/** The bound listeners of each emitter or event target, for each event name, so that a remove method finds the bound listener. */
-const boundListeners = new WeakMap<object, Map<unknown, WeakMap<object, Listener>>>();
+/** The bound listeners of one emitter or event target, for each event name. */
+type ListenersByEvent = Record<PropertyKey, WeakMap<object, Listener> | undefined>;
+
+/**
+ * The bound listeners of each emitter or event target, so that a remove method finds the bound listener.
+ * The event names are property keys, as in the EventEmitter of Node.js. Thus `1` and `"1"` are the same
+ * event name, as for the event target, which changes the type to a string.
+ */
+const boundListeners = new WeakMap<object, ListenersByEvent>();
 
 function listenersOf(target : object, event : unknown) : WeakMap<object, Listener> {
     let byEvent = boundListeners.get(target);
     if (byEvent === undefined) {
-        byEvent = new Map();
+        // The object has no prototype, thus the event name "constructor" gives no inherited value
+        byEvent = Object.create(null) as ListenersByEvent;
         boundListeners.set(target, byEvent);
     }
-    let listeners = byEvent.get(event);
+    let listeners = byEvent[event as PropertyKey];
     if (listeners === undefined) {
         listeners = new WeakMap();
-        byEvent.set(event, listeners);
+        byEvent[event as PropertyKey] = listeners;
     }
     return listeners;
+}
+
+/** This function gives the bound listener of `listener`, or `undefined` if the add methods did not bind it. */
+function boundListenerOf(target : object, event : unknown, listener : unknown) : Listener | undefined {
+    // For a key that is not an object, WeakMap.get() gives undefined
+    return boundListeners.get(target)?.[event as PropertyKey]?.get(listener as object);
 }
 
 /**
@@ -146,8 +160,7 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
                     continue;
                 }
                 methods[name] = function (this : unknown, event : unknown, listener : unknown) : unknown {
-                    const wrapper = typeof listener === "function" ? boundListeners.get(emitter)?.get(event)?.get(listener) : undefined;
-                    return Reflect.apply(original as Method, this, [event, wrapper ?? listener]);
+                    return Reflect.apply(original as Method, this, [event, boundListenerOf(emitter, event, listener) ?? listener]);
                 };
             }
             const removeAll = methods["removeAllListeners"];
@@ -156,7 +169,7 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
                     if (arguments.length === 0) {
                         boundListeners.delete(emitter);
                     } else {
-                        boundListeners.get(emitter)?.delete(event);
+                        delete boundListeners.get(emitter)?.[event as PropertyKey];
                     }
                     return Reflect.apply(removeAll as Method, this, arguments);
                 };
@@ -185,7 +198,7 @@ export function defineContextManager(createStorage : () => ContextStorage) : Asy
             };
             if (typeof remove === "function") {
                 methods["removeEventListener"] = function (this : unknown, type : unknown, listener : unknown) : unknown {
-                    const wrapper = typeof listener === "function" ? boundListeners.get(target)?.get(type)?.get(listener) : undefined;
+                    const wrapper = boundListenerOf(target, type, listener);
                     const args = Array.prototype.slice.call(arguments) as unknown[];
                     if (wrapper !== undefined) {
                         args[1] = wrapper;
