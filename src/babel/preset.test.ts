@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import vm from "node:vm";
-import { parseSync, transformAsync, traverse, types, type NodePath, type PluginObject } from "@babel/core";
+import { loadOptionsAsync, parseSync, transformAsync, traverse, types, type NodePath, type PluginObject, type PluginPass } from "@babel/core";
 import { describe, expect, it } from "vitest";
 import preset, { DEFAULT_RUNTIME, METADATA_KEY, supportsResourceManagement } from "./preset.js";
 
@@ -146,6 +146,53 @@ describe("the Babel preset", () => {
         expect(code).not.toMatch(/RUNTIME_(wrapAsyncGenerator|awaitAsyncGenerator|asyncGeneratorDelegate|OverloadYield)/);
         // The other helpers still come from the earlier plugin
         expect(code).toContain("RUNTIME_asyncIterator(items)");
+    });
+
+    it("imports each helper of the runtime one time, also OverloadYield for another plugin", async () => {
+        // A plugin that asks for the helper OverloadYield after the preset set the helperGenerator
+        const asker = () : PluginObject<PluginPass> => ({
+            visitor : {
+                Program : {
+                    exit(path) {
+                        path.pushContainer("body", types.expressionStatement(this.addHelper("OverloadYield")));
+                    },
+                },
+            },
+        });
+        const result = await transformAsync("export async function* a() { await null; yield 1; } export async function* b() { await null; yield* a(); }", {
+            filename : "input.js",
+            babelrc : false,
+            configFile : false,
+            plugins : [asker],
+            presets : [preset],
+        });
+        const code = result?.code ?? "";
+        const imports = code.match(/^import .* from "async-browser-context\/runtime";$/gm) ?? [];
+        expect(imports).toEqual([
+            "import { asyncGenerator as _asyncGenerator, awaitAsyncGenerator as _awaitAsyncGenerator, asyncGeneratorDelegate as _asyncGeneratorDelegate, OverloadYield as _OverloadYield } from \"async-browser-context/runtime\";",
+        ]);
+        expect(code.match(/_asyncGenerator\(function\*/g)).toHaveLength(2);
+        expect(code).not.toMatch(/_asyncGenerator2|_awaitAsyncGenerator2|function _OverloadYield\(/);
+    });
+
+    it("gives each plugin its own name, in the order of the steps", async () => {
+        const keys = async (names : boolean) : Promise<string[]> => {
+            const options = await loadOptionsAsync({ filename : "input.js", babelrc : false, configFile : false, presets : [[preset, { names }]] }) as { plugins : { key : string }[] };
+            return options.plugins.map((plugin) => plugin.key);
+        };
+        const steps = [
+            "async-browser-context/skip-runtime",
+            "async-browser-context/bind-generators",
+            "async-browser-context/name-coroutines",
+            "async-browser-context/static-members",
+            "async-browser-context/async-generator-helpers",
+            "transform-explicit-resource-management",
+            "async-browser-context/async-generator-resources",
+            "transform-async-generator-functions",
+            "transform-async-to-generator",
+        ];
+        expect(await keys(true)).toEqual(steps);
+        expect(await keys(false)).toEqual(steps.filter((key) => key !== "async-browser-context/name-coroutines"));
     });
 
     it("keeps the helperGenerator of an earlier plugin for the other helpers", async () => {
