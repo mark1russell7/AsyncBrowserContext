@@ -177,14 +177,19 @@ describe("the Vite plugin", () => {
         expect(await handlerOf()("export const g = function * () { };", "/app/src/g.js")).not.toBeNull();
     });
 
-    it("ignores the Babel configuration files of the project", async () => {
-        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-babel-"));
-        fs.writeFileSync(path.join(directory, "babel.config.json"), JSON.stringify({ plugins : ["a-plugin-that-does-not-exist"] }));
-        fs.writeFileSync(path.join(directory, ".babelrc"), JSON.stringify({ plugins : ["another-plugin-that-does-not-exist"] }));
-        try {
-            expect(await handlerOf()(ASYNC_CODE, path.join(directory, "load.js"))).not.toBeNull();
-        } finally {
-            fs.rmSync(directory, { recursive : true, force : true });
-        }
-    });
+    for (const file of ["babel.config.json", ".babelrc"]) {
+        it(`ignores the Babel configuration file ${file} of the project`, async () => {
+            // Babel finds babel.config.json in its root, the working folder, and a .babelrc file only inside the root package
+            const directory = fs.mkdtempSync(path.join(os.tmpdir(), "async-browser-context-babel-"));
+            fs.writeFileSync(path.join(directory, file), JSON.stringify({ plugins : ["a-plugin-that-does-not-exist"] }));
+            const cwd = process.cwd();
+            process.chdir(directory);
+            try {
+                expect(await handlerOf()(ASYNC_CODE, path.join(directory, "load.js"))).not.toBeNull();
+            } finally {
+                process.chdir(cwd);
+                fs.rmSync(directory, { recursive : true, force : true });
+            }
+        });
+    }
 });
