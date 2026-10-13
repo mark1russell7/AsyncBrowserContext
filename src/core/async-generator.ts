@@ -82,9 +82,23 @@ export function asyncGeneratorDelegate(inner : AsyncIterator<unknown, unknown, u
             return value;
         },
     };
-    if (typeof iterator.throw === "function") {
-        delegate["throw"] = (value : unknown) : unknown => pump("throw", value);
-    }
+    delegate["throw"] = (value : unknown) : unknown => {
+        if (typeof iterator.throw === "function") {
+            return pump("throw", value);
+        }
+        // Without a throw method, a native yield* closes the inner iterator and awaits its return()
+        // (AsyncIteratorClose). An error of return() goes into the body, else a TypeError.
+        waiting = true;
+        const closed = new NativePromise<never>((resolve) => {
+            resolve(typeof iterator.return === "function" ? Reflect.apply(iterator.return, inner, []) : undefined);
+        }).then((result : unknown) : never => {
+            if (typeof iterator.return === "function" && !isObject(result)) {
+                throw new TypeError("The result of return() of the iterator of yield* is not an object");
+            }
+            throw new TypeError("The iterator of yield* has no throw method");
+        });
+        return { done : false, value : new OverloadYield(closed, 1) };
+    };
     if (typeof iterator.return === "function") {
         delegate["return"] = (value : unknown) : unknown => {
             if (waiting) {
@@ -259,7 +273,16 @@ export function createAsyncGenerator(
                         resumed = true;
                     }
                     let result = step(key, argument, resumed);
+                    // return() at a yield already awaited its value. If the body completes with that value, a native generator does not await it again.
+                    if (key === "return" && result.done === true && result.value === argument) {
+                        settled = argument;
+                        complete = true;
+                        result = { done : true, value : undefined };
+                    }
                     for (;;) {
+                        if (complete) {
+                            break;
+                        }
                         const yielded : unknown = result.value;
                         const overloaded = yielded instanceof OverloadYield;
                         let value : unknown;

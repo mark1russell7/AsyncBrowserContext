@@ -495,6 +495,44 @@ describe("async generators: the requests and yield* keep the protocol of native 
         expect(log).toEqual(["return undefined", "caught TypeError"]);
     });
 
+    it.skipIf(lowered)("awaits return() of a delegate without a throw method on throw(), and throws its rejection into the body (not with SWC or esbuild)", async () => {
+        const log : string[] = [];
+        const delegate = iterable({
+            next : () => Promise.resolve({ value : "a", done : false }),
+            return : () => Promise.reject(new Error("close failed")),
+        });
+        async function* outer() : AsyncGenerator<unknown> {
+            try {
+                yield* delegate;
+            } catch (error) {
+                log.push(`caught ${(error as Error).message}`);
+            }
+        }
+        const generator = outer();
+        await generator.next();
+        // As AsyncIteratorClose: the error of return() goes into the body, in place of the TypeError
+        expect(await generator.throw(new Error("boom"))).toEqual({ value : undefined, done : true });
+        expect(log).toEqual(["caught close failed"]);
+    });
+
+    it.skipIf(lowered)("settles return() at a yield in the same microtask turn as a native async generator (not with SWC or esbuild)", async () => {
+        const order : string[] = [];
+        async function* values() : AsyncGenerator<number> {
+            try {
+                yield 1;
+            } finally {
+                order.push("finally");
+            }
+        }
+        const generator = values();
+        await generator.next();
+        const returned = generator.return(5).then((result) => { order.push(`return ${String(result.value)}`); });
+        void Promise.resolve().then(() => order.push("turn 1")).then(() => order.push("turn 2")).then(() => order.push("turn 3"));
+        await returned;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(order).toEqual(["finally", "turn 1", "return 5", "turn 2", "turn 3"]);
+    });
+
     it("completes on return() through yield* to a delegate without a return method, after the finally block of the body", async () => {
         const log : string[] = [];
         const delegate = iterable({ next : () => Promise.resolve({ value : "a", done : false }) });

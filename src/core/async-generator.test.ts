@@ -91,9 +91,9 @@ describe("asyncGeneratorDelegate", () => {
         expect(kinds).toEqual([1, 1, 2]);
     });
 
-    it("gives no throw and return methods when the inner iterator has none", () => {
+    it("gives no return method when the inner iterator has none, but always a throw method, which closes the inner iterator", () => {
         const delegate = asyncGeneratorDelegate({ next : inner.next });
-        expect("throw" in delegate).toBe(false);
         expect("return" in delegate).toBe(false);
+        expect(typeof (delegate as { throw? : unknown }).throw).toBe("function");
     });
 });
