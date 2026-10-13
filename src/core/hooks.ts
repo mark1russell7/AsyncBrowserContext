@@ -39,12 +39,8 @@ export function addCallbackHook(hook : CallbackHook) : () => void {
     warnAboutOldPatches();
     const entry : HookEntry = { hook };
     store.hooks = [...(store.hooks ?? []), entry];
-    let removed = false;
+    // A second removal finds no entry, and the list stays the same
     return function removeCallbackHook() : void {
-        if (removed) {
-            return;
-        }
-        removed = true;
         const remaining = (store.hooks ?? []).filter((other) => other !== entry);
         store.hooks = remaining.length === 0 ? undefined : remaining;
     };

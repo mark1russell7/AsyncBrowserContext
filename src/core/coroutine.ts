@@ -19,7 +19,11 @@ import { applyQuietly, applyWithHooks, store, type Frame } from "./store.js";
  * of Babel has no name. The function sets the name only when a hook operates.
  */
 function namedForHooks(generatorFunction : Function, name : string | undefined) : Function {
-    if (name !== undefined && generatorFunction.name !== name) {
+    if (name === undefined) {
+        return generatorFunction;
+    }
+    // Stryker disable next-line ConditionalExpression: the check only prevents a second change to the same name
+    if (generatorFunction.name !== name) {
         Object.defineProperty(generatorFunction, "name", { value : name, configurable : true });
     }
     return generatorFunction;
@@ -100,7 +104,7 @@ export function coroutine<T, A extends unknown[], R>(
             const previous = store.current;
             store.current = frame;
             try {
-                const hooks = resumed && !quiet ? store.hooks : undefined;
+                const hooks = resumed ? store.hooks : undefined;
                 const result = quiet
                     ? applyQuietly(resume, undefined, [argument])
                     : hooks === undefined

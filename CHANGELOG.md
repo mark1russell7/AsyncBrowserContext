@@ -71,6 +71,7 @@ This version changes some behaviors, so it is a minor version. The first section
 - Memory tests for event listeners: after `removeEventListener()`, after a `once` listener operated, and with a signal that lives long. The memory tests fail without `--expose-gc`.
 - Browser tests for each correction of the events, the streams and the callback APIs.
 - CI also starts the Node.js tests on Node.js 22.18.0 and 24.11.0, the minimum versions, and starts the tests of the STE linter (`pnpm test:ste-lint`).
+- New tests of the core runtime, from mutation testing. They examine the requests of an async generator in each state and `yield*` with unusual delegates. They also examine the callback hooks of the generator steps and the property attributes of the prototypes. The project without a transform starts the tests of the generator protocol on native async generators.
 
 ### Documentation
 

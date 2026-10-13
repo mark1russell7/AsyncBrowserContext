@@ -205,6 +205,49 @@ describe("rule C3: an async function keeps the context of its call", () => {
         expect(seen).toEqual(["read body", "call body"]);
     });
 
+    // SWC and esbuild resolve the thenable in a promise job without the context
+    it.skipIf(lowered)("calls the then method of a callable thenable and of a Promise subclass in the context of the body, also after an await (not with SWC or esbuild)", async () => {
+        const variable = new Variable<string>();
+        const seen : string[] = [];
+        const callable = Object.assign(() => undefined, {
+            then(resolve : (value : number) => void) : void {
+                seen.push(`callable ${variable.get() ?? "none"}`);
+                resolve(1);
+            },
+        });
+        class Tracked<T> extends Promise<T> {
+            override then<A = T, B = never>(
+                onFulfilled? : ((value : T) => A | PromiseLike<A>) | undefined | null,
+                onRejected? : ((reason : unknown) => B | PromiseLike<B>) | undefined | null,
+            ) : Promise<A | B> {
+                seen.push(`subclass ${variable.get() ?? "none"}`);
+                return super.then(onFulfilled, onRejected);
+            }
+        }
+        const values = await variable.run("body", async () => {
+            await null;
+            const other = busyOther(variable, "other");
+            const first = await callable;
+            const second = await Tracked.resolve(2);
+            await other;
+            return [first, second];
+        });
+        expect(values).toEqual([1, 2]);
+        expect(seen).toEqual(["callable body", "subclass body"]);
+    });
+
+    it("reads the then property of an awaited object without a then method one time, as a native await", async () => {
+        let reads = 0;
+        const plain = { get then() { reads++; return undefined; } };
+        const same = await (async () => {
+            await null;
+            const value : unknown = await plain;
+            return value === plain;
+        })();
+        expect(same).toBe(true);
+        expect(reads).toBe(1);
+    });
+
     it.skipIf(lowered)("reads and calls the then method of a returned thenable in the context of the body (not with SWC or esbuild)", async () => {
         const variable = new Variable<string>();
         const seen : string[] = [];
@@ -295,6 +338,11 @@ describe("rule C3 in static class members", () => {
         const anonymous = [async () : Promise<number> => 3][0] as () => Promise<number>;
         const names = new Names();
         expect([names.load.name, names.gen.name, names.gen.length, anonymous.name]).toEqual(["load", "gen", 2, ""]);
+        for (const fn of [names.load, names.gen, anonymous]) {
+            for (const key of ["name", "length"]) {
+                expect(Object.getOwnPropertyDescriptor(fn, key)).toMatchObject({ writable : false, enumerable : false, configurable : true });
+            }
+        }
     });
 
     it.skipIf(lowered)("keeps the result and the name of class fields with the names _ref, eval, arguments and a string key (not with SWC or esbuild)", async () => {
