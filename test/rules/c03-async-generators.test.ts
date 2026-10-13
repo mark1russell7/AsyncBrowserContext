@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Variable } from "async-browser-context";
 // @ts-expect-error The fixture is plain JavaScript without types
 import { libraryGenerator } from "../fixtures/untransformed.js";
-import { lowered, preset } from "../helpers.js";
+import { compiler, lowered, preset } from "../helpers.js";
 
 /**
  * The preset gives each async generator to the driver of the runtime
@@ -273,6 +273,19 @@ describe("async generators: the driver keeps the behavior of native async genera
         await expect(promise).rejects.toThrow(TypeError);
     });
 
+    // The helpers of SWC and esbuild throw
+    it.skipIf(lowered)("rejects with a TypeError when a method starts on undefined, null or a primitive value (not with SWC or esbuild)", async () => {
+        async function* one() : AsyncGenerator<number> {
+            yield 1;
+        }
+        const prototype = Object.getPrototypeOf(one()) as AsyncGenerator<number>;
+        for (const target of [undefined, null, 1]) {
+            let promise : Promise<unknown> | undefined;
+            expect(() => { promise = prototype.next.call(target as unknown as AsyncGenerator<number>); }).not.toThrow();
+            await expect(promise).rejects.toThrow(TypeError);
+        }
+    });
+
     // SWC and esbuild make their own async generator objects
     it.skipIf(lowered)("has no enumerable properties, and has Symbol.asyncDispose as a native async generator has (not with SWC or esbuild)", async () => {
         async function* one() : AsyncGenerator<number> {
@@ -291,5 +304,328 @@ describe("async generators: the driver keeps the behavior of native async genera
             expect(typeof (generator as unknown as Record<symbol, unknown>)[dispose]).toBe(typeof (native as unknown as Record<symbol, unknown>)[dispose]);
         }
         await native.return(undefined);
+    });
+});
+
+/** This function starts a chain of `count` then callbacks. Each callback adds its number to `log`, one microtask turn after the callback before it. */
+function microtaskChain(log : unknown[], count = 6) : Promise<void> {
+    let promise = Promise.resolve();
+    for (let index = 1; index <= count; index++) {
+        promise = promise.then(() => { log.push(index); });
+    }
+    return promise;
+}
+
+/** This function gives an async iterable that gives `iterator`. */
+function iterable(iterator : Partial<AsyncIterator<unknown>>) : AsyncIterable<unknown> {
+    return { [Symbol.asyncIterator] : () => iterator as AsyncIterator<unknown> };
+}
+
+/**
+ * These tests examine the requests in each state of the body, and `yield*` to delegates with
+ * unusual results. The expected values are the values of native async generators.
+ */
+describe("async generators: the requests and yield* keep the protocol of native async generators", () => {
+    // The helpers of SWC and esbuild take other microtask turns
+    it.skipIf(lowered)("settles return() before the first next() after one microtask turn, and completes without the body (not with SWC or esbuild)", async () => {
+        let started = false;
+        async function* never() : AsyncGenerator<number> {
+            started = true;
+            yield 1;
+        }
+        const generator = never();
+        const log : unknown[] = [];
+        const returned = generator.return(5).then((result) => { log.push(`return ${String(result.value)}`); });
+        await Promise.all([returned, microtaskChain(log)]);
+        expect(log).toEqual([1, "return 5", 2, 3, 4, 5, 6]);
+        expect(await generator.next()).toEqual({ value : undefined, done : true });
+        expect(started).toBe(false);
+    });
+
+    it.skipIf(lowered)("rejects throw() before the first next() at once, and completes without the body (not with SWC or esbuild)", async () => {
+        let started = false;
+        async function* never() : AsyncGenerator<number> {
+            started = true;
+            yield 1;
+        }
+        const generator = never();
+        const log : unknown[] = [];
+        const thrown = generator.throw(new Error("early")).catch((error : unknown) => { log.push(`throw ${(error as Error).message}`); });
+        const next = generator.next().then((result) => { log.push(`next ${String(result.done)}`); });
+        await Promise.all([thrown, next, microtaskChain(log, 2)]);
+        expect(log).toEqual(["throw early", "next true", 1, 2]);
+        expect(started).toBe(false);
+    });
+
+    it.skipIf(lowered)("settles next() after the body threw before a later microtask (not with SWC or esbuild)", async () => {
+        async function* failing() : AsyncGenerator<number> {
+            await null;
+            throw new Error("failed");
+        }
+        const generator = failing();
+        await expect(generator.next()).rejects.toThrow("failed");
+        const log : unknown[] = [];
+        const next = generator.next().then((result) => { log.push(`next ${String(result.done)}`); });
+        await Promise.all([next, microtaskChain(log, 2)]);
+        expect(log).toEqual(["next true", 1, 2]);
+    });
+
+    it("gives a promise that next() sends to the yield without an await", async () => {
+        let received : unknown;
+        async function* echo() : AsyncGenerator<number, void, unknown> {
+            received = yield 1;
+        }
+        const generator = echo();
+        await generator.next();
+        const sent = Promise.resolve(2);
+        await generator.next(sent);
+        expect(received).toBe(sent);
+    });
+
+    it("reads the then property of an object without a then method one time for an await and for a yield", async () => {
+        let reads = 0;
+        const plain = { get then() { reads++; return undefined; } };
+        async function* reader() : AsyncGenerator<unknown> {
+            const awaited : unknown = await plain;
+            yield awaited === plain;
+            yield plain;
+        }
+        const generator = reader();
+        expect((await generator.next()).value).toBe(true);
+        expect(reads).toBe(1);
+        expect((await generator.next()).value).toBe(plain);
+        expect(reads).toBe(2);
+    });
+
+    it.skipIf(compiler === "swc-es2016")("reads done and value of each result of the delegate one time, as a native yield* (not with SWC, whose helper reads done two times)", async () => {
+        const reads : string[] = [];
+        const result = (value : string, done : boolean) : IteratorResult<string> => ({
+            get done() { reads.push(`done ${value}`); return done; },
+            get value() { reads.push(`value ${value}`); return value; },
+        } as IteratorResult<string>);
+        let calls = 0;
+        const delegate = iterable({ next : () => Promise.resolve(++calls === 1 ? result("a", false) : result("end", true)) });
+        async function* outer() : AsyncGenerator<unknown> {
+            const last : unknown = yield* delegate;
+            reads.push(`last ${String(last)}`);
+        }
+        const generator = outer();
+        expect((await generator.next()).value).toBe("a");
+        expect((await generator.next()).done).toBe(true);
+        expect(reads).toEqual(["done a", "value a", "done end", "value end", "last end"]);
+    });
+
+    it.skipIf(compiler === "esbuild-es2016")("gives a promise that the delegate gives as a value through yield* without an await (not with esbuild, whose helper awaits it)", async () => {
+        const promise = Promise.resolve("inner");
+        let given = false;
+        const delegate = iterable({
+            next : () => {
+                const result = given ? { value : undefined, done : true } : { value : promise, done : false };
+                given = true;
+                return Promise.resolve(result);
+            },
+        });
+        async function* outer() : AsyncGenerator<unknown> {
+            yield* delegate;
+        }
+        const first = await outer().next();
+        expect(first.value).toBe(promise);
+        expect(first.done).toBe(false);
+    });
+
+    it("throws a rejection of next() of the delegate into the body at the yield*, and does not start throw() or return() of the delegate", async () => {
+        const log : string[] = [];
+        let calls = 0;
+        const delegate = iterable({
+            next : () => ++calls === 1 ? Promise.resolve({ value : "a", done : false }) : Promise.reject(new Error("next failed")),
+            throw : () => { log.push("throw"); return Promise.resolve({ value : undefined, done : true }); },
+            return : () => { log.push("return"); return Promise.resolve({ value : undefined, done : true }); },
+        });
+        async function* outer() : AsyncGenerator<unknown> {
+            try {
+                yield* delegate;
+            } catch (error) {
+                yield `caught ${(error as Error).message}`;
+            }
+        }
+        const generator = outer();
+        expect([await generator.next(), await generator.next(), await generator.next()]).toEqual([
+            { value : "a", done : false },
+            { value : "caught next failed", done : false },
+            { value : undefined, done : true },
+        ]);
+        expect(log).toEqual([]);
+    });
+
+    // The helper of SWC stops, and the helper of esbuild throws outside the body
+    it.skipIf(lowered)("throws a TypeError into the body at the yield* when the delegate gives a result that is not an object (not with SWC or esbuild)", async () => {
+        for (const bad of [5, undefined, null]) {
+            const delegate = iterable({ next : () => Promise.resolve(bad as unknown as IteratorResult<unknown>) });
+            async function* outer() : AsyncGenerator<unknown> {
+                try {
+                    yield* delegate;
+                } catch (error) {
+                    yield `caught ${(error as Error).constructor.name}`;
+                }
+            }
+            expect(await outer().next()).toEqual({ value : "caught TypeError", done : false });
+        }
+    });
+
+    it.skipIf(compiler === "esbuild-es2016")("closes a delegate without a throw method on throw(), and throws a TypeError into the body at the yield* (not with esbuild, whose helper throws the error of throw())", async () => {
+        const log : string[] = [];
+        const delegate = iterable({
+            next : () => Promise.resolve({ value : "a", done : false }),
+            return : (value? : unknown) => {
+                log.push(`return ${String(value)}`);
+                return Promise.resolve({ value : "r", done : true });
+            },
+        });
+        async function* outer() : AsyncGenerator<unknown> {
+            try {
+                yield* delegate;
+            } catch (error) {
+                log.push(`caught ${(error as Error).constructor.name}`);
+                yield "after";
+            }
+        }
+        const generator = outer();
+        await generator.next();
+        expect(await generator.throw(new Error("boom"))).toEqual({ value : "after", done : false });
+        expect(log).toEqual(["return undefined", "caught TypeError"]);
+    });
+
+    it("completes on return() through yield* to a delegate without a return method, after the finally block of the body", async () => {
+        const log : string[] = [];
+        const delegate = iterable({ next : () => Promise.resolve({ value : "a", done : false }) });
+        async function* outer() : AsyncGenerator<unknown> {
+            try {
+                yield* delegate;
+            } finally {
+                log.push("finally");
+            }
+        }
+        const generator = outer();
+        await generator.next();
+        expect(await generator.return(Promise.resolve("v"))).toEqual({ value : "v", done : true });
+        expect(log).toEqual(["finally"]);
+    });
+
+    // The helpers of SWC and esbuild end the generator at a yield in a finally block
+    it.skipIf(lowered)("continues after return() through yield* when the delegate yields in its finally block (not with SWC or esbuild)", async () => {
+        const log : string[] = [];
+        async function* inner() : AsyncGenerator<string> {
+            try {
+                yield "a";
+                yield "b";
+            } finally {
+                yield "cleanup";
+                log.push("inner end");
+            }
+        }
+        async function* outer() : AsyncGenerator<string> {
+            try {
+                yield* inner();
+            } finally {
+                log.push("outer finally");
+            }
+        }
+        const generator = outer();
+        expect([await generator.next(), await generator.return("stop"), await generator.next(), await generator.next()]).toEqual([
+            { value : "a", done : false },
+            { value : "cleanup", done : false },
+            { value : undefined, done : true },
+            { value : undefined, done : true },
+        ]);
+        expect(log).toEqual(["inner end", "outer finally"]);
+    });
+
+    it.skipIf(lowered)("runs a yield* in a finally block after return() to its end, and then completes with the value of return() (not with SWC or esbuild)", async () => {
+        const log : unknown[] = [];
+        async function* complete() : AsyncGenerator<string, string> {
+            return "x";
+        }
+        async function* withYield() : AsyncGenerator<string, string> {
+            yield "a";
+            return "y";
+        }
+        async function* direct() : AsyncGenerator<unknown> {
+            try {
+                yield 1;
+            } finally {
+                log.push(yield* complete());
+            }
+        }
+        async function* afterAwait() : AsyncGenerator<unknown> {
+            try {
+                yield 1;
+            } finally {
+                await null;
+                log.push(yield* complete());
+                log.push(yield* withYield());
+            }
+        }
+        const first = direct();
+        await first.next();
+        expect(await first.return(7)).toEqual({ value : 7, done : true });
+        const second = afterAwait();
+        await second.next();
+        expect([await second.return(8), await second.next(), await second.next()]).toEqual([
+            { value : "a", done : false },
+            { value : 8, done : true },
+            { value : undefined, done : true },
+        ]);
+        expect(log).toEqual(["x", "x", "y"]);
+    });
+
+    it.skipIf(lowered)("runs a yield* in the body after return() through an earlier yield* ended the delegate (not with SWC or esbuild)", async () => {
+        const log : unknown[] = [];
+        async function* inner() : AsyncGenerator<string> {
+            yield "a";
+        }
+        async function* complete() : AsyncGenerator<string, string> {
+            return "x";
+        }
+        async function* outer() : AsyncGenerator<unknown> {
+            try {
+                yield* inner();
+            } finally {
+                log.push(yield* complete());
+            }
+        }
+        const generator = outer();
+        await generator.next();
+        expect(await generator.return("stop")).toEqual({ value : "stop", done : true });
+        expect(log).toEqual(["x"]);
+    });
+
+    it.skipIf(lowered)("throws a rejection of return() of the delegate into the body at the yield*, and the body can delegate again (not with SWC or esbuild)", async () => {
+        const log : string[] = [];
+        const failing = iterable({
+            next : () => Promise.resolve({ value : "a", done : false }),
+            return : () => {
+                log.push("return");
+                return Promise.reject(new Error("return failed"));
+            },
+        });
+        async function* complete() : AsyncGenerator<string, string> {
+            return "x";
+        }
+        async function* outer() : AsyncGenerator<unknown> {
+            try {
+                yield* failing;
+            } catch (error) {
+                log.push(`caught ${(error as Error).message}`);
+                log.push(`delegated ${yield* complete()}`);
+                yield "after";
+            }
+        }
+        const generator = outer();
+        expect([await generator.next(), await generator.return("stop"), await generator.next()]).toEqual([
+            { value : "a", done : false },
+            { value : "after", done : false },
+            { value : undefined, done : true },
+        ]);
+        expect(log).toEqual(["return", "caught return failed", "delegated x"]);
     });
 });

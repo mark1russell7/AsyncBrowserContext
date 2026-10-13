@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AsyncLocalStorage } from "./async-local-storage.js";
-import { bindGenerator, coroutine } from "./coroutine.js";
+import { asyncGenerator, bindGenerator, coroutine } from "./coroutine.js";
+import { addCallbackHook } from "./hooks.js";
 import { Snapshot } from "./snapshot.js";
-import { bindOneArgument, bindToFrame, createFrame, enter, findValue, NOT_FOUND, store } from "./store.js";
+import { bindOneArgument, bindToFrame, createFrame, enter, findValue, getOrCreateStore, NOT_FOUND, store, type ContextStore, type Frame } from "./store.js";
 import { enterValue, Variable } from "./variable.js";
 
 describe("the context store", () => {
@@ -13,6 +14,36 @@ describe("the context store", () => {
         expect(descriptor?.writable).toBe(false);
         expect(descriptor?.configurable).toBe(false);
         expect(descriptor?.enumerable).toBe(false);
+    });
+
+    it("makes a store with the root frame for a global object without a store, and gives the same store later", () => {
+        const holder = {};
+        const created = getOrCreateStore(holder);
+        expect(created.current).toBe(created.root);
+        expect(created.idle).toBe(created.root);
+        expect(created.root.parent).toBeNull();
+        expect(Object.isFrozen(created.root)).toBe(true);
+        expect(Object.prototype.hasOwnProperty.call(created, "hooks")).toBe(true);
+        expect(created.inHook).toBe(false);
+        expect(created.oldCopyPatches).toBeUndefined();
+        expect(Object.getOwnPropertyDescriptor(holder, Symbol.for("async-browser-context/store/v1"))).toEqual({ value : created, writable : false, enumerable : false, configurable : false });
+        expect(getOrCreateStore(holder)).toBe(created);
+    });
+
+    it("records the patches of a store of version 0.1, which has no hooks, one time", () => {
+        const key = Symbol.for("async-browser-context/store/v1");
+        const old = { patches : new Set(["timers"]) } as unknown as ContextStore;
+        const holder = { [key] : old };
+        expect(getOrCreateStore(holder)).toBe(old);
+        expect([...(old.oldCopyPatches ?? [])]).toEqual(["timers"]);
+        // A patch that the old copy installs later does not change the record
+        old.patches.add("events");
+        getOrCreateStore(holder);
+        expect([...(old.oldCopyPatches ?? [])]).toEqual(["timers"]);
+        // The store of version 0.2 and later has the own property hooks
+        const newer = { patches : new Set(["timers"]), hooks : undefined } as unknown as ContextStore;
+        getOrCreateStore({ [key] : newer });
+        expect(newer.oldCopyPatches).toBeUndefined();
     });
 
     it("replaces a frame of the same variable, so many enterWith() calls do not make a long chain", () => {
@@ -105,6 +136,16 @@ describe("Variable lookup", () => {
         }))));
     });
 
+    it("finds a value behind the frames of two other variables", () => {
+        const variable = new Variable<string>();
+        const first = new Variable<number>();
+        const second = new Variable<number>();
+        variable.run("deep", () => first.run(1, () => second.run(2, () => {
+            expect(variable.get()).toBe("deep");
+            expect(first.get()).toBe(1);
+        })));
+    });
+
     it("gives the default value when no frame in the chain sets the variable", () => {
         const variable = new Variable({ defaultValue : "default" });
         const other = new Variable<string>();
@@ -124,9 +165,39 @@ describe("Variable lookup", () => {
             enter(previous);
         }
     });
+
+    it("records the frame of an enterValue in a task without a wrapper as the idle frame, also in a later task", async () => {
+        const variable = new Variable<string>();
+        // A native timer has no wrapper, as the evaluation of a module
+        const nativeSetTimeout = (store.originals.get(setTimeout) ?? setTimeout) as typeof setTimeout;
+        const enterInTask = (value : string) : Promise<Frame> => new Promise((resolve) => nativeSetTimeout(() => {
+            enterValue(variable, value);
+            resolve(store.current);
+        }, 0));
+        try {
+            const first = await enterInTask("first");
+            expect(store.idle).toBe(first);
+            const second = await enterInTask("second");
+            expect(store.idle).toBe(second);
+        } finally {
+            // Also in a task without a wrapper: a step of this test sets its previous frame again at its end
+            await new Promise<void>((resolve) => nativeSetTimeout(() => {
+                store.current = store.root;
+                store.idle = store.root;
+                resolve();
+            }, 0));
+        }
+    });
 });
 
 describe("coroutine", () => {
+    it("gives the functions of coroutine and asyncGenerator the name and the length of the source, or the empty name", () => {
+        const load = coroutine(function* (_id : number) : Generator<unknown, void, unknown> { /* No steps */ }, "load");
+        const rows = asyncGenerator(function* (_from : number, _to : number) : Generator<unknown, void, unknown> { /* No steps */ }, "rows");
+        const anonymous = asyncGenerator(function* () : Generator<unknown, void, unknown> { /* No steps */ });
+        expect([load.name, load.length, rows.name, rows.length, anonymous.name, anonymous.length]).toEqual(["load", 1, "rows", 2, "", 0]);
+    });
+
     it("gives this and the arguments to the generator function", async () => {
         const run = coroutine(function* (this : { id : number }, a : number) : Generator<unknown, string, unknown> {
             const value = (yield a) as number;
@@ -251,9 +322,88 @@ describe("bindGenerator", () => {
     });
 });
 
+describe("callback hooks", () => {
+    /** This function starts a callback of the library, so that the hooks operate. */
+    const startCallback = () : void => {
+        bindToFrame(store.root, () => undefined, "test")();
+    };
+
+    it("does not start the hooks again for a wrapper that a hook starts", () => {
+        const many = bindToFrame(store.root, () => "many", "test");
+        const one = bindOneArgument(store.root, (value : number) => value, "test");
+        const results : unknown[] = [];
+        let calls = 0;
+        const remove = addCallbackHook({
+            before() {
+                calls++;
+                results.push(many(), one(1));
+            },
+        });
+        try {
+            startCallback();
+        } finally {
+            remove();
+        }
+        expect(calls).toBe(1);
+        expect(results).toEqual(["many", 1]);
+    });
+
+    it("gives the arguments to the wrappers that a hook makes", () => {
+        let many : ((a : number, b : number) => number) | undefined;
+        let one : ((value : number) => number) | undefined;
+        const remove = addCallbackHook({
+            before() {
+                many ??= bindToFrame(store.root, (a : number, b : number) => a + b, "test");
+                one ??= bindOneArgument(store.root, (value : number) => value * 2, "test");
+            },
+        });
+        try {
+            startCallback();
+        } finally {
+            remove();
+        }
+        expect([many?.(1, 2), one?.(4)]).toEqual([3, 8]);
+    });
+
+    it("gives an error of a hook to console.error when the host has no reportError", () => {
+        vi.stubGlobal("reportError", undefined);
+        const errors : unknown[] = [];
+        const spy = vi.spyOn(console, "error").mockImplementation((error : unknown) => { errors.push(error); });
+        const error = new Error("hook");
+        const remove = addCallbackHook({ before() { throw error; } });
+        try {
+            startCallback();
+        } finally {
+            remove();
+            spy.mockRestore();
+            vi.unstubAllGlobals();
+        }
+        expect(errors).toEqual([error]);
+    });
+
+    it("keeps no list of hooks after the last hook is removed, also after a second removal", () => {
+        const before = store.hooks;
+        const first = addCallbackHook({});
+        const second = addCallbackHook({});
+        first();
+        first();
+        expect(store.hooks?.length).toBe((before?.length ?? 0) + 1);
+        second();
+        expect(store.hooks).toBe(before);
+        second();
+        expect(store.hooks).toBe(before);
+    });
+});
+
 describe("Snapshot.wrap", () => {
     it("throws a TypeError with a message for a value that is not a function", () => {
         expect(() => Snapshot.wrap(1 as unknown as () => void)).toThrow(new TypeError("Snapshot.wrap: the argument is not a function"));
+    });
+
+    it("names the wrapper of a function whose name is not a string \"wrapped \", as the TC39 draft does", () => {
+        const fn = () : number => 1;
+        Object.defineProperty(fn, "name", { value : 42 });
+        expect(Snapshot.wrap(fn).name).toBe("wrapped ");
     });
 
     it("gives a wrapper with a configurable name and length", () => {
@@ -262,5 +412,12 @@ describe("Snapshot.wrap", () => {
         });
         expect(Object.getOwnPropertyDescriptor(wrapped, "name")).toMatchObject({ value : "wrapped sum", configurable : true });
         expect(Object.getOwnPropertyDescriptor(wrapped, "length")).toMatchObject({ value : 2, configurable : true });
+    });
+});
+
+describe("the classes of the TC39 proposal", () => {
+    it("gives Variable and Snapshot a toStringTag that is configurable but not writable, as the TC39 draft does", () => {
+        expect(Object.getOwnPropertyDescriptor(Variable.prototype, Symbol.toStringTag)).toEqual({ value : "AsyncContext.Variable", writable : false, enumerable : false, configurable : true });
+        expect(Object.getOwnPropertyDescriptor(Snapshot.prototype, Symbol.toStringTag)).toEqual({ value : "AsyncContext.Snapshot", writable : false, enumerable : false, configurable : true });
     });
 });

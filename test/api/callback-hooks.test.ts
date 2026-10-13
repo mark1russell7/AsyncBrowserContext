@@ -38,7 +38,7 @@ function record(variable : Variable<string>, label = "") : Call[] {
 
 describe("addCallbackHook", () => {
     it("refuses a hook that is not an object, and methods that are not functions", () => {
-        expect(() => addCallbackHook(null as unknown as CallbackHook)).toThrow(TypeError);
+        expect(() => addCallbackHook(null as unknown as CallbackHook)).toThrow(new TypeError("addCallbackHook: the hook is not an object"));
         expect(() => addCallbackHook((() => undefined) as unknown as CallbackHook)).toThrow(TypeError);
         expect(() => addCallbackHook({ before : 1 } as unknown as CallbackHook)).toThrow(/hook\.before is not a function/);
         expect(() => addCallbackHook({ after : "x" } as unknown as CallbackHook)).toThrow(/hook\.after is not a function/);
@@ -146,6 +146,117 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
             { phase : "before", source : "await", name : "ticks", value : "g" },
             { phase : "after", source : "await", name : "ticks", value : "g" },
         ]);
+    });
+
+    it.skipIf(!preset)("calls the hooks for the step of return() at a yield, after the await of the value of return()", async () => {
+        const variable = new Variable<string>();
+        const calls = record(variable);
+        const log : unknown[] = [];
+        async function* closing() : AsyncGenerator<number> {
+            try {
+                yield 1;
+            } finally {
+                log.push(variable.get());
+            }
+        }
+        const generator = variable.run("r", () => closing());
+        await generator.next();
+        expect(await generator.return(2)).toEqual({ value : 2, done : true });
+        expect(log).toEqual(["r"]);
+        expect(calls.filter((call) => call.source === "await").map((call) => `${call.phase} ${call.name}`)).toEqual(["before closing", "after closing"]);
+    });
+
+    it.skipIf(!preset)("calls the hooks for a request of an async generator that waits in the queue, and for the step after a rejected await", async () => {
+        const variable = new Variable<string>();
+        const calls = record(variable);
+        async function* pair() : AsyncGenerator<unknown, void, unknown> {
+            const received : unknown = yield 1;
+            yield received;
+        }
+        async function* recovering() : AsyncGenerator<string> {
+            try {
+                await Promise.reject(new Error("rejected"));
+            } catch {
+                yield "recovered";
+            }
+        }
+        const queued = variable.run("q", () => pair());
+        expect(await Promise.all([queued.next(), queued.next("x")])).toEqual([{ value : 1, done : false }, { value : "x", done : false }]);
+        expect(await variable.run("q", () => recovering()).next()).toEqual({ value : "recovered", done : false });
+        expect(calls.filter((call) => call.source === "await").map((call) => `${call.phase} ${call.name}`)).toEqual([
+            "before pair",
+            "after pair",
+            "before recovering",
+            "after recovering",
+        ]);
+    });
+
+    it.skipIf(!preset)("calls the hooks for each step of an async generator after a step of yield*, also after a rejection of the delegate", async () => {
+        const variable = new Variable<string>();
+        const calls = record(variable);
+        async function* inner() : AsyncGenerator<number> {
+            yield 1;
+        }
+        const failing : AsyncIterable<number> = { [Symbol.asyncIterator] : () => ({ next : () => Promise.reject(new Error("failed")) }) };
+        let failed = false;
+        async function* outer() : AsyncGenerator<number> {
+            yield* inner();
+            try {
+                yield* failing;
+            } catch {
+                failed = true;
+            }
+        }
+        const values = await variable.run("d", async () => {
+            const seen : unknown[] = [];
+            for await (const value of outer()) {
+                seen.push(value);
+            }
+            return seen;
+        });
+        expect(values).toEqual([1]);
+        expect(failed).toBe(true);
+        // The steps after the first and the last step of inner(), and after the rejection
+        expect(calls.filter((call) => call.source === "await" && call.name === "outer").map((call) => call.phase)).toEqual(["before", "after", "before", "after", "before", "after"]);
+    });
+
+    it.skipIf(!preset)("gives the steps of an anonymous async function a callback with the empty name, and configurable names as native functions have", async () => {
+        const variable = new Variable<string>();
+        const seen : Function[] = [];
+        removers.push(addCallbackHook({ before : (callback, source) => { if (source === "await" && variable.get() === "n") seen.push(callback); } }));
+        async function named() : Promise<void> {
+            await null;
+        }
+        const anonymous = [async () : Promise<void> => { await null; }][0] as () => Promise<void>;
+        await variable.run("n", named);
+        await variable.run("n", anonymous);
+        expect(seen.map((callback) => callback.name)).toEqual(["named", ""]);
+        for (const callback of seen) {
+            expect(Object.getOwnPropertyDescriptor(callback, "name")).toMatchObject({ writable : false, enumerable : false, configurable : true });
+        }
+    });
+
+    it.skipIf(!preset)("gives the awaited values and the values of next() to an async function and an async generator that a hook starts", async () => {
+        async function double(value : number) : Promise<number> {
+            const awaited = await Promise.resolve(value);
+            return awaited * 2;
+        }
+        async function* echo() : AsyncGenerator<string, void, string> {
+            const received = yield "ready";
+            yield `got ${received}`;
+        }
+        let doubled : Promise<number> | undefined;
+        let generator : AsyncGenerator<string, void, string> | undefined;
+        removers.push(addCallbackHook({
+            before() {
+                doubled ??= double(2);
+                generator ??= echo();
+            },
+        }));
+        await Promise.resolve().then(() => undefined);
+        expect(await doubled).toBe(4);
+        await generator?.next("first");
+        expect(await generator?.next("x")).toEqual({ value : "got x", done : false });
     });
 
     it.skipIf(!preset)("gives the name of an async method and of an async arrow function in a variable", async () => {
@@ -312,6 +423,34 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         expect(afterSend).toBe(2);
     });
 
+    it.skipIf(!preset)("does not start the hooks for the steps of an async generator that a hook makes", async () => {
+        let afterTicks = 0;
+        let generator : AsyncGenerator<number> | undefined;
+        async function* ticks() : AsyncGenerator<number> {
+            await null;
+            yield 1;
+            await null;
+            yield 2;
+        }
+        removers.push(addCallbackHook({
+            before() {
+                generator ??= ticks();
+            },
+            after(callback, source) {
+                if (source === "await" && callback.name === "ticks") {
+                    afterTicks++;
+                }
+            },
+        }));
+        await Promise.resolve().then(() => undefined);
+        const values : number[] = [];
+        for await (const value of generator ?? ticks()) {
+            values.push(value);
+        }
+        expect(values).toEqual([1, 2]);
+        expect(afterTicks).toBe(0);
+    });
+
     it.skipIf(!preset)("does not start the hooks for an async function that a quiet callback starts, also through a chain of callbacks", async () => {
         let afterSend = 0;
         async function send() : Promise<void> {
@@ -344,8 +483,8 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
             // Patches of version 0.2 and later start the hooks: no warning
             removers.push(addCallbackHook({}));
             expect(warnings).toEqual([]);
-            // As if a copy of version 0.1 made the store and installed two patches
-            store.oldCopyPatches = new Set(["timers", "Function.prototype.toString"]);
+            // As if a copy of version 0.1 made the store and installed three patches
+            store.oldCopyPatches = new Set(["timers", "Function.prototype.toString", "events"]);
             removers.push(addCallbackHook({}));
             removers.push(addCallbackHook({}));
         } finally {
@@ -355,7 +494,7 @@ describe.skipIf(runtime !== "browser")("callback hooks (browser runtime)", () =>
         expect(warnings).toHaveLength(1);
         expect(String(warnings[0])).toContain("older copy of the library");
         // The patch of toString has no callbacks
-        expect(String(warnings[0])).toMatch(/: timers$/);
+        expect(String(warnings[0])).toMatch(/: timers, events$/);
     });
 
     it("starts a callback that has its own call and apply properties", async () => {
