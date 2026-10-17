@@ -70,6 +70,54 @@ export function unpublishableDependencies(manifest) {
     .map(([name, spec]) => `${name}@${spec}`);
 }
 
+const SEMVER =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+/** This function gives the parts of a SemVer 2.0.0 version, or undefined for a version that is not valid. */
+export function parseVersion(version) {
+  const match = SEMVER.exec(version);
+  if (!match) return undefined;
+  return { core: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease: match[4] ? match[4].split(".") : [] };
+}
+
+/** This function compares two valid versions by the SemVer precedence. It gives a negative number, 0 or a positive number. */
+export function compareVersions(a, b) {
+  const x = parseVersion(a);
+  const y = parseVersion(b);
+  for (let i = 0; i < 3; i++) if (x.core[i] !== y.core[i]) return x.core[i] - y.core[i];
+  // A prerelease comes before its release: 1.0.0-rc.1 < 1.0.0.
+  if (x.prerelease.length === 0 || y.prerelease.length === 0) return y.prerelease.length - x.prerelease.length;
+  for (let i = 0; i < Math.max(x.prerelease.length, y.prerelease.length); i++) {
+    const p = x.prerelease[i];
+    const q = y.prerelease[i];
+    if (p === undefined) return -1;
+    if (q === undefined) return 1;
+    if (p === q) continue;
+    const pNumber = /^\d+$/.test(p);
+    const qNumber = /^\d+$/.test(q);
+    if (pNumber && qNumber) return Number(p) - Number(q);
+    if (pNumber !== qNumber) return pNumber ? -1 : 1;
+    return p < q ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * This function tells why npm must not get a version of a package, or gives undefined when the version is correct.
+ * The packument is the npm data of the package, or undefined for a new package. A version that is on npm
+ * is correct: the publish job skips it.
+ */
+export function versionProblem(version, packument) {
+  if (!parseVersion(version)) return `${version} is not a SemVer version: use MAJOR.MINOR.PATCH, with an optional -prerelease.`;
+  if (packument === undefined || packument.versions?.[version]) return undefined;
+  if (packument.time?.[version]) return `${version} was on npm and was removed. npm never accepts a version again: use a greater version.`;
+  const latest = packument["dist-tags"]?.latest;
+  if (latest && parseVersion(latest) && compareVersions(version, latest) <= 0) {
+    return `${version} is not greater than ${latest}, the "latest" version on npm. Increase MAJOR, MINOR or PATCH (SemVer).`;
+  }
+  return undefined;
+}
+
 /** This function gives "owner/repo" of the GitHub remote "origin". */
 export function githubRepository(repo = root) {
   const url = execFileSync("git", ["remote", "get-url", "origin"], { cwd: repo, encoding: "utf8" }).trim();

@@ -6,12 +6,13 @@
 // real range. The script writes <folder>/packages.txt with one line for each tarball,
 // "name version file", a package after the packages of this repository that it depends on.
 // Build the packages first. The script stops when a package depends on a git, file or link
-// specifier, because npm users cannot install that package.
+// specifier, because npm users cannot install that package. It also stops when a version is not
+// SemVer, or is not greater than the "latest" version on npm (a version that is on npm is skipped).
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { publishedPackages, unpublishableDependencies } from "./workspace.mjs";
+import { publishedPackages, unpublishableDependencies, versionProblem } from "./workspace.mjs";
 
 const out = process.argv[2];
 if (out === undefined) {
@@ -28,6 +29,18 @@ if (blocked.length > 0) {
   process.stderr.write(
     `These dependencies are not on npm. Change each one to an npm range before the release:\n  ${blocked.join("\n  ")}\n`,
   );
+  process.exit(1);
+}
+
+const problems = [];
+for (const { manifest } of packages) {
+  const response = await fetch(`https://registry.npmjs.org/${manifest.name.replaceAll("/", "%2f")}`);
+  if (!response.ok && response.status !== 404) throw new Error(`The registry gave HTTP ${response.status} for ${manifest.name}.`);
+  const problem = versionProblem(manifest.version, response.status === 404 ? undefined : await response.json());
+  if (problem) problems.push(`${manifest.name}: ${problem}`);
+}
+if (problems.length > 0) {
+  process.stderr.write(`These versions cannot go to npm:\n  ${problems.join("\n  ")}\n`);
   process.exit(1);
 }
 

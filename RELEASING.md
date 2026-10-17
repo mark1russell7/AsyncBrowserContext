@@ -16,11 +16,15 @@ The owner (Mark) and one Claude session that the owner names are responsible for
 
 ## A release of a package that is on npm
 
-1. Choose the next version with the SemVer rules. Before `1.0.0`, a breaking change increases MINOR.
-2. Change `version` in the `package.json` of the package.
-3. Merge the change to `main`.
+1. Choose the next version with the SemVer rules. A breaking change increases MAJOR, a new feature MINOR, and a fix PATCH.
+2. Before `1.0.0`, a breaking change increases MINOR. A feature or a fix increases PATCH. Do not go to `1.0.0` without the owner.
+3. For a prerelease, add a hyphen suffix, for example `1.2.0-rc.1`.
+4. Change `version` in the `package.json` of the package. In the pull request, give the SemVer reason.
+5. Merge the change to `main`.
 
 The push to `main` starts `release.yml`. The workflow starts the CI gates, builds and packs each published package, and publishes each version that is not on npm. A version with a hyphen, for example `1.2.0-rc.1`, gets the dist-tag `next`. The other versions get `latest`.
+
+`scripts/release/pack.mjs` stops the release when a version is not SemVer. It also stops when a version is not greater than the `latest` version on npm. The registry does not accept a version two times, also after a removal. Thus a bad release gets a new PATCH, and `npm deprecate` marks the bad version.
 
 To publish again after a failure, start the workflow by hand: `gh workflow run release.yml --ref main`. It skips each version that is on npm.
 
