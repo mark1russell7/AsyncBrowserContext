@@ -2,6 +2,7 @@
   "$schema": "./tools/ste-lint/ste.config.schema.json",
   "include": [
     "README.md",
+    "RELEASING.md",
     "CHANGELOG.md",
     "docs/**/*.md",
     "site/content/**/*.{md,mdx}",
@@ -132,7 +133,10 @@
     "webpack",
     "WebKit",
     "Windows",
-    "zone.js"
+    "zone.js",
+    "OIDC",
+    "SemVer",
+    "Mark"
   ],
   "allowedWords": [],
   "rules": {},
