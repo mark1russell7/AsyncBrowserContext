@@ -103,8 +103,9 @@ jobs:
       # packages.txt has one line for each tarball, "name version file", in the sequence of their
       # dependencies. npm publishes each tarball as it is, with no package scripts. The path starts
       # with ./ because npm reads "release/x.tgz" as a GitHub repository (user/repo).
-      # npm limits the requests of one account (HTTP 429). The step does not let npm send a
-      # request again by itself, and it waits before it tries a publish again.
+      # npm limits the requests of one account (HTTP 429), and Sigstore can fail once (a 502, then
+      # a 409 for the entry that it wrote). npm does not send a request again by itself here: the
+      # step waits, and then starts a new publish with a new signature.
       - name: Publish
         shell: bash
         run: |
@@ -130,11 +131,11 @@ jobs:
               if npm publish "./release/$file" --access public --provenance --tag "$tag" --fetch-retries 0 2>&1 | tee publish.log; then
                 break
               fi
-              if ! grep -q "E429" publish.log || [ "$attempt" = 3 ]; then
+              if ! grep -qE "E429|E5[0-9][0-9]|TLOG_CREATE_ENTRY_ERROR|ETIMEDOUT|ECONNRESET" publish.log || [ "$attempt" = 3 ]; then
                 echo "::error::npm did not publish $name $version."
                 exit 1
               fi
-              echo "npm limits the requests (429). The next try starts in $((attempt * 60)) seconds."
+              echo "npm or Sigstore gave a temporary error (429, 5xx, or a transparency-log conflict). The next try starts in $((attempt * 60)) seconds."
               sleep $((attempt * 60))
             done
           done < release/packages.txt
