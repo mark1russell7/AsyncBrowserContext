@@ -1,81 +1,144 @@
-name: Release
-
-# Publishes the package to npm when a version tag (for example v0.2.0) is pushed.
-# npm trusted publishing uses the OIDC token of GitHub Actions, so the
-# workflow needs no npm token, and the package gets a provenance statement.
-# docs/release.md tells how to set up the trusted publisher one time.
+# The standard npm release of a repository made from mark1russell7/template.
 #
-# Two jobs: the test job installs the dependencies, starts all the tests and
-# packs the package, without the OIDC token. The publish job gets the token,
-# but it installs nothing: it publishes the tarball that the test job tested.
-# The actions are pinned to commits.
+#   verify    The gates of ci.yml.
+#   build     Builds and packs each published package (scripts/release/pack.mjs).
+#   publish   Publishes each tarball whose version npm does not have. Only this job holds
+#             "id-token: write", and it runs no code of the repository: no checkout, no install.
+#
+# A release: change the version in a package.json and merge it to main. The workflow also starts
+# by hand (workflow_dispatch), for example to publish again after a failure. It skips each
+# version that is already on npm.
+#
+# npm trusted publishing uses the OIDC token of GitHub Actions: no npm token, and each version
+# gets a provenance statement. The trusted publisher of each package names this repository and
+# the workflow file release.yml, with NO environment (npm refused an environment for a repository
+# with the immutable OIDC subject, npm/cli#9969). A version with a hyphen (1.2.0-rc.1) gets the
+# dist-tag "next". The others get "latest".
+#
+# npm trusts a workflow only for a package that exists. The owner bootstraps a new package once:
+# scripts/release/npm-bootstrap.mjs (RELEASING.md tells the procedure). Without it, this workflow
+# publishes the other packages and then fails with the names of the new ones.
+name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: ["package.json", "packages/*/package.json"]
+  workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
-# One release for each tag. A second tag does not cancel or replace the first.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
-  test:
-    name: Test and pack the package
+  verify:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  build:
+    name: Build and pack
+    needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: 24
-          cache: pnpm
-      - name: The tag agrees with the version of package.json
-        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+          persist-credentials: false
+      # The pnpm version comes from "packageManager" in package.json
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # No dependency cache: a release installs from the registry and the lockfile only.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+          package-manager-cache: false
       - run: pnpm install --frozen-lockfile
-      - name: Install the browsers and their system dependencies
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - run: pnpm build
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm lint:ste
-      # The checks of the packed package, as a user installs it
-      - run: pnpm test:babel
-      - run: pnpm smoke
-      - run: pnpm test:bundlers
-      # The steps above did the work of prepublishOnly
-      - name: Pack the package
-        run: mkdir -p package && npm pack --pack-destination package --ignore-scripts
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      # The build script of the root package.json, or else the build script of each package
+      - name: Build
+        run: |
+          if node -e 'process.exit(require("./package.json").scripts?.build ? 0 : 1)'; then
+            pnpm run build
+          else
+            pnpm -r --if-present run build
+          fi
+      - run: node scripts/release/pack.mjs "$RUNNER_TEMP/release"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: package
-          path: package/*.tgz
+          name: release
+          path: ${{ runner.temp }}/release/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
 
   publish:
     name: Publish to npm
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
-      contents: read
       id-token: write
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      # No registry-url: with it, setup-node writes `_authToken=${NODE_AUTH_TOKEN}` to an .npmrc,
+      # and that empty token can stop the OIDC exchange. The default registry is npmjs.org.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          name: package
-          path: package
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+          node-version: 26
+          package-manager-cache: false
+      - name: npm is 11.5.1 or later
+        run: |
+          npm_version="$(npm --version)"
+          if ! node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)' "$npm_version"; then
+            echo "::error::npm $npm_version cannot do trusted publishing. It must be 11.5.1 or later."
+            exit 1
+          fi
+          echo "npm $npm_version"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          node-version: 24
-          registry-url: "https://registry.npmjs.org"
-      # Trusted publishing needs npm 11.5.1 or later
-      - run: npm install --global npm@11.20.0
-      - name: Publish the tested tarball
-        # The ./ prefix makes npm read a file path, not a GitHub repository (owner/name)
-        run: npm publish ./package/*.tgz --provenance --access public
+          name: release
+          path: release
+      # packages.txt has one line for each tarball, "name version file", in the sequence of their
+      # dependencies. npm publishes each tarball as it is, with no package scripts. The path starts
+      # with ./ because npm reads "release/x.tgz" as a GitHub repository (user/repo).
+      # npm limits the requests of one account (HTTP 429). The step does not let npm send a
+      # request again by itself, and it waits before it tries a publish again.
+      - name: Publish
+        shell: bash
+        run: |
+          set -o pipefail
+          new_packages=()
+          while read -r name version file; do
+            [ -n "$name" ] || continue
+            status=$(curl -sS -o packument.json -w '%{http_code}' "https://registry.npmjs.org/${name//\//%2f}")
+            if [ "$status" = "404" ]; then
+              new_packages+=("$name")
+              continue
+            elif [ "$status" != "200" ]; then
+              echo "::error::The registry gave HTTP $status for $name."
+              exit 1
+            fi
+            if node -e 'process.exit(require("./packument.json").versions?.[process.argv[1]] ? 0 : 1)' "$version"; then
+              echo "$name $version is on npm."
+              continue
+            fi
+            tag=latest
+            case "$version" in *-*) tag=next ;; esac
+            for attempt in 1 2 3; do
+              if npm publish "./release/$file" --access public --provenance --tag "$tag" --fetch-retries 0 2>&1 | tee publish.log; then
+                break
+              fi
+              if ! grep -q "E429" publish.log || [ "$attempt" = 3 ]; then
+                echo "::error::npm did not publish $name $version."
+                exit 1
+              fi
+              echo "npm limits the requests (429). The next try starts in $((attempt * 60)) seconds."
+              sleep $((attempt * 60))
+            done
+          done < release/packages.txt
+          if [ ${#new_packages[@]} -gt 0 ]; then
+            echo "::error::These packages are not on npm: ${new_packages[*]}. The owner bootstraps each new package once (RELEASING.md), then starts this workflow again."
+            exit 1
+          fi

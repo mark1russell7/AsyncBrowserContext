@@ -20,15 +20,9 @@ The workflow `.github/workflows/release.yml` publishes the package. It uses npm 
 
 1. Change the version in `package.json`, for example to `0.2.0`.
 2. Add the changes to `CHANGELOG.md`, below a heading with the version.
-3. Commit the two changes and push them to `main`.
-4. Make a tag with the version and push it:
+3. Merge the two changes to `main`.
 
-   ```sh
-   git tag v0.2.0
-   git push origin v0.2.0
-   ```
-
-The workflow examines the tag. The tag must be `v` and the version of `package.json`. Then the workflow builds the package and checks the types. It starts all the tests and the STE lint. Then it publishes the package with a provenance statement. npm shows the statement on the page of the package.
+The push to `main` starts the workflow. The workflow starts all the gates of `ci.yml`: the build, the types, all the tests and the STE lint. Then it packs the package and publishes the tarball with a provenance statement. npm shows the statement on the page of the package. The workflow skips a version that is already on npm. `RELEASING.md` tells the standard procedure.
 
 ## The first version
 
