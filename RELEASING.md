@@ -35,7 +35,9 @@ node scripts/release/npm-bootstrap.mjs --dispatch
 
 The script reads the packages of `origin/main`. For each new package, it publishes a placeholder version `0.0.0-bootstrap.0` with the dist-tag `bootstrap`. Then it connects the package to `release.yml` (`npm trust github`) and sets "Require two-factor authentication and disallow tokens" (`npm access set mfa=publish`). With `--dispatch`, it starts `release.yml`, which publishes the real version.
 
-npm asks for the 2FA. The script opens the npm page in the browser. Confirm with the security key. Select the option to skip the 2FA for 5 minutes. npm asks for each change. In those 5 minutes, the page confirms without a new key tap. The script accepts more than one repository folder.
+npm asks for the 2FA. The script opens the npm page in the browser. Confirm with the security key. Select the option to skip the 2FA for 5 minutes.
+
+npm asks for each change. In those 5 minutes, the page confirms without a new key tap. The script accepts more than one repository folder.
 
 ## Limits of npm
 
