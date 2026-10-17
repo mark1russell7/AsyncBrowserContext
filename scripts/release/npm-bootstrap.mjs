@@ -18,8 +18,10 @@
 // not necessary, so Claude can start the script.
 //
 // npm limits the requests of one account (HTTP 429). On 2026-10-12 it refused new packages after
-// 25 new packages in one day. The script waits 3 seconds between the requests that change npm,
-// and stops at the first 429. Start it again later: it skips each step that is done.
+// 25 new packages in one day. On 2026-10-17 it refused new packages and `npm access` changes after
+// a day with many publishes. The script waits between the requests that change npm (--pause), and
+// stops at the first 429. Start it again later: it skips each step that is done. npm cannot tell
+// if a package disallows tokens, so the script records each lock in ~/.npm-bootstrap-locks.json.
 //
 // Options:
 //   --dry-run         Shows the plan. It sends no request that needs the 2FA.
@@ -36,6 +38,8 @@
 //   --dispatch        Starts the release workflow of each repository that got a new trust.
 //   --lock-all        After the repositories, also sets "disallow tokens" on each other package of
 //                     the npm user (from the npm search). Without a repository folder, only that.
+//   --relock          Sets "disallow tokens" again on the packages that the record names.
+//   --pause <s>       The seconds between the requests that change npm (default 3).
 
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -45,7 +49,7 @@ import { githubRepository, publishedPackages, readRepoFile, root } from "./works
 
 const PLACEHOLDER = "0.0.0-bootstrap.0";
 const REGISTRY = "https://registry.npmjs.org";
-const PAUSE_MS = 3000;
+const LOCKS_FILE = join(homedir(), ".npm-bootstrap-locks.json");
 
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(name);
@@ -53,7 +57,7 @@ const value = (name) => {
   const index = argv.indexOf(name);
   return index === -1 ? undefined : argv[index + 1];
 };
-const valued = new Set(["--file", "--env", "--only", "--ref"]);
+const valued = new Set(["--file", "--env", "--only", "--ref", "--pause"]);
 const repos = argv.filter((arg, i) => !arg.startsWith("--") && !valued.has(argv[i - 1])).map((dir) => resolve(dir));
 const lockAll = flag("--lock-all");
 if (repos.length === 0 && !lockAll) repos.push(root);
@@ -67,6 +71,8 @@ const replaceTrust = flag("--replace-trust");
 const lock = !flag("--no-lock");
 const lockOnly = flag("--lock-only");
 const dispatch = flag("--dispatch");
+const relock = flag("--relock");
+const PAUSE_MS = Number(value("--pause") ?? "3") * 1000;
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -78,7 +84,8 @@ const npmCli = [join(dirname(process.execPath), "node_modules", "npm", "bin", "n
 
 /** This function starts npm with JSON output and gives its status, its JSON and its text. */
 function npmJson(args) {
-  const all = [...args, "--json", "--fetch-retries", "0"];
+  // Global options use the form `--key=value`: a command with strict flags (`npm trust`) reads `--key value` as a flag and a positional argument.
+  const all = [...args, "--json", "--fetch-retries=0"];
   const r = npmCli
     ? spawnSync(process.execPath, [npmCli, ...all], { encoding: "utf8" })
     : spawnSync("npm", all, { encoding: "utf8", shell: process.platform === "win32" });
@@ -131,13 +138,17 @@ async function webOtp(authUrl, doneUrl) {
   throw new Error("Nobody confirmed the 2FA in 5 minutes.");
 }
 
-/** This function starts an npm command that changes npm, with the 2FA in the browser when npm asks. */
+/**
+ * This function starts an npm command that changes npm, with the 2FA in the browser when npm asks.
+ * npm takes a one-time password only once, so each command opens the 2FA page. In the 5 minutes
+ * after the owner selects "skip the 2FA", that page confirms without a new tap.
+ */
 async function npmWrite(args) {
   let r = npmJson(args);
   const error = r.json?.error;
   if (!r.ok && error?.code === "EOTP" && error.authUrl && error.doneUrl) {
     const otp = await webOtp(error.authUrl, error.doneUrl);
-    r = npmJson([...args, "--otp", otp]);
+    r = npmJson([...args, `--otp=${otp}`]);
   }
   if (!r.ok && /E429|Too Many Requests|rate limit/i.test(r.text)) throw new RateLimited(r.text.trim());
   await sleep(PAUSE_MS);
@@ -222,8 +233,8 @@ async function bootstrapRepo(repo) {
         summary.push(`${name}: not on npm, no lock`);
         continue;
       }
-      if (!dryRun) await npmWrite(["access", "set", "mfa=publish", name]);
-      summary.push(`${name}: ${dryRun ? "would lock" : "locked"}`);
+      summary.push(`${name}: ${await lockPackage(name)}`);
+      console.log(`  ${summary.at(-1)}`);
       continue;
     }
 
@@ -275,13 +286,7 @@ async function bootstrapRepo(repo) {
     }
 
     // 3. The lock
-    if (lock) {
-      if (dryRun) steps.push("would set disallow tokens");
-      else {
-        const r = await npmWrite(["access", "set", "mfa=publish", name]);
-        steps.push(r.ok ? "disallows tokens" : `did not set disallow tokens: ${r.text.trim().split("\n")[0]}`);
-      }
-    }
+    if (lock) steps.push(await lockPackage(name));
     summary.push(`${name}@${version}: ${steps.join("; ")}`);
     console.log(`  ${summary.at(-1)}`);
   }
@@ -295,13 +300,21 @@ async function lockOtherPackages() {
   const names = (await response.json()).objects.map((o) => o.package.name).filter((name) => !handled.has(name)).sort();
   console.log(`\nThe other packages of ${user}: ${names.length}`);
   for (const name of names) {
-    if (dryRun) summary.push(`${name}: would set disallow tokens`);
-    else {
-      const r = await npmWrite(["access", "set", "mfa=publish", name]);
-      summary.push(`${name}: ${r.ok ? "disallows tokens" : `did not set disallow tokens: ${r.text.trim().split("\n")[0]}`}`);
-    }
+    summary.push(`${name}: ${await lockPackage(name)}`);
     console.log(`  ${summary.at(-1)}`);
   }
+}
+
+/** This function sets "disallow tokens" on a package, unless the record names it. It gives the step text. */
+async function lockPackage(name) {
+  const locks = existsSync(LOCKS_FILE) ? JSON.parse(readFileSync(LOCKS_FILE, "utf8")) : {};
+  if (locks[name] && !relock) return `disallows tokens (since ${locks[name]}, from the record)`;
+  if (dryRun) return "would set disallow tokens";
+  const r = await npmWrite(["access", "set", "mfa=publish", name]);
+  if (!r.ok) return `did not set disallow tokens: ${r.text.trim().split("\n")[0]}`;
+  locks[name] = new Date().toISOString().slice(0, 10);
+  writeFileSync(LOCKS_FILE, `${JSON.stringify(locks, null, 2)}\n`);
+  return "disallows tokens";
 }
 
 let failure;
