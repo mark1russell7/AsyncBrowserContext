@@ -9,7 +9,7 @@
 // specifier, because npm users cannot install that package.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { publishedPackages, unpublishableDependencies } from "./workspace.mjs";
 
@@ -34,12 +34,13 @@ if (blocked.length > 0) {
 const shell = process.platform === "win32";
 const lines = [];
 for (const { dir, manifest } of packages) {
-  const packed = execFileSync("pnpm", ["pack", "--json", "--pack-destination", resolve(out)], {
-    cwd: dir,
-    encoding: "utf8",
-    shell,
-  });
-  const file = basename(JSON.parse(packed).filename);
+  // The new file in the folder is the tarball. The output of pnpm is not used: it also holds the
+  // output of the package scripts that pnpm pack starts (prepare, prepack).
+  const before = new Set(readdirSync(out));
+  execFileSync("pnpm", ["pack", "--pack-destination", resolve(out)], { cwd: dir, stdio: ["ignore", "inherit", "inherit"], shell });
+  const added = readdirSync(out).filter((name) => !before.has(name) && name.endsWith(".tgz"));
+  if (added.length !== 1) throw new Error(`pnpm pack of ${manifest.name} made ${added.length} tarballs: ${added.join(", ")}`);
+  const file = basename(added[0]);
   lines.push(`${manifest.name} ${manifest.version} ${file}`);
   process.stdout.write(`${manifest.name}@${manifest.version}: ${file}\n`);
 }
