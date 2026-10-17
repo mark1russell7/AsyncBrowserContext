@@ -146,7 +146,7 @@ async function npmWrite(args) {
 
 /** This function reads the public data of a package: undefined when npm does not have it. */
 async function packument(name) {
-  const response = await fetch(`${REGISTRY}/${name.replace("/", "%2f")}`);
+  const response = await fetch(`${REGISTRY}/${name.replaceAll("/", "%2f")}`);
   await sleep(300);
   if (response.status === 404) return undefined;
   if (response.status === 429) throw new RateLimited(`The registry gave HTTP 429 for ${name}.`);

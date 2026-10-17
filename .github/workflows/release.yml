@@ -112,7 +112,7 @@ jobs:
           new_packages=()
           while read -r name version file; do
             [ -n "$name" ] || continue
-            status=$(curl -sS -o packument.json -w '%{http_code}' "https://registry.npmjs.org/${name/\//%2f}")
+            status=$(curl -sS -o packument.json -w '%{http_code}' "https://registry.npmjs.org/${name//\//%2f}")
             if [ "$status" = "404" ]; then
               new_packages+=("$name")
               continue

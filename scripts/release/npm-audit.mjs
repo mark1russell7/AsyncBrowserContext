@@ -37,7 +37,7 @@ const targets = all
 
 const rows = [];
 for (const { name, local } of targets) {
-  const response = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2f")}`);
+  const response = await fetch(`https://registry.npmjs.org/${name.replaceAll("/", "%2f")}`);
   await sleep(250);
   if (response.status === 404) {
     rows.push({ name, latest: "-", oidc: "-", provenance: "-", local: local ?? "", state: "NEW: needs npm-bootstrap" });
