@@ -35,12 +35,15 @@ node scripts/release/npm-bootstrap.mjs --dispatch
 
 The script reads the packages of `origin/main`. For each new package, it publishes a placeholder version `0.0.0-bootstrap.0` with the dist-tag `bootstrap`. Then it connects the package to `release.yml` (`npm trust github`) and sets "Require two-factor authentication and disallow tokens" (`npm access set mfa=publish`). With `--dispatch`, it starts `release.yml`, which publishes the real version.
 
-npm asks for the 2FA. The script opens the npm page in the browser. Confirm with the security key, and select the option to skip the 2FA for 5 minutes. The script accepts more than one repository folder, so one 2FA can cover all of them.
+npm asks for the 2FA. The script opens the npm page in the browser. Confirm with the security key. Select the option to skip the 2FA for 5 minutes. npm asks for each change. In those 5 minutes, the page confirms without a new key tap. The script accepts more than one repository folder.
 
 ## Limits of npm
 
 - npm limits the new packages of one account. On 2026-10-12, npm refused new packages with HTTP 429 after 25 new packages in one day. Bootstrap fewer than 25 packages each day.
+- On 2026-10-17, after a day with many publishes, npm also refused new packages and `npm access` changes with HTTP 429.
 - When npm gives HTTP 429, stop. Start the same command again later. Each script skips the steps that are done.
+- npm cannot show if a package disallows tokens. Thus the bootstrap script records each lock in `~/.npm-bootstrap-locks.json`.
+- `--pause <seconds>` sets a longer time between the changes (default 3). Use it for long runs, for example `--lock-all`.
 - The trusted publishers name no GitHub environment. npm cannot match an environment for a repository with the immutable OIDC subject of GitHub ([npm/cli#9969](https://github.com/npm/cli/issues/9969)). New repositories have that subject.
 - Trusted publishing needs npm 11.5.1 or later. `npm trust` needs npm 11.15.0 or later.
 
