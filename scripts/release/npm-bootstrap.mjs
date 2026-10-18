@@ -206,6 +206,7 @@ function trustIds(list) {
 const summary = [];
 const handled = new Set();
 const trusted = new Set();
+const placeholders = new Set();
 
 async function bootstrapRepo(repo) {
   const repository = githubRepository(repo);
@@ -250,6 +251,7 @@ async function bootstrapRepo(repo) {
         } finally {
           rmSync(dir, { recursive: true, force: true });
         }
+        placeholders.add(name);
         steps.push(`published the placeholder ${PLACEHOLDER}`);
       }
     }
@@ -331,6 +333,25 @@ try {
 }
 
 console.log(`\nSummary${dryRun ? " (dry run)" : ""}:\n  ${summary.join("\n  ") || "nothing"}`);
+
+/**
+ * This function waits until the public registry shows each new package. The registry can need some
+ * minutes, and a release that starts before it gets HTTP 404 and stops (lag-hud, 2026-10-18).
+ */
+async function waitUntilVisible(names) {
+  const deadline = Date.now() + 5 * 60_000;
+  for (const name of names) {
+    while ((await fetch(`${REGISTRY}/${name.replaceAll("/", "%2f")}?t=${Date.now()}`)).status !== 200) {
+      if (Date.now() > deadline) throw new Error(`The registry does not show ${name} after 5 minutes. Start the release later.`);
+      await sleep(15_000);
+    }
+  }
+}
+
+if (dispatch && trusted.size > 0 && placeholders.size > 0 && !failure) {
+  console.log(`\nWaiting until the registry shows ${[...placeholders].join(", ")}...`);
+  await waitUntilVisible(placeholders);
+}
 if (trusted.size > 0) {
   for (const repository of trusted) {
     if (dispatch) {
