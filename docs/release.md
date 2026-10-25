@@ -22,7 +22,7 @@ The workflow `.github/workflows/release.yml` publishes the package. It uses npm 
 2. Add the changes to `CHANGELOG.md`, below a heading with the version.
 3. Merge the two changes to `main`.
 
-The push to `main` starts the workflow. The workflow starts all the gates of `ci.yml`: the build, the types, all the tests and the STE lint. Then it packs the package and publishes the tarball with a provenance statement. npm shows the statement on the page of the package. The workflow skips a version that is already on npm. `RELEASING.md` tells the standard procedure.
+The push to `main` starts the workflow. The workflow starts all the gates of `ci.yml`: the build, the types, all the tests and the STE lint. Then it packs the package and publishes the tarball with a provenance statement. npm shows the statement on the page of the package. The workflow skips a version that is already on npm. After the publish, the workflow makes the git tag `v<version>` and a GitHub release with the text of `CHANGELOG.md` for the version. `RELEASING.md` tells the standard procedure.
 
 ## The first version
 
