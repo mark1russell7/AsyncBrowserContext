@@ -91,10 +91,9 @@ class Builder {
     }
 
     emit(text : string, rawIndex : number) : void {
-        for (const char of text) {
-            this.clean += char;
-            this.offsets.push(this.rawOffsets[rawIndex]!);
-        }
+        // The tokenizer reads `offsets` at code-unit positions of `clean`. Thus each UTF-16 code unit gets an offset, also each half of an astral character.
+        this.clean += text;
+        for (let k = 0; k < text.length; k++) this.offsets.push(this.rawOffsets[rawIndex]!);
     }
 
     placeholder(kind : PlaceholderKind, text : string, rawStart : number, rawEnd : number) : void {
