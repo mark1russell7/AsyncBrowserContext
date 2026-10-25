@@ -2,6 +2,25 @@
 
 The workflow `.github/workflows/release.yml` publishes the packages of this repository to npm. The only published package is `async-browser-context` (the root `package.json`). `docs/release.md` tells the steps for this package. It uses npm trusted publishing (OIDC), so it needs no npm token. Each version gets a provenance statement.
 
+## The workflow files
+
+`release.yml` is short. Its jobs use the shared release workflows and the action `npm-publish` of the template ([`CI.md`](https://github.com/mark1russell7/template/blob/main/CI.md)):
+
+| Job | What it uses |
+|---|---|
+| `verify` | The `ci.yml` of the repository. |
+| `build` | `reusable-release-build.yml` of the template, with `scripts/release/pack.mjs` and `scripts/release/tags.mjs` of the repository. |
+| `publish` | A job of `release.yml`. Its step is the action `npm-publish` of the template. |
+| `tag` | `reusable-release-tag.yml` of the template. |
+
+The job `publish` stays in `release.yml`. The trusted publisher of each package names this repository and `release.yml`. A composite action operates in the job that uses it, so npm sees the same workflow as before. The [`CI.md` of the template](https://github.com/mark1russell7/template/blob/main/CI.md) tells the reasons.
+
+Each `uses:` of the template has a pin to a commit of `main`. Renovate does not change `release.yml`. The release session moves the pins:
+
+1. Merge the change of the template.
+2. In each repository, change the commit of each `mark1russell7/template/...@<commit> # main` line of `release.yml` to the new commit.
+3. Merge that change. The next release uses it.
+
 ## Who publishes
 
 The owner (Mark) and one Claude session that the owner names are responsible for all npm publishes. Other Claude sessions obey these rules:
@@ -28,6 +47,15 @@ The push to `main` starts `release.yml`. The workflow starts the CI gates, build
 
 To publish again after a failure, start the workflow by hand: `gh workflow run release.yml --ref main`. It skips each version that is on npm.
 
+## Only a commit on main
+
+A release publishes only a commit that is on `main`. The first step of the build job compares the commit of the run with `main`, with the GitHub compare API. The commit must be the head of `main` or an older commit of `main`. For a different commit, the step fails. Then the run publishes nothing and makes no tag.
+
+- A manual run on the branch of a pull request does not publish the code of that branch. Merge the pull request first.
+- A temporary branch `release/<version>` at a version commit of `main` is correct. Use it to publish the version of an older commit when `main` has newer changes: `gh workflow run release.yml --ref release/<version>`.
+- For a new package, merge the pull request of the version first. Then start the release on `main` ("A new package").
+- The input `require-main` of `reusable-release-build.yml` turns on the check. Its default is `true`. Only `actions-test.yml` of the template sets `false`, for the commits of pull requests.
+
 ## Git tags and GitHub releases
 
 After the publish, the job `tag` of `release.yml` makes a git tag and a GitHub release for each version that the run published.
@@ -41,6 +69,8 @@ After the publish, the job `tag` of `release.yml` makes a git tag and a GitHub r
 The build job writes the plan of the tags and the release texts (`scripts/release/tags.mjs`). The job `tag` has only the permission `contents: write`. It starts no code of the repository. `gh release create` makes each tag on GitHub, at the commit of the release.
 
 When a repository gets a second published package, the next tags use `<name>@<version>`.
+
+A repository with its own `tags.mjs` can change the plan. For example, it can give each release a title and the tarballs as files ([`CI.md` of the template](https://github.com/mark1russell7/template/blob/main/CI.md)).
 
 ### A second run
 
@@ -74,7 +104,16 @@ node scripts/release/npm-bootstrap.mjs --dry-run
 node scripts/release/npm-bootstrap.mjs --dispatch
 ```
 
-The script reads the packages of `origin/main`. For each new package, it publishes a placeholder version `0.0.0-bootstrap.0` with the dist-tag `bootstrap`. Then it connects the package to `release.yml` (`npm trust github`) and sets "Require two-factor authentication and disallow tokens" (`npm access set mfa=publish`). With `--dispatch`, it starts `release.yml`, which publishes the real version.
+The script reads the packages of `origin/main`. For each new package, it publishes a placeholder version `0.0.0-bootstrap.0` with the dist-tag `bootstrap`. Then it connects the package to `release.yml` (`npm trust github`) and sets "Require two-factor authentication and disallow tokens" (`npm access set mfa=publish`). With `--dispatch`, it starts `release.yml` on `main`, which publishes the real version.
+
+The release publishes only a commit on `main`. Thus merge the pull request of the version before the bootstrap. `--dispatch` starts the release only in these two conditions:
+
+- The bootstrap had no failure.
+- The commit of `--ref` is on `main`. One `gh api` call to the compare API examines it.
+
+Else the script shows the reason and the command `gh workflow run release.yml --repo <owner/repo> --ref main`. Start that command after the merge, in the 2 days of the trust.
+
+Without the bootstrap, the release publishes the other packages and then fails with the names of the new packages. With the input `new-packages: warning` of the action `npm-publish`, the release gives a warning and does not fail.
 
 npm asks for the 2FA. The script opens the npm page in the browser. Confirm with the security key. Select the option to skip the 2FA for 5 minutes.
 
