@@ -35,7 +35,10 @@
 //                     version to publish).
 //   --no-lock         Does not set "disallow tokens".
 //   --lock-only       Only sets "disallow tokens" on each package that exists.
-//   --dispatch        Starts the release workflow of each repository that got a new trust.
+//   --dispatch        Starts the release workflow on main, for each repository that got a new trust.
+//                     A release publishes only a commit on main. Thus the script starts it only
+//                     when the bootstrap finished and the commit of --ref is on main. Else it shows
+//                     the command to start later.
 //   --lock-all        After the repositories, also sets "disallow tokens" on each other package of
 //                     the npm user (from the npm search). Without a repository folder, only that.
 //   --relock          Sets "disallow tokens" again on the packages that the record names.
@@ -45,6 +48,7 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { compareWithMain, dispatchPlan } from "./dispatch.mjs";
 import { githubRepository, publishedPackages, readRepoFile, root } from "./workspace.mjs";
 
 const PLACEHOLDER = "0.0.0-bootstrap.0";
@@ -207,10 +211,13 @@ const summary = [];
 const handled = new Set();
 const trusted = new Set();
 const placeholders = new Set();
+// The commit of --ref in each repository: --dispatch starts a release only when it is on main
+const commits = new Map();
 
 async function bootstrapRepo(repo) {
   const repository = githubRepository(repo);
   execFileSync("git", ["fetch", "--quiet", "origin"], { cwd: repo, stdio: "inherit" });
+  commits.set(repository, execFileSync("git", ["rev-parse", "--verify", `${ref}^{commit}`], { cwd: repo, encoding: "utf8" }).trim());
   let packages = publishedPackages(repo, ref);
   if (only) packages = packages.filter(({ manifest }) => only.includes(manifest.name));
   const workflowText = readRepoFile(repo, `.github/workflows/${workflow}`, ref);
@@ -348,19 +355,16 @@ async function waitUntilVisible(names) {
   }
 }
 
-if (dispatch && trusted.size > 0 && placeholders.size > 0 && !failure) {
+// After a failure, the script starts no release: it shows the command. A release publishes only a
+// commit on main, so the script also starts no release for a commit that is not on main (dispatch.mjs).
+const plan = dispatchPlan({ repositories: trusted, workflow, dispatch, failed: failure !== undefined, commits, compare: compareWithMain });
+if (plan.some(({ start }) => start) && placeholders.size > 0) {
   console.log(`\nWaiting until the registry shows ${[...placeholders].join(", ")}...`);
   await waitUntilVisible(placeholders);
 }
-if (trusted.size > 0) {
-  for (const repository of trusted) {
-    if (dispatch) {
-      execFileSync("gh", ["workflow", "run", workflow, "--repo", repository, "--ref", "main"], { stdio: "inherit" });
-      console.log(`Started ${workflow} of ${repository}.`);
-    } else {
-      console.log(`Start the release in the next 2 days: gh workflow run ${workflow} --repo ${repository} --ref main`);
-    }
-  }
+for (const { repository, start, text } of plan) {
+  if (start) execFileSync("gh", ["workflow", "run", workflow, "--repo", repository, "--ref", "main"], { stdio: "inherit" });
+  console.log(text);
 }
 if (failure instanceof RateLimited) {
   console.error(`\nnpm limits the requests of this account (HTTP 429). Start the same command again later. It skips each step that is done.\n${failure.message}`);
