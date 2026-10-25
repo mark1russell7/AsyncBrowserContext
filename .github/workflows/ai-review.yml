@@ -1,0 +1,17 @@
+# An AI review of each pull request, comment only (AI-REVIEW.md of mark1russell7/template)
+name: AI review
+
+on:
+  pull_request:
+    # Not on each push: a new review comes from the ai-review label
+    types: [opened, reopened, ready_for_review, labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    uses: mark1russell7/template/.github/workflows/reusable-ai-review.yml@fbddd746fbc4d4b5201497aad2a450b388628754 # main
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
