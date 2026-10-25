@@ -108,7 +108,15 @@ export function Playground() {
         }
         prepare();
         setRun({ kind : "compiling" });
-        const compiler = await loadCompiler();
+        let compiler : Awaited<ReturnType<typeof loadCompiler>>;
+        try {
+            compiler = await loadCompiler();
+        } catch (error) {
+            // A network error or a new deploy can stop the load of the chunk. The reader sees the error and can try again.
+            const problem = error as { message? : string };
+            setRun({ kind : "error", problem : { message : `The page did not load the compiler (${String(problem.message ?? error)}). Load the page again.` } });
+            return;
+        }
         let compiled : string;
         try {
             compiled = compiler.compilePlayground(source);
