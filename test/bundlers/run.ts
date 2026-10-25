@@ -39,7 +39,7 @@ const smoke = path.join(root, "test", "smoke", "fixture");
 
 /** The build tools, with the versions of the test. */
 const TOOLS : readonly string[] = [
-    "webpack@5.111.1",
+    "webpack@5.112.2",
     "babel-loader@10.1.1",
     "@rspack/core@2.2.8",
     "rollup@4.64.5",
