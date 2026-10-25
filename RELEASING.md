@@ -22,11 +22,48 @@ The owner (Mark) and one Claude session that the owner names are responsible for
 4. Change `version` in the `package.json` of the package. In the pull request, give the SemVer reason.
 5. Merge the change to `main`.
 
-The push to `main` starts `release.yml`. The workflow starts the CI gates, builds and packs each published package, and publishes each version that is not on npm. A version with a hyphen, for example `1.2.0-rc.1`, gets the dist-tag `next`. The other versions get `latest`.
+The push to `main` starts `release.yml`. The workflow starts the CI gates, builds and packs each published package, and publishes each version that is not on npm. Then it makes a git tag and a GitHub release for each new version. A version with a hyphen, for example `1.2.0-rc.1`, gets the dist-tag `next`. The other versions get `latest`.
 
 `scripts/release/pack.mjs` stops the release when a version is not SemVer. It also stops when a version is not greater than the `latest` version on npm. The registry does not accept a version two times, also after a removal. Thus a bad release gets a new PATCH, and `npm deprecate` marks the bad version.
 
 To publish again after a failure, start the workflow by hand: `gh workflow run release.yml --ref main`. It skips each version that is on npm.
+
+## Git tags and GitHub releases
+
+After the publish, the job `tag` of `release.yml` makes a git tag and a GitHub release for each version that the run published.
+
+- In a repository with one published package, the tag is `v<version>`, for example `v1.2.0`.
+- In a repository with more published packages, the tag is `<name>@<version>`, for example `@mark1russell7/vex@0.9.0`. Changesets uses the same tags.
+- The text of the release is the section of the version in the `CHANGELOG.md` of the package. Without a section, the text is one line with a link to npm.
+- A version with a hyphen is a prerelease on GitHub. GitHub does not show it as the latest release.
+- The Releases page of `@mark1russell7/site-pages` reads these releases.
+
+The build job writes the plan of the tags and the release texts (`scripts/release/tags.mjs`). The job `tag` has only the permission `contents: write`. It starts no code of the repository. `gh release create` makes each tag on GitHub, at the commit of the release.
+
+When a repository gets a second published package, the next tags use `<name>@<version>`.
+
+### A second run
+
+The job skips each tag that exists. Thus a second run of the workflow does no harm.
+
+A run also tags a version that it did not publish, but only when these two conditions are true:
+
+- npm has the version with a provenance statement from this repository.
+- The repository has no tag for the version.
+
+The tag then goes on the commit that the provenance statement names. That commit is the source of the version. Thus a run after a failure adds the missing tags. A version without a provenance statement gets no tag, for example a version that a person published by hand.
+
+### A tag that GitHub refuses
+
+The token of a workflow cannot change workflow files. Thus GitHub refuses a tag from the workflow (HTTP 403) when the workflow files of the commit differ from the workflow files of each branch.
+
+- An old commit gets no tag after a change to a workflow file. For example, the versions before a repository copies this `release.yml` get no tag from the workflow.
+- For a version that the run published, the job fails. For a different version, the job gives a warning.
+- For each refused tag, the summary of the run shows a `gh release create` command. Start it with your own GitHub token.
+
+### Tag rulesets
+
+A tag ruleset of the repository must not block the creation of tags by GitHub Actions. A ruleset that blocks only the update and the deletion of tags is correct. For example, the ruleset "release tags" of `crawler` blocks only the update and the deletion of `v*` tags.
 
 ## A new package
 
