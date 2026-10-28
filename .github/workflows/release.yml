@@ -63,7 +63,7 @@ jobs:
   build:
     name: Build and pack
     needs: verify
-    uses: mark1russell7/template/.github/workflows/reusable-release-build.yml@8c77f91ba72878a1fb6275964c46ee710d1b947e # main
+    uses: mark1russell7/template/.github/workflows/reusable-release-build.yml@072c68a9d4b3fbaea886ad60ae54b6ebbef42bde # main
     permissions:
       contents: read
 
@@ -82,14 +82,14 @@ jobs:
       # this repository and release.yml. It downloads the artifact "release" and publishes each
       # version that npm does not have, with provenance (.github/actions/npm-publish of the template).
       - id: publish
-        uses: mark1russell7/template/.github/actions/npm-publish@8c77f91ba72878a1fb6275964c46ee710d1b947e # main
+        uses: mark1russell7/template/.github/actions/npm-publish@072c68a9d4b3fbaea886ad60ae54b6ebbef42bde # main
 
   tag:
     name: Git tag and GitHub release
     needs: [build, publish]
     # Also after a failed publish: each version that it published before the failure gets its tag.
     if: ${{ !cancelled() && needs.build.result == 'success' }}
-    uses: mark1russell7/template/.github/workflows/reusable-release-tag.yml@8c77f91ba72878a1fb6275964c46ee710d1b947e # main
+    uses: mark1russell7/template/.github/workflows/reusable-release-tag.yml@072c68a9d4b3fbaea886ad60ae54b6ebbef42bde # main
     permissions:
       contents: write
     with:
