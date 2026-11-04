@@ -1,69 +1,55 @@
-# Builds the documentation website (site/) and publishes it to GitHub Pages.
-# To publish, set the Pages source of the repository to "GitHub Actions"
-# (Settings > Pages). Until then, the workflow only builds the site.
+# Builds the documentation website (site/) and publishes it to GitHub Pages, with the shared Pages workflow of
+# mark1russell7 (reusable-pages.yml of mark1russell7/template, its CI.md).
+# The Pages source of the repository is "GitHub Actions" (Settings > Pages).
+# A pull request builds and checks the site in a browser, with no deploy.
 name: Pages
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+  pull_request:
 
-permissions:
-  contents: read
+permissions: {}
 
-# One deployment at a time. A newer push waits until the running build and
-# deployment are complete, and a newer push replaces a run that waits.
+# One deployment at a time. A newer push waits until the running build and deployment are complete.
+# Each pull request has its own group, and a newer push cancels its run.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          # The sitemap gets the date of the last commit of each page from the full history
-          fetch-depth: 0
-
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      # The build renders each page and each Open Graph image in Chromium (site/build/prerender.ts)
-      - name: Install Chromium and its system dependencies
-        run: pnpm --filter ./site exec playwright install --with-deps chromium
-
-      # The site uses the source of the library, so a separate build of the library is not necessary
-      - name: Build the site
-        run: pnpm --filter ./site build
-        env:
-          SITE_BASE: ${{ github.event.repository.name }}
-          # The absolute URL of the site, for the canonical links, Open Graph and the sitemap
-          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
-
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
-        with:
-          path: site/dist
-
-  deploy:
-    needs: build
-    # Only when the repository has Pages. The build job above still examines the site.
-    if: ${{ github.event.repository.has_pages }}
-    runs-on: ubuntu-latest
-    # Only this job deploys, so only this job gets the Pages and OIDC permissions
+  pages:
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@f48f29fe5b00772951e0910a90fbbe312343338c
+    # The build job of the shared workflow gets only the read permissions. Only its deploy job,
+    # which runs no code of the repository, writes to Pages.
     permissions:
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
+      checks: read
+      statuses: read
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+    with:
+      node-version: "24"
+      # The build renders each page and each Open Graph image in Chromium (site/build/prerender.ts).
+      # The site uses the source of the library, so a separate build of the library is not necessary.
+      build: |
+        pnpm --filter ./site exec playwright install --with-deps chromium
+        pnpm --filter ./site build
+      out: site/dist
+      # SITE_URL gives the absolute URL of the site, for the canonical links, Open Graph and the sitemap.
+      env: '{"SITE_BASE": "${{ github.event.repository.name }}", "SITE_URL": "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"}'
+      deploy: ${{ github.event_name != 'pull_request' }}
+      # The site-pages action adds the Releases page and the Status page to the built site.
+      # The repository has no roadmap file, so the Status page shows the open pull requests and issues.
+      site-pages: true
+      packages: async-browser-context
+      site-name: async-browser-context
+      # The check opens each page in a browser at each width, in light and dark. The probe drives the first page:
+      # the playground, with the real library. The check reads the TypeScript source and removes its types.
+      site-check: true
+      site-check-pages: /explore/playground/,/,/releases/,/status/
+      site-check-probe: site/src/check-probe.ts
