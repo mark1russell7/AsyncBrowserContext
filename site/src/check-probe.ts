@@ -2,7 +2,7 @@
  * The probe of the playground. The site check of the Pages workflow starts it in a browser at each width, before the
  * deploy. A failed check stops the deploy.
  *
- * The probe drives the core of the site: the reader's code runs with the real library. A scenario loads its code, bad
+ * The probe drives the core of the site: the real library starts the code of the reader. A scenario loads its code, bad
  * code shows its error, and good code opens the debugger.
  *
  * The site check reads this TypeScript file directly. It removes the types and the `export` line, and it starts the
