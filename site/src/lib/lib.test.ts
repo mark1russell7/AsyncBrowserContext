@@ -17,8 +17,9 @@ describe("format", () => {
         expect(formatMs(999.4)).toBe("999 ms");
         expect(formatMs(999.6)).toBe("1 s");
         expect(formatMs(59_994)).toBe("59.99 s");
-        expect(formatMs(59_999)).toBe("1 min 0 s");
-        expect(formatMs(119_700)).toBe("2 min 0 s");
+        expect(formatMs(59_999)).toBe("1 min");
+        expect(formatMs(119_700)).toBe("2 min");
+        expect(formatMs(3_700_000)).toBe("1 h 2 min");
         expect(formatMs(-125_000)).toBe("-2 min 5 s");
         expect(formatMs(-1_250)).toBe("-1.25 s");
     });
