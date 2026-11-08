@@ -79,6 +79,16 @@ describe("pnpm site:stamps", () => {
         expect(results?.runs.map(run => run.id)).toEqual(["90", "101"]);
     });
 
+    // The freshness gate compares only the versions of the newest run of a page with npm. After a release, the newest
+    // Stryker run names the old version until the next Stryker run. Each page with the Stryker run therefore also
+    // names a run of the Pages build, which is always newer, so the old version of the Stryker run does not stop the deploy.
+    it("gives each page a run of the Pages build as its newest run, also when the Stryker run names an older version", () => {
+        for (const stamp of siteStamps(files).pages) {
+            const newest = [...stamp.runs].sort((a, b) => Date.parse(a.date) - Date.parse(b.date)).at(-1);
+            expect(newest, stamp.page).toMatchObject({ id : "101", engines : { [ENGINE] : "0.3.0" } });
+        }
+    });
+
     it("stamps only pages that the site has: the home page and one MDX page for each other page", () => {
         for (const { page } of MEASURED_PAGES) {
             if (page === "index.html") continue;
