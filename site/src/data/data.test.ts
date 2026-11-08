@@ -21,7 +21,8 @@ describe("data files", () => {
         expect(validateDataFile("mutation", dataFile("mutation")).rows.length).toBeGreaterThan(0);
         expect(validateDataFile("browsers", dataFile("browsers")).rows.length).toBeGreaterThan(0);
         expect(bench.rows.length).toBeGreaterThan(0);
-        expect(validateDataFile("size", dataFile("size")).gzipBytes).toBeGreaterThan(0);
+        expect(validateDataFile("size", dataFile("size")).transform.length).toBeGreaterThan(0);
+        expect(validateDataFile("browser-bench", dataFile("browser-bench")).rows.length).toBeGreaterThan(0);
     });
 
     it("gives the first problem of a file with an incorrect shape", () => {
@@ -48,13 +49,26 @@ describe("data files", () => {
     });
 
     it("examines the entries of the size file and the environment of the bench file", () => {
-        const size = { generated : "x", entries : ["a"], minifiedBytes : 3, gzipBytes : 2, brotliBytes : 1 };
+        const bundle = { minifiedBytes : 3, gzipBytes : 2, brotliBytes : 1 };
+        const row = { name : "ky", version : "2.2.0", kind : "HTTP client", asyncFunctions : 2, native : bundle, transformed : bundle, transformedWithoutNames : bundle, loweredEs2016 : bundle };
+        const size = { generated : "x", entries : ["a"], ...bundle, vite : "8.3.4", zone : { version : "0.16.3", ...bundle }, transform : [row] };
         expect(validateDataFile("size", size).entries).toEqual(["a"]);
+        expect(() => validateDataFile("size", { ...size, vite : undefined })).toThrow("has no text \"vite\"");
+        expect(() => validateDataFile("size", { ...size, zone : bundle })).toThrow("\"zone\" has no text \"version\"");
+        expect(() => validateDataFile("size", { ...size, transform : [{ ...row, loweredEs2016 : undefined }] })).toThrow("row 1 has no \"loweredEs2016\"");
+        expect(() => validateDataFile("size", { ...size, transform : [{ ...row, native : { ...bundle, gzipBytes : "2" } }] })).toThrow("row 1, \"native\" has no number \"gzipBytes\"");
         expect(() => validateDataFile("size", { ...size, entries : "a" })).toThrow("\"entries\" is not a list");
         expect(() => validateDataFile("size", { ...size, gzipBytes : null })).toThrow("has no number \"gzipBytes\"");
         expect(() => validateDataFile("bench", { generated : "x", environment : { node : "v24", os : "Linux" }, rows : [] })).toThrow("\"environment\" has no text \"cpu\"");
         expect(() => validateDataFile("bench", { generated : "x", environment : { node : "v24", os : "Linux", cpu : "x" }, rows : [{ benchmark : "b", plainMs : 1, transformOnlyMs : null, libraryMs : 2 }] }))
             .toThrow("row 1 has no number \"transformOnlyMs\"");
+    });
+
+    it("examines the rows of the browser benchmark", () => {
+        const file = { generated : "x", count : 50_000, runs : 7, minRunMs : 100, rows : [{ engine : "WebKit", version : "27.2", workload : "then chain", ms : { Native : 2, "Babel helper" : 1.9, Library : 3 } }] };
+        expect(validateDataFile("browser-bench", file).rows).toHaveLength(1);
+        expect(() => validateDataFile("browser-bench", { ...file, runs : undefined })).toThrow("has no number \"runs\"");
+        expect(() => validateDataFile("browser-bench", { ...file, rows : [{ ...file.rows[0], ms : { Native : 2, Library : 3 } }] })).toThrow("row 1, \"ms\" has no number \"Babel helper\"");
     });
 });
 

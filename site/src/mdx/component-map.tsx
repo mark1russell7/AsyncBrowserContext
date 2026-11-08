@@ -34,6 +34,9 @@ const ProbeTable = lazyComponent<object>(async () => ({ default : (await import(
 const MutationChart = lazyComponent<object>(async () => ({ default : (await import("../results/ResultViews")).MutationChart }), "The mutation chart loads.");
 const BrowserMatrix = lazyComponent<object>(async () => ({ default : (await import("../results/ResultViews")).BrowserMatrix }), "The browser table loads.");
 const BenchChart = lazyComponent<object>(async () => ({ default : (await import("../results/ResultViews")).BenchChart }), "The benchmark chart loads.");
+const SizeTable = lazyComponent<object>(async () => ({ default : (await import("../results/PerformanceViews")).SizeTable }), "The size table loads.");
+const TransformSizeTable = lazyComponent<object>(async () => ({ default : (await import("../results/PerformanceViews")).TransformSizeTable }), "The size table of the packages loads.");
+const BrowserBenchTable = lazyComponent<object>(async () => ({ default : (await import("../results/PerformanceViews")).BrowserBenchTable }), "The browser benchmark loads.");
 
 /**
  * The components that MDX pages can use without an import. To add a
@@ -47,6 +50,7 @@ export const mdxComponents = {
 
     // Components, in alphabetical order
     BenchChart,
+    BrowserBenchTable,
     BrowserMatrix,
     Callout,
     ContextDebugger,
@@ -58,7 +62,9 @@ export const mdxComponents = {
     Playground,
     PlotFigure,
     ProbeTable,
+    SizeTable,
     Tab,
     Tabs,
+    TransformSizeTable,
     TransformViewer,
 } satisfies MDXComponents;

@@ -9,15 +9,17 @@
  *   this run when you give the option `--browsers`.
  * - `probes.json` has the results of the review. The regression tests examine
  *   them. The script sets only its time.
- * - `size.json` has the size of the browser runtime, from
- *   `bench/results/size.json` (`pnpm bench:size`). Thus the site and the
- *   documents show the same values.
+ * - `size.json` has the size of the browser runtime, of zone.js and of the
+ *   npm packages with the transform, from `bench/results/size.json`
+ *   (`pnpm bench:size`). Thus the site and the documents show the same values.
+ * - `browser-bench.json` comes from `bench/results/browsers.json`
+ *   (`pnpm bench:browsers`).
  *
  * The script does not change a file when its source does not exist. Without
  * a Stryker report, `mutation.json` keeps its Stryker summary.
  *
- * In GitHub Actions, `bench.json` and `size.json` get the field `run`: the run
- * that measured them. `mutation.json` gets the run of `reports/mutation/run.json`
+ * In GitHub Actions, `bench.json`, `size.json`, `browser-bench.json` and
+ * `browsers.json` get the field `run`: the run that measured them. `mutation.json` gets the run of `reports/mutation/run.json`
  * (`pnpm mutation:run`). The site shows these runs, and `pnpm site:stamps`
  * makes the data stamps from them.
  */
@@ -217,7 +219,7 @@ async function writeBrowsers() : Promise<void> {
         console.log("browsers: no browser gave results. browsers.json stays the same.");
         return;
     }
-    writeData("browsers", { generated, rows });
+    writeData("browsers", { generated, rows, ...runField(actionsRun(process.env, generated, packageVersion())) });
 }
 
 function writeProbes() : void {
@@ -230,10 +232,55 @@ function writeProbes() : void {
     writeData("probes", { ...probes, generated });
 }
 
-/** The size of the code that a browser application gets: the classes, the patches, the callback hooks and the runtime of the transform. The same bundle as the runtime row of `pnpm bench:size`. */
-interface SizeResults {
+/** The sizes of one minified bundle, in bytes. */
+interface BundleSize { readonly minifiedBytes : number; readonly gzipBytes : number; readonly brotliBytes : number }
+
+/** One npm package of `pnpm bench:size`, without the transform and with each form of the transform. */
+interface TransformSize {
+    readonly name : string;
+    readonly version : string;
+    readonly kind : string;
+    readonly asyncFunctions : number;
+    readonly native : BundleSize;
+    readonly transformed : BundleSize;
+    readonly transformedWithoutNames : BundleSize;
+    readonly loweredEs2016 : BundleSize;
+}
+
+/**
+ * The results of `pnpm bench:size`. The runtime is the code that a browser application gets: the classes, the patches,
+ * the callback hooks and the runtime of the transform.
+ */
+export interface SizeResults {
     readonly date : string;
-    readonly runtime : { readonly entries : readonly string[]; readonly minifiedBytes : number; readonly gzipBytes : number; readonly brotliBytes : number };
+    readonly vite : string;
+    readonly runtime : BundleSize & { readonly entries : readonly string[] };
+    readonly zone : BundleSize & { readonly version : string };
+    readonly transform : readonly TransformSize[];
+}
+
+const bundle = ({ minifiedBytes, gzipBytes, brotliBytes } : BundleSize) : BundleSize => ({ minifiedBytes, gzipBytes, brotliBytes });
+
+/** This function gives the content of `size.json`: the runtime, zone.js and each package of the transform, with the run that measured them. */
+export function sizeData(results : SizeResults, run? : DataRun) : object {
+    return {
+        generated : results.date,
+        entries : results.runtime.entries,
+        ...bundle(results.runtime),
+        vite : results.vite,
+        zone : { version : results.zone.version, ...bundle(results.zone) },
+        transform : results.transform.map((row) => ({
+            name : row.name,
+            version : row.version,
+            kind : row.kind,
+            asyncFunctions : row.asyncFunctions,
+            native : bundle(row.native),
+            transformed : bundle(row.transformed),
+            transformedWithoutNames : bundle(row.transformedWithoutNames),
+            loweredEs2016 : bundle(row.loweredEs2016),
+        })),
+        ...runField(run),
+    };
 }
 
 function writeSize() : void {
@@ -242,8 +289,41 @@ function writeSize() : void {
         console.log("no bench/results/size.json: size.json stays as it is (pnpm bench:size)");
         return;
     }
-    const { entries, minifiedBytes, gzipBytes, brotliBytes } = results.runtime;
-    writeData("size", { generated : results.date, entries, minifiedBytes, gzipBytes, brotliBytes, ...runField(actionsRun(process.env, results.date, packageVersion())) });
+    writeData("size", sizeData(results, actionsRun(process.env, results.date, packageVersion())));
+}
+
+/** The results of `pnpm bench:browsers`. */
+export interface BrowserBenchResults {
+    readonly date : string;
+    readonly count : number;
+    readonly runs : number;
+    readonly minRunMs : number;
+    readonly rows : readonly { readonly engine : string; readonly version : string; readonly workload : string; readonly ms : Readonly<Record<string, number>> }[];
+}
+
+/** The cases of the browser benchmark. A row with no value of a case is an error, because the table cannot show it. */
+const BROWSER_CASES = ["Native", "Babel helper", "Library"] as const;
+
+/** This function gives the content of `browser-bench.json`, with the run that measured it. */
+export function browserBenchData(results : BrowserBenchResults, run? : DataRun) : object {
+    const rows = results.rows.map((row) => {
+        const ms = Object.fromEntries(BROWSER_CASES.map((name) => {
+            const value = row.ms[name];
+            if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`bench/results/browsers.json: ${row.engine} ${row.workload} has no time of the case "${name}".`);
+            return [name, value];
+        }));
+        return { engine : row.engine, version : row.version, workload : row.workload, ms };
+    });
+    return { generated : results.date, count : results.count, runs : results.runs, minRunMs : results.minRunMs, rows, ...runField(run) };
+}
+
+function writeBrowserBench() : void {
+    const results = readJson<BrowserBenchResults>(path.join(root, "bench", "results", "browsers.json"));
+    if (results === undefined) {
+        console.log("no bench/results/browsers.json: browser-bench.json stays as it is (pnpm bench:browsers)");
+        return;
+    }
+    writeData("browser-bench", browserBenchData(results, actionsRun(process.env, results.date, packageVersion())));
 }
 
 /** True when Node.js started this file, and false when a test imports its functions. */
@@ -259,6 +339,7 @@ if (isMainModule()) {
     writeMutation();
     writeProbes();
     writeSize();
+    writeBrowserBench();
     if (process.argv.includes("--browsers")) {
         await writeBrowsers();
     }

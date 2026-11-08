@@ -1,0 +1,128 @@
+{
+  "generated": "2026-10-12T21:44:01.635Z",
+  "count": 50000,
+  "runs": 7,
+  "minRunMs": 100,
+  "rows": [
+    {
+      "engine": "Chromium",
+      "version": "156.0.8078.4",
+      "workload": "await null",
+      "ms": {
+        "Native": 0.9542857147398449,
+        "Babel helper": 1.462318840234176,
+        "Library": 2.1739130434782608
+      }
+    },
+    {
+      "engine": "Chromium",
+      "version": "156.0.8078.4",
+      "workload": "await a promise",
+      "ms": {
+        "Native": 1.5212121217539816,
+        "Babel helper": 2.142553191235725,
+        "Library": 2.3295454545454546
+      }
+    },
+    {
+      "engine": "Chromium",
+      "version": "156.0.8078.4",
+      "workload": "async generator",
+      "ms": {
+        "Native": 4.12,
+        "Babel helper": 7.8357142848627905,
+        "Library": 11.519999998807908
+      }
+    },
+    {
+      "engine": "Chromium",
+      "version": "156.0.8078.4",
+      "workload": "then chain",
+      "ms": {
+        "Native": 1.3767123287671232,
+        "Babel helper": 1.3440000001589458,
+        "Library": 2.3511627898659815
+      }
+    },
+    {
+      "engine": "Firefox",
+      "version": "157.0",
+      "workload": "await null",
+      "ms": {
+        "Native": 0.6289308176100629,
+        "Babel helper": 268,
+        "Library": 3.4482758620689653
+      }
+    },
+    {
+      "engine": "Firefox",
+      "version": "157.0",
+      "workload": "await a promise",
+      "ms": {
+        "Native": 1.294871794871795,
+        "Babel helper": 194,
+        "Library": 45.666666666666664
+      }
+    },
+    {
+      "engine": "Firefox",
+      "version": "157.0",
+      "workload": "async generator",
+      "ms": {
+        "Native": 184,
+        "Babel helper": 828,
+        "Library": 645
+      }
+    },
+    {
+      "engine": "Firefox",
+      "version": "157.0",
+      "workload": "then chain",
+      "ms": {
+        "Native": 49,
+        "Babel helper": 50,
+        "Library": 74.5
+      }
+    },
+    {
+      "engine": "WebKit",
+      "version": "27.2",
+      "workload": "await null",
+      "ms": {
+        "Native": 1.694915254237288,
+        "Babel helper": 2.4634146341463414,
+        "Library": 2.55
+      }
+    },
+    {
+      "engine": "WebKit",
+      "version": "27.2",
+      "workload": "await a promise",
+      "ms": {
+        "Native": 1.4285714285714286,
+        "Babel helper": 2.2444444444444445,
+        "Library": 2.8055555555555554
+      }
+    },
+    {
+      "engine": "WebKit",
+      "version": "27.2",
+      "workload": "async generator",
+      "ms": {
+        "Native": 6.25,
+        "Babel helper": 15.142857142857142,
+        "Library": 15
+      }
+    },
+    {
+      "engine": "WebKit",
+      "version": "27.2",
+      "workload": "then chain",
+      "ms": {
+        "Native": 2.061224489795918,
+        "Babel helper": 1.8518518518518519,
+        "Library": 3.0294117647058822
+      }
+    }
+  ]
+}

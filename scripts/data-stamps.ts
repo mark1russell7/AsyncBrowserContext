@@ -64,20 +64,31 @@ export function runsOf(files : DataFiles, names : readonly string[]) : StampRun[
 }
 
 /**
- * This function gives the stamps of the measured pages. The home page shows the
- * size of the runtime (`size.json`), the mutation score (`mutation.json`) and
- * the time of one `get()` (`bench.json`).
+ * The measured pages, with the data files that each page shows. The probes of the
+ * results page are not in the list: the regression tests examine them, and no run
+ * measures them.
  */
+export const MEASURED_PAGES = [
+    // The size of the runtime, the mutation score and the time of one get()
+    { page : "index.html", files : ["bench", "size", "mutation"], limit : MUTATION_LIMIT },
+    // The benchmarks, the size tables and the browser benchmark
+    { page : "testing/performance/index.html", files : ["bench", "size", "browser-bench"] },
+    // The mutation chart and the browser tests
+    { page : "testing/results/index.html", files : ["mutation", "browsers"], limit : MUTATION_LIMIT },
+] as const;
+
+/** This function gives the stamps of the measured pages (`MEASURED_PAGES`). */
 export function siteStamps(files : DataFiles) : DataStamps {
     return {
         schema : "data-stamp/1",
-        pages : [{ page : "index.html", runs : runsOf(files, ["bench", "size", "mutation"]), limit : MUTATION_LIMIT }],
+        pages : MEASURED_PAGES.map(({ page, files : names, ...rest }) => ({ page, runs : runsOf(files, names), ...rest })),
     };
 }
 
 function main() : void {
     const data = (name : string) : { run? : DataRun } => JSON.parse(fs.readFileSync(path.join(root, "site", "public", "data", `${name}.json`), "utf8")) as { run? : DataRun };
-    const stamps = siteStamps({ bench : data("bench"), size : data("size"), mutation : data("mutation") });
+    const names = [...new Set(MEASURED_PAGES.flatMap((page) => page.files))];
+    const stamps = siteStamps(Object.fromEntries(names.map((name) => [name, data(name)])));
     const out = path.join(root, "site", "dist", "data-stamps.json");
     fs.writeFileSync(out, `${JSON.stringify(stamps, null, 2)}\n`);
     for (const page of stamps.pages) console.log(`Data stamp of ${page.page}: ${page.runs.map((run) => `run ${run.id} of ${run.date}`).join(", ")}.`);

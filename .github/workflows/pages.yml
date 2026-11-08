@@ -2,7 +2,8 @@
 # mark1russell7 (reusable-pages.yml of mark1russell7/template, its CI.md).
 # The Pages source of the repository is "GitHub Actions" (Settings > Pages).
 # A pull request builds and checks the site in a browser, with no deploy.
-# Each build measures the numbers of the home page again, and the freshness gate holds them (data-stamps).
+# Each build measures the numbers of the home page, the performance page and the results page again.
+# The freshness gate holds them (data-stamps).
 name: Pages
 
 on:
@@ -40,14 +41,16 @@ jobs:
       node-version: "24"
       # The build renders each page and each Open Graph image in Chromium (site/build/prerender.ts).
       # The site uses the source of the library, so a separate build of the library is not necessary.
-      # The build measures the benchmarks and the size in this run, and gets the newest Stryker report (mutation.yml).
+      # The build measures the benchmarks, the size and the browser benchmark in this run, starts the browser tests
+      # in the three engines (site:data --browsers), and gets the newest Stryker report (mutation.yml).
       # The data files then name these runs, and site:stamps writes the data stamps from them.
       build: |
-        pnpm --filter ./site exec playwright install --with-deps chromium
+        pnpm --filter ./site exec playwright install --with-deps chromium firefox webkit
         pnpm bench
         pnpm bench:size
+        pnpm bench:browsers
         pnpm mutation:run
-        pnpm site:data
+        pnpm site:data --browsers
         pnpm --filter ./site build
         pnpm site:stamps
       # mutation:run reads the Actions runs and downloads the Stryker report with this token (the permission actions: read).

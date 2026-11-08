@@ -121,13 +121,63 @@ export type BenchFile = DataFileBase & {
     rows : BenchRow[];
 };
 
-/** The size of the browser runtime in one minified bundle, in bytes. */
-export type SizeFile = DataFileBase & {
-    /** The modules in the bundle. */
-    entries : string[];
+/** The size of one minified bundle, in bytes. */
+export type BundleSize = {
     minifiedBytes : number;
     gzipBytes : number;
     brotliBytes : number;
+};
+
+/** One npm package of the size measurement: its bundle without the transform, and with each form of the transform. */
+export type TransformSizeRow = {
+    name : string;
+    /** The version of the package. An application of several packages has an empty version. */
+    version : string;
+    /** What the package is, for example "HTTP client". */
+    kind : string;
+    asyncFunctions : number;
+    native : BundleSize;
+    /** With the Vite plugin of the library. */
+    transformed : BundleSize;
+    /** With the Vite plugin and the option `names: false`. */
+    transformedWithoutNames : BundleSize;
+    /** With the compiler target ES2016 and no plugin. */
+    loweredEs2016 : BundleSize;
+};
+
+/** The size of the browser runtime in one minified bundle, in bytes, and the sizes of `pnpm bench:size` for comparison. */
+export type SizeFile = DataFileBase & BundleSize & {
+    /** The modules in the bundle. */
+    entries : string[];
+    /** The version of Vite that built the bundles. */
+    vite : string;
+    /** zone.js, for comparison. */
+    zone : BundleSize & { version : string };
+    /** The npm packages that the transform changes. */
+    transform : TransformSizeRow[];
+};
+
+/** One workload of the browser benchmark in one engine: the time of each case, in ms. */
+export type BrowserBenchRow = {
+    engine : string;
+    version : string;
+    workload : string;
+    ms : {
+        Native : number;
+        "Babel helper" : number;
+        Library : number;
+    };
+};
+
+/** The browser benchmark (`pnpm bench:browsers`). */
+export type BrowserBenchFile = DataFileBase & {
+    /** The number of steps of each workload. */
+    count : number;
+    /** Each value is the median of this number of runs. */
+    runs : number;
+    /** One run repeats the workload until at least this time has passed, in ms. */
+    minRunMs : number;
+    rows : BrowserBenchRow[];
 };
 
 /** The data file of each name. */
@@ -137,6 +187,7 @@ export type SiteDataMap = {
     browsers : BrowsersFile;
     bench : BenchFile;
     size : SizeFile;
+    "browser-bench" : BrowserBenchFile;
 };
 
 export type SiteDataName = keyof SiteDataMap;

@@ -4,6 +4,7 @@ import { StatusIcon, type StatusKind } from "../components/StatusIcon/StatusIcon
 import type { BenchRow, MutationRow, ProbeResult, StrykerSummary } from "../data/types";
 import { formatMs, formatNumber, formatPercent } from "../lib/format";
 import { DataState } from "./DataState";
+import { RunName } from "./RunName";
 import styles from "./ResultViews.module.css";
 
 /** An estimate of the width of a text in the charts (12 px font), in pixels. */
@@ -165,32 +166,35 @@ export function BrowserMatrix() {
     return (
         <DataState name="browsers">
             {(file) => (
-                <ScrollTable label="Browser results">
-                    <table className={styles.table}>
-                        <thead>
-                            <tr>
-                                <th scope="col">Browser</th>
-                                <th scope="col">Version</th>
-                                <th scope="col" data-align="right">Pass</th>
-                                <th scope="col" data-align="right">Fail</th>
-                                <th scope="col" data-align="right">Skip</th>
-                                <th scope="col">Result</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {file.rows.map(row => (
-                                <tr key={`${row.browser}-${row.version}`}>
-                                    <th scope="row">{row.browser}</th>
-                                    <td>{row.version}</td>
-                                    <td data-align="right">{row.passed}</td>
-                                    <td data-align="right">{row.failed}</td>
-                                    <td data-align="right">{row.skipped}</td>
-                                    <td><StatusIcon kind={row.failed > 0 ? "failed" : "passed"} /></td>
+                <>
+                    <p className={styles.environment}>The results come from <RunName source={file} />.</p>
+                    <ScrollTable label="Browser results">
+                        <table className={styles.table}>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Browser</th>
+                                    <th scope="col">Version</th>
+                                    <th scope="col" data-align="right">Pass</th>
+                                    <th scope="col" data-align="right">Fail</th>
+                                    <th scope="col" data-align="right">Skip</th>
+                                    <th scope="col">Result</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </ScrollTable>
+                            </thead>
+                            <tbody>
+                                {file.rows.map(row => (
+                                    <tr key={`${row.browser}-${row.version}`}>
+                                        <th scope="row">{row.browser}</th>
+                                        <td>{row.version}</td>
+                                        <td data-align="right">{row.passed}</td>
+                                        <td data-align="right">{row.failed}</td>
+                                        <td data-align="right">{row.skipped}</td>
+                                        <td><StatusIcon kind={row.failed > 0 ? "failed" : "passed"} /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </ScrollTable>
+                </>
             )}
         </DataState>
     );
@@ -218,7 +222,7 @@ export function BenchChart() {
                 return (
                     <>
                         <p className={styles.environment}>
-                            Node.js {file.environment.node}, {file.environment.os}, {file.environment.cpu}.
+                            Node.js {file.environment.node}, {file.environment.os}, {file.environment.cpu}. The values come from <RunName source={file} />.
                         </p>
                         <PlotFigure
                             title="The mean time of each benchmark"
