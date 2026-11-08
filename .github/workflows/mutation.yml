@@ -3,8 +3,9 @@ name: Mutation testing
 on:
   workflow_dispatch:
   schedule:
-    # Every Sunday at 04:23 UTC
-    - cron: "23 4 * * 0"
+    # Each Sunday and Wednesday at 04:23 UTC. The data stamp of the home page has an age limit of 9 days
+    # (scripts/data-stamps.ts), and this schedule meets it also after one failed run. The Pages build reads the newest passed run.
+    - cron: "23 4 * * 0,3"
 
 permissions:
   contents: read

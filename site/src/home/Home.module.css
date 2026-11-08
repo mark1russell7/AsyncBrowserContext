@@ -219,6 +219,19 @@
     font-size: var(--text-sm);
 }
 
+/* The stats and the line with their runs: one item of the hero grid */
+.statBlock {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.statSources {
+    margin: 0;
+    color: var(--color-ink-secondary);
+    font-size: var(--text-xs);
+}
+
 /* The problem */
 
 .band {

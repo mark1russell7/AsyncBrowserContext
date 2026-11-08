@@ -2,6 +2,7 @@
 # mark1russell7 (reusable-pages.yml of mark1russell7/template, its CI.md).
 # The Pages source of the repository is "GitHub Actions" (Settings > Pages).
 # A pull request builds and checks the site in a browser, with no deploy.
+# Each build measures the numbers of the home page again, and the freshness gate holds them (data-stamps).
 name: Pages
 
 on:
@@ -9,6 +10,9 @@ on:
     branches: [main]
   workflow_dispatch:
   pull_request:
+  # Each day, so the measured numbers of the site are at most one day old
+  schedule:
+    - cron: "17 6 * * *"
 
 permissions: {}
 
@@ -36,9 +40,19 @@ jobs:
       node-version: "24"
       # The build renders each page and each Open Graph image in Chromium (site/build/prerender.ts).
       # The site uses the source of the library, so a separate build of the library is not necessary.
+      # The build measures the benchmarks and the size in this run, and gets the newest Stryker report (mutation.yml).
+      # The data files then name these runs, and site:stamps writes the data stamps from them.
       build: |
         pnpm --filter ./site exec playwright install --with-deps chromium
+        pnpm bench
+        pnpm bench:size
+        pnpm mutation:run
+        pnpm site:data
         pnpm --filter ./site build
+        pnpm site:stamps
+      # mutation:run reads the Actions runs and downloads the Stryker report with this token (the permission actions: read).
+      github-token: true
+      timeout-minutes: 45
       out: site/dist
       # SITE_URL gives the absolute URL of the site, for the canonical links, Open Graph and the sitemap.
       env: '{"SITE_BASE": "${{ github.event.repository.name }}", "SITE_URL": "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"}'
@@ -53,3 +67,5 @@ jobs:
       site-check: true
       site-check-pages: /explore/playground/,/,/releases/,/status/
       site-check-probe: site/src/check-probe.ts
+      # The freshness gate: data older than its limit, or measured on an old version of the package, stops the deploy.
+      data-stamps: site/dist/data-stamps.json

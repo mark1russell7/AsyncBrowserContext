@@ -54,6 +54,13 @@ const MUTATION_SUITES = ["old", "new"] as const;
 export function validateDataFile<K extends SiteDataName>(name : K, value : unknown) : SiteDataMap[K] {
     if (!isRecord(value)) throw new Error(`The file data/${name}.json is not an object.`);
     if (typeof value["generated"] !== "string") throw new Error(`The file data/${name}.json has no "generated" time.`);
+    const run = value["run"];
+    if (run !== undefined) {
+        if (!isRecord(run)) throw new Error(`In data/${name}.json, "run" is not an object.`);
+        for (const field of ["id", "url", "date", "version"]) {
+            if (typeof run[field] !== "string") throw new Error(`In data/${name}.json, "run" has no text "${field}".`);
+        }
+    }
     switch (name) {
         case "probes": {
             const probes = rowsOf(value, "probes", name);

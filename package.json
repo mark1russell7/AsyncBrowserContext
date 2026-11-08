@@ -131,6 +131,8 @@
     "site:build": "pnpm --filter ./site build",
     "prepublishOnly": "pnpm build && pnpm test",
     "site:data": "tsx scripts/site-data.ts",
+    "site:stamps": "tsx scripts/data-stamps.ts",
+    "mutation:run": "tsx scripts/mutation-run.ts",
     "readme:media": "tsx scripts/readme-media.ts",
     "test:bundlers": "pnpm build && tsx test/bundlers/run.ts",
     "bench:size": "tsx bench/size.ts",
