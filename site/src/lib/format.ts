@@ -34,39 +34,6 @@ export function formatPercent(value : number | undefined) : string {
     return `${number1.format(value)}%`;
 }
 
-/**
- * This function formats a size in bytes: "512 B", "1.5 KB", "1 MB". The
- * next unit starts when the rounded value is 1,024. Thus, 1,048,575 bytes give "1 MB", not "1,024 KB".
- */
-export function formatBytes(bytes : number) : string {
-    if (!Number.isFinite(bytes)) return "–";
-    const units = ["B", "KB", "MB", "GB"];
-    const rounded = (value : number) : number => Math.round(Math.abs(value) * 10) / 10;
-    let value = bytes;
-    let unit = 0;
-    while (rounded(value) >= 1024 && unit < units.length - 1) {
-        value /= 1024;
-        unit++;
-    }
-    return `${number1.format(value)} ${units[unit]}`;
-}
-
-/** This function formats a value in an OpenTelemetry unit ("ms", "%", "By", "ratio", "{gc}"). */
-export function formatValue(value : number, unit : string) : string {
-    switch (unit) {
-        case "ms": return formatMs(value);
-        case "%": return formatPercent(value);
-        case "By": return formatBytes(value);
-        case "ratio": return formatPercent(value * 100);
-        case "1": return formatNumber(value, 2);
-        case "": return formatNumber(value, 2);
-        default: {
-            const label = unit.startsWith("{") && unit.endsWith("}") ? unit.slice(1, -1) : unit;
-            return `${formatNumber(value, 2)} ${label}`;
-        }
-    }
-}
-
 const dateTime = new Intl.DateTimeFormat("en-GB", {
     day : "numeric",
     month : "short",
