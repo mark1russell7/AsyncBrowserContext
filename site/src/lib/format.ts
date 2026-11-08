@@ -1,5 +1,7 @@
 /** Number and date formats for the whole site. Dates show in UTC, so every reader sees the same text. */
 
+import { DURATION_MS, formatOnScale, quantity } from "@mark1russell7/quantity";
+
 const number1 = new Intl.NumberFormat("en", { maximumFractionDigits : 1 });
 const number2 = new Intl.NumberFormat("en", { maximumFractionDigits : 2 });
 const integer = new Intl.NumberFormat("en", { maximumFractionDigits : 0 });
@@ -11,20 +13,13 @@ export function formatNumber(value : number, maximumFractionDigits : 0 | 1 | 2 =
 }
 
 /**
- * This function formats a duration: "0.42 ms", "3.5 ms", "120 ms", "1.25 s", "2 min 5 s".
- * It rounds the value before it selects the unit. Thus, 59,999 ms gives "1 min 0 s", not "60 s".
+ * This function formats a duration on the scale `DURATION_MS` of `@mark1russell7/quantity`: "0.42 ms", "3.5 ms",
+ * "120 ms", "1.25 s", "2 min 5 s", "1 h 2 min". The scale rounds the value before it selects the unit. Thus, 59,999 ms
+ * gives "1 min", not "60 s". A value that is not finite gives "–".
  */
 export function formatMs(ms : number) : string {
     if (!Number.isFinite(ms)) return "–";
-    const abs = Math.abs(ms);
-    const sign = ms < 0 ? "-" : "";
-    if (abs < 1) return `${number2.format(ms)} ms`;
-    if (abs < 10) return `${number1.format(ms)} ms`;
-    if (Math.round(abs) < 1000) return `${integer.format(ms)} ms`;
-    const seconds = Math.round(abs / 10) / 100;
-    if (seconds < 60) return `${sign}${number2.format(seconds)} s`;
-    const totalSeconds = Math.round(abs / 1000);
-    return `${sign}${Math.floor(totalSeconds / 60)} min ${totalSeconds % 60} s`;
+    return formatOnScale(quantity(ms, "ms"), DURATION_MS);
 }
 
 /** This function formats a percentage from 0 to 100. The value `undefined` means that there is no data. */

@@ -13,6 +13,7 @@
   "dependencies": {
     "@fontsource-variable/atkinson-hyperlegible-mono": "^5.3.0",
     "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
+    "@mark1russell7/quantity": "^0.3.2",
     "@observablehq/plot": "^0.6.17",
     "mermaid": "^12.1.0",
     "react": "^19.3.0",
