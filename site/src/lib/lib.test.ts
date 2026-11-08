@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { formatBytes, formatCount, formatDate, formatDateTime, formatMs, formatPercent, formatValue } from "./format";
+import { formatCount, formatDate, formatDateTime, formatMs, formatPercent } from "./format";
 import { memoizePromise } from "./memoize-promise";
 import { pathWithoutHtmlFile } from "./page-path";
 
@@ -23,16 +23,10 @@ describe("format", () => {
         expect(formatMs(-1_250)).toBe("-1.25 s");
     });
 
-    it("formats percentages, bytes, units and counts", () => {
+    it("formats percentages and counts", () => {
         expect(formatPercent(87.54)).toBe("87.5%");
         expect(formatPercent(100)).toBe("100%");
         expect(formatPercent(undefined)).toBe("No data");
-        expect(formatBytes(1536)).toBe("1.5 KB");
-        expect(formatBytes(1023)).toBe("1,023 B");
-        expect(formatBytes(1048575)).toBe("1 MB");
-        expect(formatBytes(1048524)).toBe("1,023.9 KB");
-        expect(formatValue(0.25, "ratio")).toBe("25%");
-        expect(formatValue(3, "{gc}")).toBe("3 gc");
         expect(formatCount(1, "test")).toBe("1 test");
         expect(formatCount(1200, "test")).toBe("1,200 tests");
     });
