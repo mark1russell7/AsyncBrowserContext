@@ -18,9 +18,9 @@ export function rangeOf(values : readonly number[]) : readonly [number, number] 
 }
 
 /**
- * This function gives the two ranges of the text under the table of the transform: the increase with the Vite plugin
- * for the API clients (each package with "client" in its kind), and the part that the option `names: false` removes
- * from each package with async functions.
+ * This function gives the two ranges of the text under the table of the transform. The first range is the increase
+ * with the Vite plugin for the API clients, which have "client" in their kind. The second range is the part that the
+ * option `names: false` removes from each package with async functions.
  */
 export function transformRanges(rows : readonly TransformSizeRow[]) : { clients? : readonly [number, number]; names? : readonly [number, number] } {
     const clients = rangeOf(rows.filter(row => /client/i.test(row.kind)).map(row => gzipIncrease(row.native, row.transformed)));
