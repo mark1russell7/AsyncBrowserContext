@@ -4,12 +4,26 @@
  * real results, and then the pages show a note.
  */
 
+/** The run of GitHub Actions that measured the values of a data file. */
+export type DataRun = {
+    /** The ID of the run. */
+    id : string;
+    /** The link of the run. */
+    url : string;
+    /** The time of the measurement, in ISO 8601 format. */
+    date : string;
+    /** The version of the package that the run measured. */
+    version : string;
+};
+
 /** The fields that each data file has. */
 export type DataFileBase = {
     /** The time at which a tool wrote the file, in ISO 8601 format. */
     generated : string;
     /** `true` if the file contains sample values and not measured results. */
     sample? : boolean;
+    /** The CI run that measured the values. A file from a local run has no run. */
+    run? : DataRun;
 };
 
 /** The result of a probe: a small program of the review that shows one problem. */

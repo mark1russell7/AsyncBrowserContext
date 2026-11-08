@@ -15,6 +15,11 @@
  *
  * The script does not change a file when its source does not exist. Without
  * a Stryker report, `mutation.json` keeps its Stryker summary.
+ *
+ * In GitHub Actions, `bench.json` and `size.json` get the field `run`: the run
+ * that measured them. `mutation.json` gets the run of `reports/mutation/run.json`
+ * (`pnpm mutation:run`). The site shows these runs, and `pnpm site:stamps`
+ * makes the data stamps from them.
  */
 import { execSync } from "node:child_process";
 import fs from "node:fs";
@@ -27,8 +32,37 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(root, "site", "public", "data");
 const generated = new Date().toISOString();
 
+/** The run that measured the values of a data file. The site shows it, and the data stamp names it. */
+export interface DataRun {
+    /** The ID of the run of GitHub Actions. */
+    readonly id : string;
+    /** The link of the run. */
+    readonly url : string;
+    /** The time of the measurement, in ISO 8601 format. */
+    readonly date : string;
+    /** The version of the package `async-browser-context` that the run measured. */
+    readonly version : string;
+}
+
+/** This function gives the current run of GitHub Actions, or `undefined` outside GitHub Actions. */
+export function actionsRun(env : Readonly<Record<string, string | undefined>>, date : string, version : string) : DataRun | undefined {
+    const { GITHUB_SERVER_URL : server, GITHUB_REPOSITORY : repository, GITHUB_RUN_ID : id } = env;
+    if (!server || !repository || !id) return undefined;
+    return { id, url : `${server}/${repository}/actions/runs/${id}`, date, version };
+}
+
+/** The field `run` of a data file, or no field. */
+const runField = (run : DataRun | undefined) : { run? : DataRun } => (run === undefined ? {} : { run });
+
 function readJson<T>(file : string) : T | undefined {
     return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) as T : undefined;
+}
+
+/** The version of the package, from `package.json`. */
+function packageVersion() : string {
+    const manifest = readJson<{ version : string }>(path.join(root, "package.json"));
+    if (manifest === undefined) throw new Error("There is no package.json.");
+    return manifest.version;
 }
 
 function writeData(name : string, value : object) : void {
@@ -70,7 +104,7 @@ function writeBench() : void {
     }
     const { rows, incomplete } = benchRows(results);
     for (const name of incomplete) console.log(`bench: the benchmark "${name}" has no value for each case, so it is not in bench.json`);
-    writeData("bench", { generated : results.date, environment : results.environment, rows });
+    writeData("bench", { generated : results.date, environment : results.environment, rows, ...runField(actionsRun(process.env, results.date, packageVersion())) });
 }
 
 /** The mutants of the review of 2026-10-08 (docs/remediation-plan.md, Appendix C), with the old tests. */
@@ -123,15 +157,18 @@ export function strykerSummary(report : MutationReport) : Record<string, unknown
  * Without a report, the function keeps the Stryker summary of `existing`.
  * Then it gives `undefined` if the rows of the review are also the same.
  */
-export function mutationData(report : MutationReport | undefined, existing : { rows? : unknown; stryker? : unknown } | undefined, time : string) : object | undefined {
-    if (report !== undefined) return { generated : time, rows : REVIEW_MUTANTS, stryker : strykerSummary(report) };
+export function mutationData(report : MutationReport | undefined, existing : { rows? : unknown; stryker? : unknown; run? : unknown } | undefined, time : string, run? : DataRun) : object | undefined {
+    if (report !== undefined) return { generated : time, rows : REVIEW_MUTANTS, stryker : strykerSummary(report), ...runField(run) };
     if (existing !== undefined && JSON.stringify(existing.rows) === JSON.stringify(REVIEW_MUTANTS)) return undefined;
-    return { generated : time, rows : REVIEW_MUTANTS, ...(existing?.stryker === undefined ? {} : { stryker : existing.stryker }) };
+    // The Stryker summary keeps the run that made it.
+    const kept = existing?.stryker === undefined ? {} : { stryker : existing.stryker, ...(existing.run === undefined ? {} : { run : existing.run }) };
+    return { generated : time, rows : REVIEW_MUTANTS, ...kept };
 }
 
 function writeMutation() : void {
     const report = readJson<MutationReport>(path.join(root, "reports", "mutation", "mutation.json"));
-    const data = mutationData(report, readJson(path.join(dataDir, "mutation.json")), generated);
+    const run = readJson<DataRun>(path.join(root, "reports", "mutation", "run.json"));
+    const data = mutationData(report, readJson(path.join(dataDir, "mutation.json")), generated, run);
     if (report === undefined) console.log("no reports/mutation/mutation.json: start pnpm mutation first. mutation.json keeps its Stryker summary.");
     if (data !== undefined) writeData("mutation", data);
 }
@@ -206,7 +243,7 @@ function writeSize() : void {
         return;
     }
     const { entries, minifiedBytes, gzipBytes, brotliBytes } = results.runtime;
-    writeData("size", { generated : results.date, entries, minifiedBytes, gzipBytes, brotliBytes });
+    writeData("size", { generated : results.date, entries, minifiedBytes, gzipBytes, brotliBytes, ...runField(actionsRun(process.env, results.date, packageVersion())) });
 }
 
 /** True when Node.js started this file, and false when a test imports its functions. */
