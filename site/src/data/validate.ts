@@ -47,6 +47,9 @@ function requireStrings(value : unknown, where : string) : void {
 const PROBE_STATUSES = ["fixed", "safe", "documentation", "correct"] as const;
 const MUTATION_SUITES = ["old", "new"] as const;
 
+/** The sizes of one bundle, in bytes. */
+const BUNDLE_FIELDS = ["minifiedBytes", "gzipBytes", "brotliBytes"] as const;
+
 /**
  * This function examines the shape of a data file. It gives the file if the
  * shape is correct, and it throws an error with the first problem if not.
@@ -86,10 +89,36 @@ export function validateDataFile<K extends SiteDataName>(name : K, value : unkno
         case "browsers":
             requireFields(rowsOf(value, "rows", name), { browser : "string", version : "string", passed : "number", failed : "number", skipped : "number" }, name);
             break;
-        case "size":
-            requireNumbers(value, ["minifiedBytes", "gzipBytes", "brotliBytes"], `The file data/${name}.json`);
+        case "size": {
+            requireNumbers(value, BUNDLE_FIELDS, `The file data/${name}.json`);
             requireStrings(value["entries"], `In data/${name}.json, "entries"`);
+            if (typeof value["vite"] !== "string") throw new Error(`The file data/${name}.json has no text "vite".`);
+            const zone = value["zone"];
+            if (!isRecord(zone)) throw new Error(`The file data/${name}.json has no "zone".`);
+            requireNumbers(zone, BUNDLE_FIELDS, `In data/${name}.json, "zone"`);
+            if (typeof zone["version"] !== "string") throw new Error(`In data/${name}.json, "zone" has no text "version".`);
+            const rows = rowsOf(value, "transform", name);
+            requireFields(rows, { name : "string", version : "string", kind : "string", asyncFunctions : "number" }, name);
+            rows.forEach((row, index) => {
+                for (const form of ["native", "transformed", "transformedWithoutNames", "loweredEs2016"]) {
+                    const bundle = row[form];
+                    if (!isRecord(bundle)) throw new Error(`In data/${name}.json, row ${index + 1} has no "${form}".`);
+                    requireNumbers(bundle, BUNDLE_FIELDS, `In data/${name}.json, row ${index + 1}, "${form}"`);
+                }
+            });
             break;
+        }
+        case "browser-bench": {
+            requireNumbers(value, ["count", "runs", "minRunMs"], `The file data/${name}.json`);
+            const rows = rowsOf(value, "rows", name);
+            requireFields(rows, { engine : "string", version : "string", workload : "string" }, name);
+            rows.forEach((row, index) => {
+                const ms = row["ms"];
+                if (!isRecord(ms)) throw new Error(`In data/${name}.json, row ${index + 1} has no "ms".`);
+                requireNumbers(ms, ["Native", "Babel helper", "Library"], `In data/${name}.json, row ${index + 1}, "ms"`);
+            });
+            break;
+        }
         case "bench": {
             const environment = value["environment"];
             if (!isRecord(environment)) throw new Error(`The file data/${name}.json has no "environment".`);
