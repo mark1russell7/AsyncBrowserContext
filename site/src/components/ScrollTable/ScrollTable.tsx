@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode, type TableHTMLAttributes } from "react";
+import { useScrolls } from "../../lib/use-scrolls";
 import styles from "./ScrollTable.module.css";
 
 export type ScrollTableProps = {
@@ -27,20 +28,12 @@ function tableName(wrapper : HTMLElement) : string | undefined {
  */
 export function ScrollTable({ label, children } : ScrollTableProps) {
     const wrapper = useRef<HTMLDivElement>(null);
-    const [scrolls, setScrolls] = useState(false);
+    const scrolls = useScrolls(wrapper);
     const [name, setName] = useState(label);
 
     useLayoutEffect(() => {
         const element = wrapper.current;
-        if (!element) return undefined;
-        setName(label ?? tableName(element) ?? "Table");
-        const update = () : void => setScrolls(element.scrollWidth > element.clientWidth + 1);
-        update();
-        if (typeof ResizeObserver === "undefined") return undefined;
-        const observer = new ResizeObserver(update);
-        observer.observe(element);
-        if (element.firstElementChild) observer.observe(element.firstElementChild);
-        return () => observer.disconnect();
+        if (element) setName(label ?? tableName(element) ?? "Table");
     }, [label]);
 
     return (
