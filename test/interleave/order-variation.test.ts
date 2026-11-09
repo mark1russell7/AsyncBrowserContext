@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { mulberry32 } from "@mark1russell7/rigor-generators";
 import { Snapshot, Variable } from "async-browser-context";
 import { delay } from "../helpers.js";
 
@@ -10,18 +11,6 @@ import { delay } from "../helpers.js";
  * sequence of operations of a task does not change with the order of the
  * tasks, and a failure message gives the seed and the task.
  */
-
-/** A small random generator with a seed (mulberry32). */
-function random(seed : number) : () => number {
-    let state = seed >>> 0;
-    return () => {
-        state = (state + 0x6d2b79f5) >>> 0;
-        let value = state;
-        value = Math.imul(value ^ (value >>> 15), value | 1);
-        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-        return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
-    };
-}
 
 type Operation = (variable : Variable<string>, other : Variable<string>, next : () => number) => Promise<unknown>;
 
@@ -58,7 +47,7 @@ async function runSeed(seed : number, tasks : number, steps : number) : Promise<
     const other = new Variable<string>();
     const failures : string[] = [];
     await Promise.all(Array.from({ length : tasks }, (_, task) => variable.run(`task-${task}`, async () => {
-        const next = random(Math.imul(seed, 0x9e3779b1) ^ (task + 1));
+        const next = mulberry32(Math.imul(seed, 0x9e3779b1) ^ (task + 1));
         for (let step = 0; step < steps; step++) {
             const index = Math.floor(next() * OPERATIONS.length);
             const operation = OPERATIONS[index] as Operation;

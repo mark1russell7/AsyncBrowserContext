@@ -158,6 +158,7 @@
     }
   },
   "devDependencies": {
+    "@mark1russell7/rigor-generators": "^0.1.8",
     "@opentelemetry/api": "^1.9.1",
     "@stryker-mutator/core": "^10.0.0",
     "@swc/core": "^1.16.18",
