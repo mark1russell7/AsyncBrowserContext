@@ -5,6 +5,8 @@
     border: 1px solid var(--color-rule);
     border-radius: var(--radius);
     background: var(--color-surface);
+    /* The background of the cue in a browser with no scroll timelines (the class scroll-cue) */
+    --scroll-cue-bg: var(--color-surface);
     font-family: var(--font-mono);
     font-size: 0.82rem;
     line-height: 1.65;

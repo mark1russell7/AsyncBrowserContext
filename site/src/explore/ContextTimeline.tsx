@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { PlotFigure } from "../components/PlotFigure/PlotFigure";
+import { useScrolls } from "../lib/use-scrolls";
 import type { ThemeColors } from "../theme/colors";
 import { useThemeColors } from "../theme/colors";
 import {
@@ -149,6 +150,9 @@ export function ContextTimeline({ scenario : initialScenario = SCENARIOS[0]!.id,
     const generation = useRef(0);
     const compareId = useId();
     const scenario = scenarioById(scenarioId);
+    // The code of the scenario scrolls sideways on a narrow screen: then it gets a tab stop
+    const codeBox = useRef<HTMLPreElement>(null);
+    const codeScrolls = useScrolls(codeBox, [scenario.code]);
 
     const start = useCallback(async (id : string, compare : ImplementationId | "none") => {
         const current = ++generation.current;
@@ -195,7 +199,7 @@ export function ContextTimeline({ scenario : initialScenario = SCENARIOS[0]!.id,
             </ul>
             <p className={styles.meta}>Rule {scenario.rule}</p>
             <p className={styles.summary}>{scenario.summary}</p>
-            <pre className={styles.code}><code>{scenario.code}</code></pre>
+            <pre ref={codeBox} className={`${styles.code} scroll-cue`} tabIndex={codeScrolls ? 0 : undefined}><code>{scenario.code}</code></pre>
             <div className={styles.toolbar}>
                 <label className={styles.field} htmlFor={compareId}>
                     Compare the library with

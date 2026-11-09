@@ -1,4 +1,5 @@
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
+import { useScrolls } from "../../lib/use-scrolls";
 import styles from "./HighlightedCode.module.css";
 
 /** One token of highlighted code: the text, the light color, the dark color, and `1` for italic text. The build makes the tokens with Shiki. */
@@ -12,10 +13,15 @@ export type HighlightedCodeProps = {
     className? : string;
 };
 
-/** Code with the colors of the build. The light and the dark theme each have their colors. */
+/**
+ * Code with the colors of the build. The light and the dark theme each have their colors.
+ * A line that is wider than the box scrolls: the class scroll-cue shows a fade at the edge, and the box gets a tab stop.
+ */
 export function HighlightedCode({ lines, label, className } : HighlightedCodeProps) {
+    const box = useRef<HTMLPreElement>(null);
+    const scrolls = useScrolls(box, [lines]);
     return (
-        <pre className={`${styles.code} ${className ?? ""}`} role={label === undefined ? undefined : "group"} aria-label={label}>
+        <pre ref={box} className={`${styles.code} scroll-cue ${className ?? ""}`} tabIndex={scrolls ? 0 : undefined} role={label === undefined ? undefined : "group"} aria-label={label}>
             <code>
                 {lines.map((line, index) => (
                     <span key={index}>

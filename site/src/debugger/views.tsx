@@ -29,7 +29,7 @@ export function CodeView({ lines : code, trace, index, lanes } : ViewProps & { l
         return map;
     }, [trace, index]);
     return (
-        <pre className={styles.code} role="group" aria-label={`The code of the scenario. ${step ? `Line ${step.line} is active.` : ""}`}>
+        <pre className={`${styles.code} scroll-cue`} role="group" aria-label={`The code of the scenario. ${step ? `Line ${step.line} is active.` : ""}`}>
             <code>
                 {code.map((tokens, position) => {
                     const line = position + 1;

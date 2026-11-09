@@ -237,6 +237,8 @@
     padding: 0.6rem 0;
     overflow-x: auto;
     background: var(--color-surface);
+    /* The background of the cue in a browser with no scroll timelines (the class scroll-cue) */
+    --scroll-cue-bg: var(--color-surface);
     font-family: var(--font-mono);
     font-size: 0.8rem;
     line-height: 1.7;

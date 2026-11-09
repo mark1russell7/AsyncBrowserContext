@@ -70,6 +70,8 @@
     overflow-x: auto;
     border-radius: var(--radius-small);
     background: var(--color-surface-sunken);
+    /* The background of the cue in a browser with no scroll timelines (the class scroll-cue) */
+    --scroll-cue-bg: var(--color-surface-sunken);
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     line-height: 1.5;
