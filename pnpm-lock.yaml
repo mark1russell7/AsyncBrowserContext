@@ -29,6 +29,9 @@ importers:
         specifier: ^8.0.5
         version: 8.0.5(@babel/core@8.0.7)
     devDependencies:
+      '@mark1russell7/rigor-generators':
+        specifier: ^0.1.8
+        version: 0.1.8
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -775,6 +778,10 @@ packages:
 
   '@mark1russell7/rational@0.1.2':
     resolution: {integrity: sha512-hn2C5jjOFCGKJqFQPHt57C/Cn1l9Lb9MltVNtL71KSu+nRrfPOmg8ujYB5n3oDFFWNdNA4bE/8LLT4tG3lmrGA==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-generators@0.1.8':
+    resolution: {integrity: sha512-6AC/YQdSrMKs/1NcHesjmmxVjKrqTDXjzKaElE8N8TgsqgiApCbsnk5xRoGJfvIJZUX7vJHFB9F+w48OSdRtHQ==}
     engines: {node: '>=22'}
 
   '@mdx-js/mdx@3.1.1':
@@ -3376,6 +3383,8 @@ snapshots:
       zod: 4.6.7
 
   '@mark1russell7/rational@0.1.2': {}
+
+  '@mark1russell7/rigor-generators@0.1.8': {}
 
   '@mdx-js/mdx@3.1.1':
     dependencies:
