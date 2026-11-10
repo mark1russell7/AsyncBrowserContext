@@ -58,12 +58,24 @@
   "types": "./dist/index.d.ts",
   "typesVersions": {
     "*": {
-      "browser": ["./dist/index.d.ts"],
-      "browser/runtime": ["./dist/runtime.d.ts"],
-      "runtime": ["./dist/runtime.d.ts"],
-      "opentelemetry": ["./dist/opentelemetry.d.ts"],
-      "babel-preset": ["./dist/babel/preset.d.ts"],
-      "vite": ["./dist/vite/plugin.d.ts"]
+      "browser": [
+        "./dist/index.d.ts"
+      ],
+      "browser/runtime": [
+        "./dist/runtime.d.ts"
+      ],
+      "runtime": [
+        "./dist/runtime.d.ts"
+      ],
+      "opentelemetry": [
+        "./dist/opentelemetry.d.ts"
+      ],
+      "babel-preset": [
+        "./dist/babel/preset.d.ts"
+      ],
+      "vite": [
+        "./dist/vite/plugin.d.ts"
+      ]
     }
   },
   "exports": {

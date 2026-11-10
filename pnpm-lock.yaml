@@ -31,7 +31,7 @@ importers:
     devDependencies:
       '@mark1russell7/rigor-generators':
         specifier: ^0.1.8
-        version: 0.1.8
+        version: 0.1.14
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -85,10 +85,10 @@ importers:
         version: 5.3.0
       '@mark1russell7/quantity':
         specifier: ^0.3.2
-        version: 0.3.2(zod@4.6.7)
+        version: 0.3.5(zod@4.6.7)
       '@mark1russell7/site-pages':
         specifier: ^0.4.3
-        version: 0.4.3
+        version: 0.4.6
       '@observablehq/plot':
         specifier: ^0.6.17
         version: 0.6.19
@@ -770,8 +770,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mark1russell7/quantity@0.3.2':
-    resolution: {integrity: sha512-Mm1OM9hu1/sU06IeZzm/IX8FipabzrhCWBcOeELwsIpHE0a0FbYYiZHRG+qeeScSkZ9bl9Flmeif0ZgAcz4Fuw==}
+  '@mark1russell7/quantity@0.3.5':
+    resolution: {integrity: sha512-RCwaYZjMH3mVbnhLIW/xz2Enz4ekUBOY80g20pb4nhk9I1U9eDXd/eMxmkvN+/szFYjpzTRQp7Skq7zk2DVxzA==}
     engines: {node: '>=22.19'}
     peerDependencies:
       zod: ^4.1.0
@@ -783,16 +783,16 @@ packages:
     resolution: {integrity: sha512-hn2C5jjOFCGKJqFQPHt57C/Cn1l9Lb9MltVNtL71KSu+nRrfPOmg8ujYB5n3oDFFWNdNA4bE/8LLT4tG3lmrGA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/rigor-generators@0.1.8':
-    resolution: {integrity: sha512-6AC/YQdSrMKs/1NcHesjmmxVjKrqTDXjzKaElE8N8TgsqgiApCbsnk5xRoGJfvIJZUX7vJHFB9F+w48OSdRtHQ==}
+  '@mark1russell7/rigor-generators@0.1.14':
+    resolution: {integrity: sha512-wSSv2qWetdgWMhhr7VdujBKgdF0kYB8PsckImdGC3yibgpI79fwos0U61dKZaPF7DebhE29F9AXWk7Ke//ASPQ==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.1.26':
     resolution: {integrity: sha512-JhwMAsYFg9FLFGVHRt6U7TWYmRblA/f+zS08H+DVzRlP4ypAqwmX6+QXNY+jNbwkyFPJqaLQJq/1PSC8QoKIWQ==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.4.3':
-    resolution: {integrity: sha512-6RVlKnaXyVAwcZwrKugTcm32strh0D5Dz+ZSSz6zlLXtWtX31C23ue88bPh7PujLw6r90PywY00uSkNafOCKfg==}
+  '@mark1russell7/site-pages@0.4.6':
+    resolution: {integrity: sha512-h/vcASVZcbf3UhDBHlalot0PvAzt8tUpLC6ngZgZoZJSw9Aj3Pcm6lw5irKmP1o42aFI8SnhJvxSuC9PUWZPAg==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -3392,7 +3392,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@mark1russell7/quantity@0.3.2(zod@4.6.7)':
+  '@mark1russell7/quantity@0.3.5(zod@4.6.7)':
     dependencies:
       '@mark1russell7/rational': 0.1.2
     optionalDependencies:
@@ -3400,13 +3400,13 @@ snapshots:
 
   '@mark1russell7/rational@0.1.2': {}
 
-  '@mark1russell7/rigor-generators@0.1.8': {}
+  '@mark1russell7/rigor-generators@0.1.14': {}
 
   '@mark1russell7/rigor-statistics@0.1.26':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.1.8
+      '@mark1russell7/rigor-generators': 0.1.14
 
-  '@mark1russell7/site-pages@0.4.3':
+  '@mark1russell7/site-pages@0.4.6':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.1.26
 
