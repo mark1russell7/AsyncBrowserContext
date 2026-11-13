@@ -6,7 +6,7 @@
  * the patches took 16 to 22 ms when the page loaded. With this list, they
  * take 7 to 8 ms (the medians in CHANGELOG.md, version 0.2.0).
  *
- * The list is the union of Chromium 156, Firefox 157 and WebKit 27.2 in a
+ * The list is the union of Chromium 158, Firefox 157 and WebKit 27.2 in a
  * secure context. It also has some interfaces of Safari, of mobile browsers
  * and of workers. The test "patches each on... property of each interface" in
  * `test/browser/c13-events.test.ts` reads all globals in each browser of the
@@ -20,8 +20,9 @@ export const HANDLER_INTERFACES : readonly string[] = [
     "BluetoothRemoteGATTService", "BroadcastChannel", "CaptureController", "Clipboard", "CloseWatcher", "CookieStore",
     "CreateMonitor", "DedicatedWorkerGlobalScope", "DevicePosture", "Document", "DocumentPictureInPicture",
     "EditContext", "Element", "EventSource", "FileReader", "FontFaceSet", "GPUDevice", "HID", "HIDDevice",
-    "HTMLBodyElement", "HTMLCameraElement", "HTMLElement", "HTMLFrameSetElement", "HTMLGeolocationElement",
-    "HTMLMediaElement", "HTMLMicrophoneElement", "HTMLUserMediaElement", "HTMLVideoElement", "IDBDatabase",
+    "HTMLBodyElement", "HTMLCameraElement", "HTMLCanvasElement", "HTMLElement", "HTMLFrameSetElement",
+    "HTMLGeolocationElement", "HTMLInstallElement", "HTMLMediaElement", "HTMLMicrophoneElement", "HTMLUserMediaElement",
+    "HTMLVideoElement", "IDBDatabase",
     "IDBOpenDBRequest", "IDBRequest", "IDBTransaction", "IdleDetector", "LanguageModel", "ManagedMediaSource",
     "ManagedSourceBuffer", "MathMLElement", "MediaDevices", "MediaKeySession", "MediaQueryList", "MediaRecorder",
     "MediaSource", "MediaStream", "MediaStreamTrack", "MessagePort", "MIDIAccess", "MIDIInput", "MIDIPort",
