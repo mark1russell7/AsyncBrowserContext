@@ -31,7 +31,7 @@ importers:
     devDependencies:
       '@mark1russell7/rigor-generators':
         specifier: ^0.1.8
-        version: 0.1.15
+        version: 0.1.16
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -783,8 +783,8 @@ packages:
     resolution: {integrity: sha512-hn2C5jjOFCGKJqFQPHt57C/Cn1l9Lb9MltVNtL71KSu+nRrfPOmg8ujYB5n3oDFFWNdNA4bE/8LLT4tG3lmrGA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/rigor-generators@0.1.15':
-    resolution: {integrity: sha512-0r+5JbxvSk6H0rTGqhzmlnE5UAHAImOH7R1CbOjQARLil2zOYkvvJzWvnwC5txLCw71eyVCvpT7rb09oKRcGxQ==}
+  '@mark1russell7/rigor-generators@0.1.16':
+    resolution: {integrity: sha512-C94Q4C31aZ8UXx1R0JSBV7DiQFl5tVpbFxHxHzHaSqr3dTgmCkEvLrvlUV8/0/GZqPhQYG9cbX6GOlqfRj/h4g==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.1.26':
@@ -3400,11 +3400,11 @@ snapshots:
 
   '@mark1russell7/rational@0.1.2': {}
 
-  '@mark1russell7/rigor-generators@0.1.15': {}
+  '@mark1russell7/rigor-generators@0.1.16': {}
 
   '@mark1russell7/rigor-statistics@0.1.26':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.1.15
+      '@mark1russell7/rigor-generators': 0.1.16
 
   '@mark1russell7/site-pages@0.4.7':
     dependencies:
