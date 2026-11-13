@@ -31,7 +31,7 @@ importers:
     devDependencies:
       '@mark1russell7/rigor-generators':
         specifier: ^0.1.8
-        version: 0.1.14
+        version: 0.1.15
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -88,7 +88,7 @@ importers:
         version: 0.3.5(zod@4.6.7)
       '@mark1russell7/site-pages':
         specifier: ^0.4.3
-        version: 0.4.6
+        version: 0.4.7
       '@observablehq/plot':
         specifier: ^0.6.17
         version: 0.6.19
@@ -804,16 +804,16 @@ packages:
     resolution: {integrity: sha512-hn2C5jjOFCGKJqFQPHt57C/Cn1l9Lb9MltVNtL71KSu+nRrfPOmg8ujYB5n3oDFFWNdNA4bE/8LLT4tG3lmrGA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/rigor-generators@0.1.14':
-    resolution: {integrity: sha512-wSSv2qWetdgWMhhr7VdujBKgdF0kYB8PsckImdGC3yibgpI79fwos0U61dKZaPF7DebhE29F9AXWk7Ke//ASPQ==}
+  '@mark1russell7/rigor-generators@0.1.15':
+    resolution: {integrity: sha512-0r+5JbxvSk6H0rTGqhzmlnE5UAHAImOH7R1CbOjQARLil2zOYkvvJzWvnwC5txLCw71eyVCvpT7rb09oKRcGxQ==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.1.26':
     resolution: {integrity: sha512-JhwMAsYFg9FLFGVHRt6U7TWYmRblA/f+zS08H+DVzRlP4ypAqwmX6+QXNY+jNbwkyFPJqaLQJq/1PSC8QoKIWQ==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.4.6':
-    resolution: {integrity: sha512-h/vcASVZcbf3UhDBHlalot0PvAzt8tUpLC6ngZgZoZJSw9Aj3Pcm6lw5irKmP1o42aFI8SnhJvxSuC9PUWZPAg==}
+  '@mark1russell7/site-pages@0.4.7':
+    resolution: {integrity: sha512-NvqfZQAPKRDvrfzw3lTA/ialYSaanDhayjLN3RvwufZ1t/JtelzZxc+3lR4zf8N52sy2skVCocmIKLTJT/TGPg==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -3494,13 +3494,13 @@ snapshots:
 
   '@mark1russell7/rational@0.1.2': {}
 
-  '@mark1russell7/rigor-generators@0.1.14': {}
+  '@mark1russell7/rigor-generators@0.1.15': {}
 
   '@mark1russell7/rigor-statistics@0.1.26':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.1.14
+      '@mark1russell7/rigor-generators': 0.1.15
 
-  '@mark1russell7/site-pages@0.4.6':
+  '@mark1russell7/site-pages@0.4.7':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.1.26
 
