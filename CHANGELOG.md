@@ -1,5 +1,11 @@
 # Change history
 
+## 0.3.1
+
+This version fixes a bug, so it is a patch version.
+
+- The event patch also reads the interfaces `HTMLCanvasElement` and `HTMLInstallElement`. In Chromium 158, `HTMLCanvasElement` has the properties `onpaint` and `onelementgeometryupdate`, and `HTMLInstallElement` has the property `onvalidationstatuschange`. Before, the patch did not change these properties, so their handlers did not get the context of the code that set them.
+
 ## 0.3.0
 
 This version changes some behaviors, so it is a minor version. The first section gives the changes that can affect existing code.
