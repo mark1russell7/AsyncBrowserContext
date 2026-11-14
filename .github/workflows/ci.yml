@@ -162,3 +162,19 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:babel
+
+  # On a pull request, start the release build on the commit, as the job build of release.yml does: the install, the
+  # build, pack.ts and tags.ts of the template. It fails when the release build fails on the same commit, for example
+  # when a dependency update changes a shipped file and the version is already on npm. The release on main then stops,
+  # so this job finds the fault before the merge. The template keeps the code (actions/release-check), at the same
+  # template commit as the job build of release.yml. The Node.js version is the default of both: 26.
+  release-check:
+    name: release-check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: mark1russell7/template/.github/actions/release-check@4466542421ef76bcb3ccf5b5e1765d4f509f8f4f # main
