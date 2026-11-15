@@ -1,5 +1,12 @@
 # Change history
 
+## 0.3.2
+
+This version fixes a bug, so it is a patch version.
+
+- The Babel preset does not change the server code of React Server Components: a file or a function with the directive `"use server"`, `"use cache"` or `"use cache: <kind>"`. Next.js accepts only native async functions there. Before, the preset changed them into functions that are not async and that use `this` and `arguments`. Next.js then stopped the build, also when a Turbopack rule gave only the files of the browser to the preset. The other presets and plugins of the configuration still change this code. The Vite plugin uses the preset, so it gets the same fix.
+- The guide "Build tools" recommends a Turbopack rule with `babel-loader` for Next.js. It also tells the pnpm settings with which a dependency finds the runtime, and how to make Babel do less work. CI builds the rule with a server action and a `"use cache"` function.
+
 ## 0.3.1
 
 This version fixes a bug, so it is a patch version.

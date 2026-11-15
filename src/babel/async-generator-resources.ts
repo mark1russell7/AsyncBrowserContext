@@ -1,5 +1,5 @@
 import type { NodePath, PluginObject, PluginPass, types } from "@babel/core";
-import { isRuntimeFunction } from "./runtime-calls.js";
+import { isUnchangedFunction } from "./server-code.js";
 import type { PluginFactory } from "./skip-runtime.js";
 
 /**
@@ -11,7 +11,7 @@ import type { PluginFactory } from "./skip-runtime.js";
  * This function gives a plugin that changes the `using` declarations of each async generator
  * in `Program` enter, with the visitor of `resources`. The preset puts it after the plugin of
  * `using` declarations and before the plugin of async generators. The functions with the
- * directive of the runtime stay as they are.
+ * directive of the runtime and the server functions (server-code.ts) stay as they are.
  */
 export function asyncGeneratorResources(resources : PluginFactory) : PluginFactory {
     return function asyncGeneratorResourcesPlugin(api, options, dirname) : PluginObject<PluginPass> {
@@ -23,7 +23,7 @@ export function asyncGeneratorResources(resources : PluginFactory) : PluginFacto
                 Program(programPath, state) {
                     programPath.traverse({
                         Function(functionPath : NodePath<types.Function>) {
-                            if (isRuntimeFunction(functionPath.node)) {
+                            if (isUnchangedFunction(functionPath.node)) {
                                 functionPath.skip();
                                 return;
                             }

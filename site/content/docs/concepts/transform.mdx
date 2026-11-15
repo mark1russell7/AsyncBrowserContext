@@ -22,6 +22,8 @@ The preset `async-browser-context/babel-preset` contains nine Babel plugins, in 
 8. `@babel/plugin-transform-async-generator-functions` changes the async generators and the `for await` loops. The preset makes its own traversal also skip the functions with the directive of the runtime.
 9. `@babel/plugin-transform-async-to-generator` changes each async function into a generator function. Its `module` and `method` options make the code use `coroutine` from `async-browser-context/runtime`.
 
+Steps 2 to 9 do not change the server code of React Server Components: a file or a function with the directive `"use server"`, `"use cache"` or `"use cache: <kind>"`. Next.js accepts only native async functions there, and the server keeps the context with the native `AsyncLocalStorage`. These plugins do not skip the code in the shared traversal of Babel. Thus the other presets, for example `@babel/preset-typescript`, still change it. The [Next.js](/docs/guides/build-tools#server-actions-and-use-cache) section of the build tools guide tells more.
+
 The Babel transforms of steps 8 and 9 already handle destructuring, `var`, labels, closures, sync iterables and the `return()` use after `break`. The library adds no custom code for `await`.
 
 The plugin of step 5 sets the helpers in the `Program` visitor. Thus the preset also operates with `@babel/plugin-transform-runtime`, which gives the other helpers of Babel from `@babel/runtime`.

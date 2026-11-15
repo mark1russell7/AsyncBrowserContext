@@ -1,5 +1,6 @@
 import { types, type NodePath, type PluginObject, type PluginPass } from "@babel/core";
-import { isRuntimeCallee, isRuntimeFunction } from "./runtime-calls.js";
+import { isRuntimeCallee } from "./runtime-calls.js";
+import { isUnchangedFunction } from "./server-code.js";
 
 /** The options of the plugin. */
 export interface NameCoroutinesOptions {
@@ -213,8 +214,8 @@ export function nameCoroutinesPlugin(_api : unknown, options : object) : PluginO
                     namesOfFile.set(state, names);
                     programPath.traverse({
                         Function(path) {
-                            if (isRuntimeFunction(path.node)) {
-                                // The native async functions of the runtime stay native (skip-runtime.ts)
+                            if (isUnchangedFunction(path.node)) {
+                                // The native async functions of the runtime and the server functions stay native (skip-runtime.ts, server-code.ts)
                                 path.skip();
                                 return;
                             }

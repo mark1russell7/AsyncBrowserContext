@@ -7,7 +7,10 @@
  * 2. It installs the two tarballs and the build tools with npm in a new
  *    folder.
  * 3. It builds the page with webpack, Rspack, Rollup and esbuild
- *    (`fixture/build.mjs`), and with Next.js (`fixture/next`).
+ *    (`fixture/build.mjs`), and with Next.js (`fixture/next`). The Next.js
+ *    page also calls a server action, which calls a `"use cache"` function.
+ *    Next.js accepts only native async functions there, so the preset must not
+ *    change them.
  * 4. It opens each page in Chromium. The page writes the results of
  *    `test/smoke/fixture/checks.js` to `window.__results`.
  *
@@ -55,6 +58,8 @@ const TOOLS : readonly string[] = [
 const ALL_RULES : Results = { inExpression : "A", inDependency : "A", generator : "A", browserEvent : "A" };
 /** The compiler changes async functions into generators: a generator body gets the context of the `next()` call. */
 const WITHOUT_RULE_C5 : Results = { ...ALL_RULES, generator : "B" };
+/** The Next.js page also gives the result of its server action (fixture/next/app/actions.js). */
+const SERVER_ACTION : Results = { serverAction : "A" };
 
 /** The builds of `fixture/build.mjs`. */
 const STATIC_CASES : readonly (readonly [string, Results])[] = [
@@ -69,15 +74,20 @@ const STATIC_CASES : readonly (readonly [string, Results])[] = [
 interface NextCase {
     readonly name : string;
     readonly args : readonly string[];
-    /** `babel`: the Babel config of the fixture. `swc`: no Babel config, and a browserslist query that makes SWC change async functions. */
-    readonly compiler : "babel" | "swc";
+    /**
+     * - `babel`: the Babel config of the fixture (`babel.config.js`).
+     * - `turbopack-rule`: no Babel config, and a Turbopack rule that gives the files of the browser to babel-loader with only the preset (`fixture/next-turbopack-rule`).
+     * - `swc`: no Babel config, and a browserslist query that makes SWC change async functions.
+     */
+    readonly compiler : "babel" | "turbopack-rule" | "swc";
     readonly expected : Results;
 }
 
 const NEXT_CASES : readonly NextCase[] = [
-    { name : "next-turbopack-babel", args : [], compiler : "babel", expected : ALL_RULES },
-    { name : "next-webpack-babel", args : ["--webpack"], compiler : "babel", expected : ALL_RULES },
-    { name : "next-turbopack-swc", args : [], compiler : "swc", expected : WITHOUT_RULE_C5 },
+    { name : "next-turbopack-babel", args : [], compiler : "babel", expected : { ...ALL_RULES, ...SERVER_ACTION } },
+    { name : "next-webpack-babel", args : ["--webpack"], compiler : "babel", expected : { ...ALL_RULES, ...SERVER_ACTION } },
+    { name : "next-turbopack-rule", args : [], compiler : "turbopack-rule", expected : { ...ALL_RULES, ...SERVER_ACTION } },
+    { name : "next-turbopack-swc", args : [], compiler : "swc", expected : { ...WITHOUT_RULE_C5, ...SERVER_ACTION } },
 ];
 
 /** Runs a command in a shell (npm is a .cmd file on Windows). Each argument is in quotes. */
@@ -136,11 +146,16 @@ async function withNextServer<T>(directory : string, next : string, env : NodeJS
 function nextApp(app : string, testCase : NextCase) : string {
     const directory = path.join(app, testCase.name);
     fs.cpSync(path.join(app, "next"), directory, { recursive : true });
+    if (testCase.compiler === "turbopack-rule") {
+        // Without a Babel config, SWC compiles the code, and the rule of next.config.mjs gives the files of the browser to the preset
+        fs.rmSync(path.join(directory, "babel.config.js"));
+        fs.cpSync(path.join(app, "next-turbopack-rule"), directory, { recursive : true });
+    }
     if (testCase.compiler === "swc") {
         // Without a Babel config, SWC compiles the code. A browser without async functions
         // in the query makes SWC change them into generators, also in node_modules.
         fs.rmSync(path.join(directory, "babel.config.js"));
-        fs.rmSync(path.join(directory, "next.config.mjs"));
+        fs.writeFileSync(path.join(directory, "next.config.mjs"), "export default { cacheComponents : true };\n");
         fs.writeFileSync(path.join(directory, "package.json"), JSON.stringify({ private : true, browserslist : ["chrome 54"] }));
     }
     return directory;
@@ -186,7 +201,10 @@ async function checkCases(app : string, browser : Browser) : Promise<boolean> {
     const env = { ...process.env, NEXT_TELEMETRY_DISABLED : "1" };
     for (const testCase of NEXT_CASES) {
         const directory = nextApp(app, testCase);
+        const start = performance.now();
         execFileSync(process.execPath, [next, "build", ...testCase.args], { cwd : directory, stdio : ["ignore", "ignore", "inherit"], env });
+        // One build of a small page on a CI computer: a rough comparison of the setups, not a benchmark
+        console.log(`${testCase.name}: next build took ${((performance.now() - start) / 1000).toFixed(1)} s`);
         const results = await withNextServer(directory, next, env, (url) => resultsOf(browser, url));
         passed = check(testCase.name, results, testCase.expected) && passed;
     }

@@ -1,5 +1,6 @@
 import type { NodePath, PluginAPI, PluginObject, PluginPass, types, Visitor } from "@babel/core";
 import { isRuntimeFunction } from "./runtime-calls.js";
+import { isUnchangedFunction } from "./server-code.js";
 
 export { RUNTIME_DIRECTIVE } from "./runtime-calls.js";
 
@@ -17,6 +18,21 @@ function skipRuntimeFunction(functionPath : NodePath<types.Function>) : void {
  */
 function skipRuntimeVisitor() : Visitor<PluginPass> {
     return { Function : skipRuntimeFunction };
+}
+
+/** This function skips a function of the runtime or a server function (server-code.ts) in the own traversal of a plugin. */
+function skipUnchangedFunction(functionPath : NodePath<types.Function>) : void {
+    if (isUnchangedFunction(functionPath.node)) {
+        functionPath.skip();
+    }
+}
+
+/**
+ * This function gives a new visitor for the own traversal of a plugin. It skips each function
+ * that the preset must not change. A skip in that traversal does not stop the other plugins.
+ */
+function skipUnchangedVisitor() : Visitor<PluginPass> {
+    return { Function : skipUnchangedFunction };
 }
 
 /**
@@ -39,8 +55,8 @@ export type PluginFactory = (api : PluginAPI, options : object, dirname : string
  * The plugin of Babel for async generators changes the async generators and the `for await`
  * loops in its own traversal. It starts that traversal in its `Program` visitor. The skip of the main
  * traversal does not apply to that traversal. This function gives a plugin that operates as
- * `factory`. But it puts the visitor of `skipRuntimePlugin` in front of each traversal that the `Program` visitor
- * starts.
+ * `factory`. But it puts a visitor in front of each traversal that the `Program` visitor starts.
+ * That visitor skips the functions of the runtime and the server functions (server-code.ts).
  *
  * The function uses the traversal of the Babel that loads the plugin (`api.traverse`).
  * If the plugin has no `Program` function, it stays as it is.
@@ -58,7 +74,7 @@ export function withRuntimeSkipped(factory : PluginFactory) : PluginFactory {
                 const ownTraverse = path.traverse;
                 // An own property of this path object hides the method of the prototype during the visitor
                 path.traverse = function (this : NodePath, inner : Visitor<unknown>, innerState? : unknown) : void {
-                    Reflect.apply(ownTraverse, this, [api.traverse.visitors.merge([skipRuntimeVisitor() as Visitor<unknown>, inner]), innerState]);
+                    Reflect.apply(ownTraverse, this, [api.traverse.visitors.merge([skipUnchangedVisitor() as Visitor<unknown>, inner]), innerState]);
                 } as typeof path.traverse;
                 try {
                     Reflect.apply(program, this, [path, state]);
