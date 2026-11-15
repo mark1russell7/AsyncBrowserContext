@@ -112,7 +112,7 @@ A test in CI (`pnpm test:bundlers`) builds a page with each of these setups and 
 | Rollup 4 | `@rollup/plugin-babel` with the preset | All |
 | esbuild | A small plugin that applies the preset | All |
 | Next.js 16, Turbopack | A `turbopack.rules` rule: `babel-loader` with only the preset, for the files of the browser | All |
-| Next.js 16, webpack | `babel.config.js` with `next/babel` and the preset, and `transpilePackages` for the dependencies | All |
+| Next.js 16, webpack | `babel.config.js` with `next/babel` (with the browsers of Next.js as `preset-env` targets) and the preset, and `transpilePackages` for the dependencies | All |
 | SWC, esbuild, Next.js without Babel | The target ES2016: the compiler changes async functions into generators | All except rule C5 |
 
 With the target ES2016, the patch of `then` keeps the context through `await`. A generator body then gets the context of each `next()` call, and the callback hooks get no names.

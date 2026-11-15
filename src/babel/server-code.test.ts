@@ -157,7 +157,8 @@ export class Data { static async load() { "use cache"; await null; } }`);
     it("finds a server directive also without the text of the file (transformFromAst)", async () => {
         const code = "\"use server\";\nexport async function act() { await null; }";
         const ast = parseSync(code, { babelrc : false, configFile : false, sourceType : "module", filename : "input.js" });
-        const result = await transformFromAstAsync(ast as NonNullable<typeof ast>, undefined, {
+        // Without the text, Babel gives the file the code ""
+        const result = await transformFromAstAsync(ast as NonNullable<typeof ast>, "", {
             filename : "input.js",
             babelrc : false,
             configFile : false,
@@ -170,27 +171,30 @@ export class Data { static async load() { "use cache"; await null; } }`);
 
 describe("withServerCodeSkipped", () => {
     /** A plugin that counts the calls of each visitor form: a function, an array of functions, and enter and exit. */
-    function countingPlugin(calls : Record<string, number>, shouldSkip : () => boolean) : PluginFactory {
+    function countingPlugin(calls : Record<string, number>, keys : Record<string, unknown> = {}) : PluginFactory {
         const count = (name : string) => () : void => {
             calls[name] = (calls[name] ?? 0) + 1;
         };
         return () => ({
             visitor : {
-                noScope : true,
-                shouldSkip,
+                ...keys,
                 StringLiteral : count("function"),
                 NumericLiteral : { enter : [count("enter array")], exit : count("exit") },
                 "Identifier|ThisExpression" : { enter : count("enter") },
-            } as unknown as PluginObject<PluginPass>["visitor"],
-        });
+            },
+        }) as unknown as PluginObject<PluginPass>;
     }
 
-    it("keeps the keys that are not visitor functions", () => {
+    // Babel accepts these keys only in the visitor of path.traverse, not in a plugin. Thus this test does not start Babel.
+    it("keeps the keys that are not visitor functions, for example the marks of a prepared visitor", () => {
         const shouldSkip = () : boolean => false;
-        const plugin = withServerCodeSkipped(countingPlugin({}, shouldSkip))({} as never, {}, "");
+        const keys = { noScope : true, shouldSkip, _exploded : true, _verified : true };
+        const plugin = withServerCodeSkipped(countingPlugin({}, keys))({} as never, {}, "");
         const visitor = plugin.visitor as Record<string, unknown>;
         expect(visitor["noScope"]).toBe(true);
         expect(visitor["shouldSkip"]).toBe(shouldSkip);
+        expect(visitor["_exploded"]).toBe(true);
+        expect(visitor["_verified"]).toBe(true);
     });
 
     it("gives a plugin without a visitor as it is", () => {
@@ -205,13 +209,15 @@ describe("withServerCodeSkipped", () => {
                 filename : "input.js",
                 babelrc : false,
                 configFile : false,
-                plugins : [withServerCodeSkipped(countingPlugin(calls, () => false))],
+                plugins : [withServerCodeSkipped(countingPlugin(calls))],
             });
             return calls;
         };
+        // The identifiers f, a and a
         const body = "export function f(a) { return ['x', 1, a]; }";
-        expect(await run(body)).toEqual({ "function" : 1, "enter array" : 1, "exit" : 1, "enter" : 2 });
+        expect(await run(body)).toEqual({ "function" : 1, "enter array" : 1, "exit" : 1, "enter" : 3 });
         expect(await run(`"use server";\n${body}`)).toEqual({});
-        expect(await run("export async function f(a) { \"use server\"; return ['x', 1, a]; }")).toEqual({ "enter" : 1 });
+        // Only the identifiers g, b and b are outside the server function. Its name f is in its node.
+        expect(await run("function g(b) { async function f(a) { \"use server\"; return ['x', 1, a, this]; } return b; }")).toEqual({ "enter" : 3 });
     });
 });

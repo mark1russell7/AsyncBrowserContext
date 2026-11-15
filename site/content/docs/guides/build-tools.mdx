@@ -239,12 +239,15 @@ The build tool test writes the time of each Next.js build to its output. These t
 
 ### A Babel configuration file
 
-1. Add a Babel configuration file next to `package.json`, with the preset of Next.js and the preset of the library:
+1. Add a Babel configuration file next to `package.json`, with the preset of Next.js and the preset of the library. Give the browsers of Next.js to `@babel/preset-env` in `next/babel`:
 
    ```js
    // babel.config.js
    module.exports = {
-       presets : ["next/babel", "async-browser-context/babel-preset"],
+       presets : [
+           ["next/babel", { "preset-env" : { targets : "chrome 111, edge 111, firefox 111, safari 16.4" } }],
+           "async-browser-context/babel-preset",
+       ],
    };
    ```
 
@@ -254,6 +257,8 @@ The build tool test writes the time of each Next.js build to its output. These t
    // next.config.mjs
    export default { transpilePackages : ["some-dependency"] };
    ```
+
+With webpack, `next/babel` also compiles the code of the browser with `@babel/preset-env`. Next.js does not give it the browsers of its SWC configuration. Without `targets` and without a `browserslist` query, preset-env changes all the code for old browsers. It also changes the async functions of each server action that a client component imports. Next.js then stops the build with the error "Server Actions must be async functions". This occurs also without the preset of the library. The `targets` above are the default browsers of Next.js 16. A `browserslist` query in `package.json` can replace them, but each browser in the query must have native async functions. On the server, `next/babel` uses the version of Node.js that builds the app.
 
 With a Babel configuration file, Next.js uses Babel in place of SWC for all your code, with Turbopack and with webpack. The build takes more time. Next.js does not apply the Babel configuration to the other packages in `node_modules`. With Turbopack, use [the rule](#a-turbopack-rule): SWC then compiles all the other files.
 
