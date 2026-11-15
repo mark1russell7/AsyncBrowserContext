@@ -76,7 +76,7 @@ interface NextCase {
     readonly args : readonly string[];
     /**
      * - `babel`: the Babel config of the fixture (`babel.config.js`).
-     * - `turbopack-rule`: no Babel config, and a Turbopack rule that gives the files of the browser to babel-loader with only the preset (`fixture/next-turbopack-rule`).
+     * - `turbopack-rule`: no Babel config, and a Turbopack rule that gives the files of the browser to babel-loader with only the preset (`fixture/next-rule`).
      * - `swc`: no Babel config, and a browserslist query that makes SWC change async functions.
      */
     readonly compiler : "babel" | "turbopack-rule" | "swc";
@@ -149,7 +149,7 @@ function nextApp(app : string, testCase : NextCase) : string {
     if (testCase.compiler === "turbopack-rule") {
         // Without a Babel config, SWC compiles the code, and the rule of next.config.mjs gives the files of the browser to the preset
         fs.rmSync(path.join(directory, "babel.config.js"));
-        fs.cpSync(path.join(app, "next-turbopack-rule"), directory, { recursive : true });
+        fs.cpSync(path.join(app, "next-rule"), directory, { recursive : true });
     }
     if (testCase.compiler === "swc") {
         // Without a Babel config, SWC compiles the code. A browser without async functions

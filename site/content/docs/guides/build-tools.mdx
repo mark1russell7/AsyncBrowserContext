@@ -31,7 +31,7 @@ The command `pnpm test:bundlers` builds the same page with each setup, and opens
 | Next.js 16, webpack | A Babel configuration file | All rules |
 | Next.js 16, Turbopack | A `browserslist` query with a browser without async functions | All rules except rule C5 |
 
-The configurations of the test are in `test/bundlers/fixture/build.mjs`, `test/bundlers/fixture/next/` and `test/bundlers/fixture/next-turbopack-rule/`.
+The configurations of the test are in `test/bundlers/fixture/build.mjs`, `test/bundlers/fixture/next/` and `test/bundlers/fixture/next-rule/`.
 
 ## Vite
 
@@ -195,7 +195,7 @@ export default {
 - The `browser` condition selects the code of the browser. On the server, the `node` export condition selects the Node.js entry of the library, which uses the native `AsyncLocalStorage`. The server code thus does not need the transform.
 - The rule also applies to the packages in `node_modules`. To exclude a file or a package, add a condition to the `all` list, for example `{ not : { path : /node_modules\/some-package\// } }`. `{ not : "foreign" }` excludes all of `node_modules`. A callback that a package starts after its own `await` then gets the root context (refer to [the dependencies](#the-dependencies)).
 
-The configuration of the test is in `test/bundlers/fixture/next-turbopack-rule/next.config.mjs`.
+The configuration of the test is in `test/bundlers/fixture/next-rule/next.config.mjs`.
 
 ### Server Actions and `"use cache"`
 
@@ -258,7 +258,9 @@ The build tool test writes the time of each Next.js build to its output. These t
    export default { transpilePackages : ["some-dependency"] };
    ```
 
-With webpack, `next/babel` also compiles the code of the browser with `@babel/preset-env`. Next.js does not give it the browsers of its SWC configuration. Without `targets` and without a `browserslist` query, preset-env changes all the code for old browsers. It also changes the async functions of each server action that a client component imports. Next.js then stops the build with the error "Server Actions must be async functions". This occurs also without the preset of the library. The `targets` above are the default browsers of Next.js 16. A `browserslist` query in `package.json` can replace them, but each browser in the query must have native async functions. On the server, `next/babel` uses the version of Node.js that builds the app.
+With webpack, `next/babel` also compiles the code of the browser with `@babel/preset-env`. Next.js does not give it the browsers of its SWC configuration. Without `targets` and without a `browserslist` query, preset-env changes all the code for old browsers. It also changes the async functions of each server action that a client component imports. Next.js then stops the build with the error "Server Actions must be async functions". This occurs also without the preset of the library.
+
+The `targets` above are the default browsers of Next.js 16. A `browserslist` query in `package.json` can replace them, but each browser in the query must have native async functions. On the server, `next/babel` uses the version of Node.js that builds the app.
 
 With a Babel configuration file, Next.js uses Babel in place of SWC for all your code, with Turbopack and with webpack. The build takes more time. Next.js does not apply the Babel configuration to the other packages in `node_modules`. With Turbopack, use [the rule](#a-turbopack-rule): SWC then compiles all the other files.
 
