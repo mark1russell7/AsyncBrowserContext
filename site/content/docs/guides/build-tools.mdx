@@ -15,7 +15,7 @@ Use the Babel preset if your build tool can use Babel. Use the target ES2016 if 
 
 ## The tested setups
 
-The command `pnpm test:bundlers` builds the same page with each setup, and opens the page in Chromium. The page examines the context after `await`, in a callback of a dependency in `node_modules`, in a generator and in an event of the browser. CI starts this test for each change.
+The command `pnpm test:bundlers` builds the same page with each setup, and opens the page in Chromium. The page examines the context after `await`, in a callback of a dependency in `node_modules`, in a generator and in an event of the browser. The Next.js page also starts a server action and a `"use cache"` function. CI starts this test for each change.
 
 | Tool | Setup | Rules |
 | --- | --- | --- |
@@ -26,11 +26,12 @@ The command `pnpm test:bundlers` builds the same page with each setup, and opens
 | Rollup 4 | `@rollup/plugin-babel` with the preset | All rules |
 | esbuild 0.28 | A plugin that applies the preset | All rules |
 | esbuild 0.28 | The target `es2016` | All rules except rule C5 |
+| Next.js 16, Turbopack | A rule with `babel-loader` and the preset | All rules |
 | Next.js 16, Turbopack | A Babel configuration file | All rules |
 | Next.js 16, webpack | A Babel configuration file | All rules |
 | Next.js 16, Turbopack | A `browserslist` query with a browser without async functions | All rules except rule C5 |
 
-The configurations of the test are in `test/bundlers/fixture/build.mjs` and `test/bundlers/fixture/next/`.
+The configurations of the test are in `test/bundlers/fixture/build.mjs`, `test/bundlers/fixture/next/` and `test/bundlers/fixture/next-rule/`.
 
 ## Vite
 
@@ -146,12 +147,107 @@ Without the plugin, set the target `es2016`. esbuild then changes each async fun
 
 ## Next.js
 
-1. Add a Babel configuration file next to `package.json`, with the preset of Next.js and the preset of the library:
+CI builds and examines three setups with Next.js 16. The page of the test also starts a server action, which starts a `"use cache"` function.
+
+| Setup | Rules | The code that changes | Use it |
+| --- | --- | --- | --- |
+| [A Turbopack rule](#a-turbopack-rule) | All rules | The files of the browser with async functions or generators, also in `node_modules` | With Turbopack. This is the recommended setup. |
+| [A Babel configuration file](#a-babel-configuration-file) | All rules | All your code, on the server and in the browser, and the packages in `transpilePackages` | With webpack (`next build --webpack`) |
+| [SWC with a `browserslist` query](#swc-with-a-browserslist-query) | All rules except rule C5 | All the code of the browser, also in `node_modules` | If you do not want Babel |
+
+### A Turbopack rule
+
+Install `babel-loader`. Then add a rule for each kind of file to `next.config.mjs`:
+
+```js
+// next.config.mjs
+/** The options of babel-loader for one kind of file. */
+function babel(syntax) {
+    return {
+        loader : "babel-loader",
+        options : {
+            babelrc : false,
+            configFile : false,
+            sourceType : "unambiguous",
+            parserOpts : { plugins : syntax },
+            presets : ["async-browser-context/babel-preset"],
+        },
+    };
+}
+
+/** The files of the browser with async functions or generators. */
+const condition = { all : ["browser", { content : /\basync\b|\byield\b|function\s*\*/ }] };
+
+export default {
+    turbopack : {
+        rules : {
+            "*.{js,jsx,mjs,cjs}" : { condition, loaders : [babel(["jsx"])] },
+            "*.{ts,mts,cts}" : { condition, loaders : [babel(["typescript"])] },
+            "*.tsx" : { condition, loaders : [babel(["typescript", "jsx"])] },
+        },
+    },
+};
+```
+
+- The loader applies only the preset of the library. Babel reads the TypeScript and JSX syntax (`parserOpts`), but it does not change it. After the loader, SWC compiles the file as usual.
+- A `.ts` file cannot have JSX. Thus TypeScript files and TSX files have different rules.
+- Turbopack gives the options of a loader as JSON. Thus use only names, strings, numbers and lists in `options`. Do not use functions or regular expressions there.
+- The `browser` condition selects the code of the browser. On the server, the `node` export condition selects the Node.js entry of the library, which uses the native `AsyncLocalStorage`. The server code thus does not need the transform.
+- The rule also applies to the packages in `node_modules`. To exclude a file or a package, add a condition to the `all` list, for example `{ not : { path : /node_modules\/some-package\// } }`. `{ not : "foreign" }` excludes all of `node_modules`. A callback that a package starts after its own `await` then gets the root context (refer to [the dependencies](#the-dependencies)).
+
+The configuration of the test is in `test/bundlers/fixture/next-rule/next.config.mjs`.
+
+### Server Actions and `"use cache"`
+
+The preset does not change the server code of React Server Components: a file or a function with the directive `"use server"`, `"use cache"` or `"use cache: <kind>"`. Next.js accepts only native async functions there. Thus you do not exclude these files from a rule. In the bundle of the browser, Next.js replaces a server action with a reference to the server. The server keeps the context with the native `AsyncLocalStorage`.
+
+The preset changes the other functions of the file. For example, an async page function can have a server action in it. The page function changes, and the server action stays a native async function.
+
+The preset of version 0.3.1 and earlier changed these functions, and Next.js then stopped the build.
+
+### pnpm
+
+The preset adds an import of `async-browser-context/runtime` to each file that it changes, also to the files of dependencies. Thus each dependency that the rule changes must find the library from its own folder. With pnpm, this depends on the settings:
+
+| pnpm setting | A dependency finds the runtime | What to do |
+| --- | --- | --- |
+| The default `hoistPattern` (`*`) | Yes, in `node_modules/.pnpm/node_modules` | Nothing |
+| `hoist: false`, or a `hoistPattern` without `async-browser-context` | No | Add `async-browser-context` to `publicHoistPattern`, or add the alias below |
+| `enableGlobalVirtualStore: true` | No | Add the alias below |
+
+The alias sends each import of the runtime in the browser to one file. The path goes from the folder of `next.config.mjs` to the `node_modules` folder with the library. In a monorepo, this can be `../../node_modules`.
+
+```js
+// next.config.mjs
+export default {
+    turbopack : {
+        resolveAlias : {
+            "async-browser-context/runtime" : { browser : "./node_modules/async-browser-context/dist/runtime.js" },
+        },
+        rules : { /* the rules above */ },
+    },
+};
+```
+
+### Performance
+
+Babel is slower than SWC. The rule above gives Babel only the files of the browser with the words `async`, `yield` or `function*` (the `content` condition). SWC compiles all the other files without Babel. The Vite plugin of the library uses the same filter.
+
+A file that Babel changes gets generators in place of async functions, and it uses the runtime. Thus the bundle gets larger. The cost depends on the number of files with async functions in your code and in your dependencies. Compare the time of `next build` and the size of the bundle with and without the rule. To make Babel do less work, exclude packages with a `path` condition. Exclude only the packages that do not start your code after an `await`.
+
+The build tool test writes the time of each Next.js build to its output. These times come from one build of a small page, so they are not a benchmark.
+
+### A Babel configuration file
+
+1. Add a Babel configuration file next to `package.json`, with the preset of Next.js and the preset of the library. Give the browsers of Next.js to `@babel/preset-env` in `next/babel`:
 
    ```js
    // babel.config.js
    module.exports = {
-       presets : ["next/babel", "async-browser-context/babel-preset"],
+       presets : [
+           ["next/babel", { "preset-env" : { targets : "chrome 111, edge 111, firefox 111, safari 16.4" } }],
+           "async-browser-context/babel-preset",
+       ],
    };
    ```
 
@@ -162,11 +258,19 @@ Without the plugin, set the target `es2016`. esbuild then changes each async fun
    export default { transpilePackages : ["some-dependency"] };
    ```
 
-With a Babel configuration file, Next.js uses Babel in place of SWC for your code, with Turbopack and with webpack. The build takes more time. Next.js does not apply the Babel configuration to the other packages in `node_modules`.
+With webpack, `next/babel` also compiles the code of the browser with `@babel/preset-env`. Next.js does not give it the browsers of its SWC configuration. Without `targets` and without a `browserslist` query, preset-env changes all the code for old browsers. It also changes the async functions of each server action that a client component imports. Next.js then stops the build with the error "Server Actions must be async functions". This occurs also without the preset of the library.
 
-The server code also gets the transform. On the server, the `node` export condition selects the Node.js entry of the library, which uses the native `AsyncLocalStorage`.
+The `targets` above are the default browsers of Next.js 16. A `browserslist` query in `package.json` can replace them, but each browser in the query must have native async functions. On the server, `next/babel` uses the version of Node.js that builds the app.
 
-Next.js can also keep SWC. Add a browser without async functions to the `browserslist` query of `package.json`, for example `"chrome 54"`. SWC then changes each async function into a generator. Turbopack applies the query also to `node_modules`. The webpack mode of Next.js does not, so it needs `transpilePackages`. The query also changes all newer syntax, so the bundles get larger.
+With a Babel configuration file, Next.js uses Babel in place of SWC for all your code, with Turbopack and with webpack. The build takes more time. Next.js does not apply the Babel configuration to the other packages in `node_modules`. With Turbopack, use [the rule](#a-turbopack-rule): SWC then compiles all the other files.
+
+The server code also gets the transform. On the server, the `node` export condition selects the Node.js entry of the library, which uses the native `AsyncLocalStorage`. The preset does not change server actions and `"use cache"` functions (refer to [Server Actions](#server-actions-and-use-cache)).
+
+### SWC with a `browserslist` query
+
+Next.js can also keep SWC for all files. Add a browser without async functions to the `browserslist` query of `package.json`, for example `"chrome 54"`. SWC then changes each async function into a generator. Turbopack applies the query also to `node_modules`. The webpack mode of Next.js does not, so it needs `transpilePackages`.
+
+This setup keeps all rules except rule C5, and the callback hooks get no names (refer to [what the target ES2016 does not keep](#what-the-target-es2016-does-not-keep)). The query also changes all newer syntax, so the bundles get larger. The library has no SWC plugin.
 
 ## SWC
 
@@ -192,7 +296,7 @@ The setups on this page minify after the transform of each module, so they are c
 
 ## The dependencies
 
-A dependency with native async functions continues after its own `await` without the context. A callback that the dependency starts after that `await` gets the root context (rule C7). It does not get the context of a different operation. Each setup on this page also transforms `node_modules`, except Next.js, which needs `transpilePackages`.
+A dependency with native async functions continues after its own `await` without the context. A callback that the dependency starts after that `await` gets the root context (rule C7). It does not get the context of a different operation. Each setup on this page also transforms `node_modules`, except the Babel configuration file of Next.js, which needs `transpilePackages`.
 
 A dependency that its authors compiled to generators before the publish needs nothing. Examples are the `__awaiter` helper of TypeScript and `_asyncToGenerator` of Babel. The helpers continue in `then` callbacks, and the patch of `then` keeps the context.
 

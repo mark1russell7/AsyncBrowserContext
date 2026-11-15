@@ -191,7 +191,7 @@ The plugin applies the Babel preset to each JavaScript and TypeScript module, an
 | `names` | `true` | Give the name of each async function to the callback hooks. The option of the preset tells more. |
 | `ssr` | `false` | Also transform the modules of server-side rendering. On Node.js, the native `AsyncLocalStorage` keeps the context, so the default is `false`. Set it to `true` for tests in the Node.js environment of Vitest. |
 
-The plugin does not change a module that has no async function, no generator and no `for await` loop. It does not transform the runtime of the library. The plugin skips the files in the `dist` folder of the package, and the preset skips the functions with the directive of the runtime.
+The plugin does not change a module that has no async function, no generator and no `for await` loop. It does not transform the runtime of the library. The plugin skips the files in the `dist` folder of the package, and the preset skips the functions with the directive of the runtime. The preset also does not change the server code of React Server Components: a file or a function with the directive `"use server"`, `"use cache"` or `"use cache: <kind>"`.
 
 The plugin gives Babel the source type "module", because Vite serves each module as an ES module, also a worker. Only a `.cjs` or `.cts` file, or a file with CommonJS marks and no static `import` or `export`, can be a script. The plugin does not read an input source map, because the map of Vite describes the code that the plugin gets. It keeps the format of large modules (`compact: false`).
 

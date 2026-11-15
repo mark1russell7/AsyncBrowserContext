@@ -1,6 +1,7 @@
 import { types, type NodePath, type PluginObject, type PluginPass } from "@babel/core";
 import { addNamed } from "@babel/helper-module-imports";
-import { isRuntimeCallee, isRuntimeFunction } from "./runtime-calls.js";
+import { isRuntimeCallee } from "./runtime-calls.js";
+import { isUnchangedFunction } from "./server-code.js";
 
 /** The options of the plugin. */
 export interface BindGeneratorsOptions {
@@ -151,8 +152,8 @@ export function bindGeneratorsPlugin(_api : unknown, options : object) : PluginO
                 programPath.traverse({
                     Function(path) {
                         const node = path.node;
-                        if (isRuntimeFunction(node)) {
-                            // The native async functions of the runtime stay native (skip-runtime.ts)
+                        if (isUnchangedFunction(node)) {
+                            // The native async functions of the runtime and the server functions stay native (skip-runtime.ts, server-code.ts)
                             path.skip();
                             return;
                         }

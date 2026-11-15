@@ -6,6 +6,7 @@ import { asyncGeneratorHelpersPlugin } from "./async-generator-helpers.js";
 import { asyncGeneratorResources } from "./async-generator-resources.js";
 import { bindGeneratorsPlugin } from "./bind-generators.js";
 import { nameCoroutinesPlugin } from "./name-coroutines.js";
+import { withServerCodeSkipped } from "./server-code.js";
 import { skipRuntimePlugin, withRuntimeSkipped, type PluginFactory } from "./skip-runtime.js";
 import { staticMembersPlugin } from "./static-members.js";
 
@@ -28,11 +29,23 @@ export interface PresetOptions {
     readonly names? : boolean | undefined;
 }
 
+/*
+ * Each plugin after the first does not change server code (server-code.ts). The preset makes these
+ * plugins one time, so that the cache of Babel finds the same function for each file.
+ */
+
 /** The plugin of Babel for async generators, without a change of the functions of the runtime (skip-runtime.ts). */
-const asyncGeneratorFunctionsOutsideRuntime = withRuntimeSkipped(asyncGeneratorFunctions as unknown as PluginFactory);
+const asyncGeneratorFunctionsOutsideRuntime = withServerCodeSkipped(withRuntimeSkipped(asyncGeneratorFunctions as unknown as PluginFactory));
 
 /** The plugin of `using` declarations for async generators, before the plugin of Babel for async generators (async-generator-resources.ts). */
-const asyncGeneratorResourcesPlugin = asyncGeneratorResources(explicitResourceManagement as unknown as PluginFactory);
+const asyncGeneratorResourcesPlugin = withServerCodeSkipped(asyncGeneratorResources(explicitResourceManagement as unknown as PluginFactory));
+
+const explicitResourceManagementPlugin = withServerCodeSkipped(explicitResourceManagement as unknown as PluginFactory);
+const asyncToGeneratorPlugin = withServerCodeSkipped(asyncToGenerator as unknown as PluginFactory);
+const bindGenerators = withServerCodeSkipped(bindGeneratorsPlugin as PluginFactory);
+const nameCoroutines = withServerCodeSkipped(nameCoroutinesPlugin as PluginFactory);
+const staticMembers = withServerCodeSkipped(staticMembersPlugin as PluginFactory);
+const asyncGeneratorHelpers = withServerCodeSkipped(asyncGeneratorHelpersPlugin as PluginFactory);
 
 /** The default runtime module. */
 export const DEFAULT_RUNTIME = "async-browser-context/runtime";
@@ -64,6 +77,12 @@ export const DEFAULT_RUNTIME = "async-browser-context/runtime";
  * 9. `@babel/plugin-transform-async-to-generator` changes each async function
  *    into a generator that the `coroutine` function of the runtime operates.
  *
+ * The steps 2 to 9 do not change server code of React Server Components: a file or a
+ * function with the directive `"use server"`, `"use cache"` or
+ * `"use cache: <kind>"` (server-code.ts). Next.js accepts only native async
+ * functions there. The other presets and plugins of the configuration still
+ * change that code.
+ *
  * The preset operates with Babel 7.22 and later and with Babel 8. Put it last
  * in the `presets` list: Babel uses the presets in reverse order.
  */
@@ -71,19 +90,19 @@ export default function asyncBrowserContextPreset(api : PresetAPI, options : Pre
     api.assertVersion("^7.22.0 || ^8.0.0");
     const runtime = options.runtime ?? DEFAULT_RUNTIME;
     // Stryker disable next-line ObjectLiteral: the plugin also finds the local names that the preset gives, for example _coroutine, without the runtime
-    const names : PluginItem[] = options.names === false ? [] : [[nameCoroutinesPlugin, { runtime }]];
+    const names : PluginItem[] = options.names === false ? [] : [[nameCoroutines, { runtime }]];
     // The async transform keeps an `await using` declaration, which is a SyntaxError in a generator
-    const resources : PluginItem[] = supportsResourceManagement(api.version) ? [explicitResourceManagement, asyncGeneratorResourcesPlugin] : [];
+    const resources : PluginItem[] = supportsResourceManagement(api.version) ? [explicitResourceManagementPlugin, asyncGeneratorResourcesPlugin] : [];
     return {
         plugins : [
             skipRuntimePlugin,
-            [bindGeneratorsPlugin, { runtime }],
+            [bindGenerators, { runtime }],
             ...names,
-            staticMembersPlugin,
-            [asyncGeneratorHelpersPlugin, { runtime }],
+            staticMembers,
+            [asyncGeneratorHelpers, { runtime }],
             ...resources,
             asyncGeneratorFunctionsOutsideRuntime,
-            [asyncToGenerator, { module : runtime, method : "coroutine" }],
+            [asyncToGeneratorPlugin, { module : runtime, method : "coroutine" }],
         ],
     };
 }

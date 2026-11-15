@@ -1,5 +1,6 @@
 import { types, type NodePath, type PluginObject, type PluginPass } from "@babel/core";
 import { keyName } from "./name-coroutines.js";
+import { isUnchangedFunction } from "./server-code.js";
 
 /**
  * `@babel/plugin-transform-async-to-generator` keeps `this` and `super` of an async arrow
@@ -27,17 +28,18 @@ import { keyName } from "./name-coroutines.js";
 
 /**
  * This function gives `true` if `element` is or contains an async arrow function whose `this` is the `this` of the class element.
- * It gives `false` for a path without a node, for example the value of `static x;`.
+ * It gives `false` for a path without a node, for example the value of `static x;`. A server
+ * function stays where it is, because the async transform does not change it (server-code.ts).
  */
 function hasAsyncArrowOfElement(element : NodePath) : boolean {
     if (element.isArrowFunctionExpression() && element.node.async) {
-        return true;
+        return !isUnchangedFunction(element.node);
     }
     let found = false;
     element.traverse({
         Function(path) {
-            if (!path.isArrowFunctionExpression()) {
-                // A function that is not an arrow function has its own this
+            if (!path.isArrowFunctionExpression() || isUnchangedFunction(path.node)) {
+                // A function that is not an arrow function has its own this, and a server function does not change
                 path.skip();
                 return;
             }
@@ -89,6 +91,12 @@ export function staticMembersPlugin() : PluginObject<PluginPass> {
         visitor : {
             Program(programPath) {
                 programPath.traverse({
+                    Function(path) {
+                        // The functions of the runtime and the server functions stay as they are (server-code.ts)
+                        if (isUnchangedFunction(path.node)) {
+                            path.skip();
+                        }
+                    },
                     "ClassProperty|ClassPrivateProperty|ClassAccessorProperty"(path : NodePath<types.ClassProperty | types.ClassPrivateProperty | types.ClassAccessorProperty>) {
                         const node = path.node;
                         if (node.static !== true || !hasAsyncArrowOfElement(path.get("value") as NodePath)) {
