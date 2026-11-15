@@ -177,4 +177,4 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: mark1russell7/template/.github/actions/release-check@4466542421ef76bcb3ccf5b5e1765d4f509f8f4f # main
+      - uses: mark1russell7/template/.github/actions/release-check@eb7f3517aa8614e338a46acd37ab0c49395be5f9 # main
