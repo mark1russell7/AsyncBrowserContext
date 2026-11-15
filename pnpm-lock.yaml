@@ -85,10 +85,10 @@ importers:
         version: 5.3.0
       '@mark1russell7/quantity':
         specifier: ^0.4.0
-        version: 0.4.0(zod@4.6.7)
+        version: 0.4.1(zod@4.6.7)
       '@mark1russell7/site-pages':
-        specifier: ^0.4.3
-        version: 0.4.8
+        specifier: ^0.5.0
+        version: 0.5.0
       '@observablehq/plot':
         specifier: ^0.6.17
         version: 0.6.19
@@ -788,8 +788,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mark1russell7/quantity@0.4.0':
-    resolution: {integrity: sha512-TucM9+HtueZd+duKWeB3ClS3uIaS545eOF9dB+8kM7vlD0NVBIjQd4IaIzTsQabaPG3WnlPOLJuX8H8LyqrcAQ==}
+  '@mark1russell7/quantity@0.4.1':
+    resolution: {integrity: sha512-L3yZOBpJ1ZMd9CWSLVhz/pJOAQVnN68xpg2sAzHdQiyeOsgG8D3sTDIRIVJ4mTjasJfPQfgcpu8y2txQcS6u4w==}
     engines: {node: '>=22.19'}
     peerDependencies:
       zod: ^4.1.0
@@ -805,12 +805,12 @@ packages:
     resolution: {integrity: sha512-C94Q4C31aZ8UXx1R0JSBV7DiQFl5tVpbFxHxHzHaSqr3dTgmCkEvLrvlUV8/0/GZqPhQYG9cbX6GOlqfRj/h4g==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/rigor-statistics@0.1.26':
-    resolution: {integrity: sha512-JhwMAsYFg9FLFGVHRt6U7TWYmRblA/f+zS08H+DVzRlP4ypAqwmX6+QXNY+jNbwkyFPJqaLQJq/1PSC8QoKIWQ==}
+  '@mark1russell7/rigor-statistics@0.2.4':
+    resolution: {integrity: sha512-0L075rT+toD6edxEwDdZHiFzHP4+dJrI64Pw5gh9V33VwCfNRUMQY90AooDpMgVcC9cuxHNXegDLSOYU9ZMIlA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.4.8':
-    resolution: {integrity: sha512-uN7SV7VxrsMyH7/cPOUClFOnJhw24S2+qVaMIoNK+7AtJe3FB4l5qN2NowKAYvYgLcDpY4gUBlw9meJ6/Gq2pQ==}
+  '@mark1russell7/site-pages@0.5.0':
+    resolution: {integrity: sha512-sGDFRCr2fIRarRV4FCoDvfYBSOln134N9ApuwNMKXYtiiXpPv8LMeUUB/19QQU7fJDKWGZgqPSAJZ/+RA7p63A==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -3524,7 +3524,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@mark1russell7/quantity@0.4.0(zod@4.6.7)':
+  '@mark1russell7/quantity@0.4.1(zod@4.6.7)':
     dependencies:
       '@mark1russell7/rational': 0.1.2
     optionalDependencies:
@@ -3534,13 +3534,13 @@ snapshots:
 
   '@mark1russell7/rigor-generators@0.1.16': {}
 
-  '@mark1russell7/rigor-statistics@0.1.26':
+  '@mark1russell7/rigor-statistics@0.2.4':
     dependencies:
       '@mark1russell7/rigor-generators': 0.1.16
 
-  '@mark1russell7/site-pages@0.4.8':
+  '@mark1russell7/site-pages@0.5.0':
     dependencies:
-      '@mark1russell7/rigor-statistics': 0.1.26
+      '@mark1russell7/rigor-statistics': 0.2.4
 
   '@mdx-js/mdx@3.1.1':
     dependencies:
