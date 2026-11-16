@@ -31,7 +31,7 @@ importers:
     devDependencies:
       '@mark1russell7/rigor-generators':
         specifier: ^0.1.8
-        version: 0.1.16
+        version: 0.1.18
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.10.0
@@ -87,8 +87,8 @@ importers:
         specifier: ^0.4.0
         version: 0.4.1(zod@4.6.7)
       '@mark1russell7/site-pages':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.7.0
+        version: 0.7.0
       '@observablehq/plot':
         specifier: ^0.6.17
         version: 0.6.19
@@ -801,16 +801,16 @@ packages:
     resolution: {integrity: sha512-hn2C5jjOFCGKJqFQPHt57C/Cn1l9Lb9MltVNtL71KSu+nRrfPOmg8ujYB5n3oDFFWNdNA4bE/8LLT4tG3lmrGA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/rigor-generators@0.1.16':
-    resolution: {integrity: sha512-C94Q4C31aZ8UXx1R0JSBV7DiQFl5tVpbFxHxHzHaSqr3dTgmCkEvLrvlUV8/0/GZqPhQYG9cbX6GOlqfRj/h4g==}
+  '@mark1russell7/rigor-generators@0.1.18':
+    resolution: {integrity: sha512-z5Ia9gDuS/I9pV/4rOoRx3o2DAhW2VE2UYoqIlHo88pmLPX7SWJcympg2N+QS9sSA6Dn0vTPcicxeDX6oXzAGw==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.2.4':
     resolution: {integrity: sha512-0L075rT+toD6edxEwDdZHiFzHP4+dJrI64Pw5gh9V33VwCfNRUMQY90AooDpMgVcC9cuxHNXegDLSOYU9ZMIlA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.5.0':
-    resolution: {integrity: sha512-sGDFRCr2fIRarRV4FCoDvfYBSOln134N9ApuwNMKXYtiiXpPv8LMeUUB/19QQU7fJDKWGZgqPSAJZ/+RA7p63A==}
+  '@mark1russell7/site-pages@0.7.0':
+    resolution: {integrity: sha512-nFiaxs1D/IAxj54KUow0AkU35fxWj6iCHAcQ2GG2ISv0yD+YwnOoDHNmO1mV1g+roRV7G5czJNZlzv+3lcT2vg==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -3532,13 +3532,13 @@ snapshots:
 
   '@mark1russell7/rational@0.1.2': {}
 
-  '@mark1russell7/rigor-generators@0.1.16': {}
+  '@mark1russell7/rigor-generators@0.1.18': {}
 
   '@mark1russell7/rigor-statistics@0.2.4':
     dependencies:
-      '@mark1russell7/rigor-generators': 0.1.16
+      '@mark1russell7/rigor-generators': 0.1.18
 
-  '@mark1russell7/site-pages@0.5.0':
+  '@mark1russell7/site-pages@0.7.0':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.4
 
