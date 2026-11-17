@@ -1,0 +1,18 @@
+{
+  "$comment": "The site config of this repository (CI.md of the template, \"The site config\"). The Pages workflow deploys this site from main, and a job of ci.yml checks it on each pull request.",
+  "node-version": "24",
+  "build": "pnpm --filter ./site exec playwright install --with-deps chromium firefox webkit\npnpm bench\npnpm bench:size\npnpm bench:browsers\npnpm mutation:run\npnpm site:data --browsers\npnpm --filter ./site build\npnpm site:stamps\n",
+  "github-token": true,
+  "out": "site/dist",
+  "env": {
+    "SITE_BASE": "{repo}",
+    "SITE_URL": "https://{owner}.github.io/{repo}/"
+  },
+  "site-pages": true,
+  "packages": "async-browser-context",
+  "site-name": "async-browser-context",
+  "site-check": true,
+  "site-check-pages": "/explore/playground/,/,/releases/,/status/",
+  "site-check-probe": "site/src/check-probe.ts",
+  "data-stamps": "site/dist/data-stamps.json"
+}

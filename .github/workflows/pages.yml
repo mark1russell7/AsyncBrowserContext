@@ -10,7 +10,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  pull_request:
   # Each day, so the measured numbers of the site are at most one day old
   schedule:
     - cron: "17 6 * * *"
@@ -25,7 +24,7 @@ concurrency:
 
 jobs:
   pages:
-    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@e34da837089781ed64d4619b1391938e1219664c # main
+    uses: mark1russell7/template/.github/workflows/reusable-pages.yml@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
     # The build job of the shared workflow gets only the read permissions. Only its deploy job,
     # which runs no code of the repository, writes to Pages.
     permissions:
@@ -38,37 +37,4 @@ jobs:
       pages: write
       id-token: write
     with:
-      node-version: "24"
-      # The build renders each page and each Open Graph image in Chromium (site/build/prerender.ts).
-      # The site uses the source of the library, so a separate build of the library is not necessary.
-      # The build measures the benchmarks, the size and the browser benchmark in this run, starts the browser tests
-      # in the three engines (site:data --browsers), and gets the newest Stryker report (mutation.yml).
-      # The data files then name these runs, and site:stamps writes the data stamps from them.
-      build: |
-        pnpm --filter ./site exec playwright install --with-deps chromium firefox webkit
-        pnpm bench
-        pnpm bench:size
-        pnpm bench:browsers
-        pnpm mutation:run
-        pnpm site:data --browsers
-        pnpm --filter ./site build
-        pnpm site:stamps
-      # mutation:run reads the Actions runs and downloads the Stryker report with this token (the permission actions: read).
-      github-token: true
       timeout-minutes: 45
-      out: site/dist
-      # SITE_URL gives the absolute URL of the site, for the canonical links, Open Graph and the sitemap.
-      env: '{"SITE_BASE": "${{ github.event.repository.name }}", "SITE_URL": "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"}'
-      deploy: ${{ github.event_name != 'pull_request' }}
-      # The site-pages action adds the Releases page and the Status page to the built site.
-      # The repository has no roadmap file, so the Status page shows the open pull requests and issues.
-      site-pages: true
-      packages: async-browser-context
-      site-name: async-browser-context
-      # The check opens each page in a browser at each width, in light and dark. The probe drives the first page:
-      # the playground, with the real library. The check reads the TypeScript source and removes its types.
-      site-check: true
-      site-check-pages: /explore/playground/,/,/releases/,/status/
-      site-check-probe: site/src/check-probe.ts
-      # The freshness gate: data older than its limit, or measured on an old version of the package, stops the deploy.
-      data-stamps: site/dist/data-stamps.json
