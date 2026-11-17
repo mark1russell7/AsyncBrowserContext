@@ -177,4 +177,29 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: mark1russell7/template/.github/actions/release-check@e34da837089781ed64d4619b1391938e1219664c # main
+      - uses: mark1russell7/template/.github/actions/release-check@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
+
+  # The site of .github/site.json: the build, the site check and the probe, with no deploy (CI.md of the
+  # template, "The site config"). The Pages workflow deploys the same site from main.
+  site-check:
+    uses: mark1russell7/template/.github/workflows/reusable-pages-check.yml@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
+    permissions:
+      contents: read
+    with:
+      timeout-minutes: 45
+
+  # The summary check of the ruleset of main: each job passed (CI.md of the template, "The check of the
+  # ruleset").
+  ci-ok:
+    name: CI OK
+    if: ${{ !cancelled() }}
+    needs: [node, coverage, browser, smoke, bundlers, site, babel, release-check, site-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: mark1russell7/template/.github/actions/gate-summary@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
+        with:
+          needs: ${{ toJSON(needs) }}
+          # The jobs that their own if can skip. Each other job must pass.
+          allow-skip: "release-check"
