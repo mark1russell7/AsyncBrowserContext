@@ -30,8 +30,8 @@ importers:
         version: 8.0.5(@babel/core@8.1.0)
     devDependencies:
       '@mark1russell7/rigor-generators':
-        specifier: ^0.1.8
-        version: 0.1.18
+        specifier: ^0.2.0
+        version: 0.2.0
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.10.0
@@ -803,6 +803,10 @@ packages:
 
   '@mark1russell7/rigor-generators@0.1.18':
     resolution: {integrity: sha512-z5Ia9gDuS/I9pV/4rOoRx3o2DAhW2VE2UYoqIlHo88pmLPX7SWJcympg2N+QS9sSA6Dn0vTPcicxeDX6oXzAGw==}
+    engines: {node: '>=22'}
+
+  '@mark1russell7/rigor-generators@0.2.0':
+    resolution: {integrity: sha512-eTyJhK4Nowx1KQ3QrsQqLiAlhFoL+8m1OT6He+X0Lf0G/0f9OyQC8ponQLViQKRkP/ef10B6oACFjtjnKErobg==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.2.4':
@@ -3533,6 +3537,8 @@ snapshots:
   '@mark1russell7/rational@0.1.2': {}
 
   '@mark1russell7/rigor-generators@0.1.18': {}
+
+  '@mark1russell7/rigor-generators@0.2.0': {}
 
   '@mark1russell7/rigor-statistics@0.2.4':
     dependencies:
