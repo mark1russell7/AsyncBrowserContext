@@ -177,12 +177,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: mark1russell7/template/.github/actions/release-check@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
+      - uses: mark1russell7/template/.github/actions/release-check@8384e885a3cb304498a858c531cd86641956480c # main
 
   # The site of .github/site.json: the build, the site check and the probe, with no deploy (CI.md of the
   # template, "The site config"). The Pages workflow deploys the same site from main.
   site-check:
-    uses: mark1russell7/template/.github/workflows/reusable-pages-check.yml@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
+    uses: mark1russell7/template/.github/workflows/reusable-pages-check.yml@8384e885a3cb304498a858c531cd86641956480c # main
     permissions:
       contents: read
     with:
@@ -198,7 +198,7 @@ jobs:
     timeout-minutes: 2
     permissions: {}
     steps:
-      - uses: mark1russell7/template/.github/actions/gate-summary@2030c7dec9485afebb504772f79f41f23bdb2df7 # main
+      - uses: mark1russell7/template/.github/actions/gate-summary@8384e885a3cb304498a858c531cd86641956480c # main
         with:
           needs: ${{ toJSON(needs) }}
           # The jobs that their own if can skip. Each other job must pass.
