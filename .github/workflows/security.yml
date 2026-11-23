@@ -18,9 +18,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  security:
-    uses: mark1russell7/template/.github/workflows/reusable-security.yml@a456a3a088d2bf443f2bce9ac0dc0041e827a1de # main
+  security-ok:
+    name: Security OK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write
       actions: read
+    steps:
+      - uses: mark1russell7/template/.github/actions/security-scan@8a01259f04dce1d6a2fa351b758c6d283e9f7fc9 # main
