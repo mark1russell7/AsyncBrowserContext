@@ -29,6 +29,9 @@ importers:
         specifier: ^8.0.5
         version: 8.0.5(@babel/core@8.1.0)
     devDependencies:
+      '@mark1russell7/conventions':
+        specifier: ^0.53.2
+        version: 0.53.2
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
         version: 0.2.6
@@ -788,6 +791,11 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@mark1russell7/conventions@0.53.2':
+    resolution: {integrity: sha512-OfFvxHZl4Eu6zRcgzSmnEoXF5eZGgv1rpw4qdGUmfpS1jR1wFgEpiZPGW2W3R/lHBZ/4VN24/rV7/6SIboTWmQ==}
+    engines: {node: '>=22'}
+    hasBin: true
+
   '@mark1russell7/quantity@0.5.0':
     resolution: {integrity: sha512-Ol1MzmUod+yd7UZVNmNzk5VlzE1BMMYS2ma46VyB4LnapzilGcBE8PooyonPEnjgnLOSKKeGnHXXZEYqS3OR6Q==}
     engines: {node: '>=22.19'}
@@ -817,6 +825,10 @@ packages:
     resolution: {integrity: sha512-0U814F6nv69ueZ82B+PKkHH/Y8qapXNTFo2KMchvfqBcEkYh+2eQYAGdPzJANR+xni9HJZVpeC2nu+/lCeaEDQ==}
     engines: {node: '>=22'}
     hasBin: true
+
+  '@mark1russell7/text@0.0.19':
+    resolution: {integrity: sha512-pPJV318wzfEcsnnzlqVu+OBp/o9VLKWsAo1Wkf4rNaerOjgINDo+vErhmtPVQw6BzcVmGn4brXmMLcosCT9sAw==}
+    engines: {node: '>=22.12'}
 
   '@mdx-js/mdx@3.1.1':
     resolution: {integrity: sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ==}
@@ -3528,6 +3540,11 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  '@mark1russell7/conventions@0.53.2':
+    dependencies:
+      '@mark1russell7/text': 0.0.19
+      yaml: 2.9.1
+
   '@mark1russell7/quantity@0.5.0(zod@4.6.7)':
     dependencies:
       '@mark1russell7/rational': 0.1.2
@@ -3547,6 +3564,8 @@ snapshots:
   '@mark1russell7/site-pages@0.8.7':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.4
+
+  '@mark1russell7/text@0.0.19': {}
 
   '@mdx-js/mdx@3.1.1':
     dependencies:

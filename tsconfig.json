@@ -35,13 +35,13 @@
     "test/**/*.ts",
     "bench/**/*.ts",
     "vitest.config.ts",
+    "vitest.stryker.config.ts",
     "stryker.config.mjs",
     "scripts/**/*.ts",
     "tools/ste-lint/src/**/*.ts",
     "tools/ste-lint/vitest.config.ts"
   ],
   "exclude": [
-    "test/legacy/**",
     "test/smoke/fixture/**"
   ]
 }

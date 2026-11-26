@@ -42,6 +42,11 @@ jobs:
         run: pnpm lint:ste
       - name: Tests of the STE linter
         run: pnpm test:ste-lint
+      # Each rule of @mark1russell7/conventions, with the settings in package.json. It reads the files, so one
+      # version of Node.js is sufficient.
+      - name: Conventions check
+        if: matrix.node == 24
+        run: pnpm check:conventions
 
   # The function report of the tests (coverage-final.json) for the coverage view of the code atlas: the
   # atlas reads the artifact "coverage" of the newest run on main. The browser tests are not in it.

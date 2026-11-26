@@ -1,6 +1,6 @@
 {
   "name": "async-browser-context",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "AsyncLocalStorage and the TC39 AsyncContext API (Variable, Snapshot) for browsers. The context stays through await, promises, timers, events and generators. A Babel preset and a Vite plugin transform async functions. On Node.js, the package uses the native AsyncLocalStorage.",
   "license": "MIT",
   "author": "Mark Russell",
@@ -148,7 +148,8 @@
     "readme:media": "tsx scripts/readme-media.ts",
     "test:bundlers": "pnpm build && tsx test/bundlers/run.ts",
     "bench:size": "tsx bench/size.ts",
-    "bench:browsers": "tsx bench/browsers.ts"
+    "bench:browsers": "tsx bench/browsers.ts",
+    "check:conventions": "conventions check"
   },
   "dependencies": {
     "@babel/core": "^8.0.7",
@@ -170,6 +171,7 @@
     }
   },
   "devDependencies": {
+    "@mark1russell7/conventions": "^0.53.2",
     "@mark1russell7/rigor-generators": "^0.2.0",
     "@opentelemetry/api": "^1.9.1",
     "@stryker-mutator/core": "^10.0.0",
@@ -185,5 +187,116 @@
     "typescript": "^5.9.3",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
+  },
+  "conventions": {
+    "rules": {
+      "no-console": {
+        "baseline": 2,
+        "failFrom": "2027-01-20",
+        "reason": "The sources of async-browser-context had 2 console calls on 2026-11-25: a warning in src/core/hooks.ts and an error in src/core/store.ts. The count only gets lower. Each console call fails from 2027-01-20. A diagnostic of the library goes to a log record of @mark1russell7/otel-ts."
+      },
+      "no-local-paths": {
+        "ignore": [
+          "test/vitest/test-files.test.ts",
+          "test/vitest/test-files.ts"
+        ],
+        "reason": "The 37 texts are fake home folders (/home/test, C:Users\test): the inputs of the tests of the path functions. They name no real user, so the exception stays."
+      },
+      "typed-scripts": {
+        "ignore": [
+          "site/src/debugger/scenarios/generators.scenario.js",
+          "site/src/debugger/scenarios/nested.scenario.js",
+          "site/src/debugger/scenarios/snapshot.scenario.js",
+          "site/src/debugger/scenarios/timers-and-events.scenario.js",
+          "site/src/debugger/scenarios/two-requests.scenario.js",
+          "site/src/debugger/scenarios/untransformed.scenario.js",
+          "stryker.config.mjs",
+          "test/babel/program.js",
+          "test/bundlers/fixture/build.mjs",
+          "test/bundlers/fixture/next-rule/next.config.mjs",
+          "test/bundlers/fixture/next/app/actions.js",
+          "test/bundlers/fixture/next/app/cached.js",
+          "test/bundlers/fixture/next/app/layout.js",
+          "test/bundlers/fixture/next/app/page.js",
+          "test/bundlers/fixture/next/babel.config.js",
+          "test/bundlers/fixture/next/next.config.mjs",
+          "test/fixtures/compiled-tsc-es2015.js",
+          "test/fixtures/untransformed-babel.js",
+          "test/fixtures/untransformed-tsc-es2015.js",
+          "test/fixtures/untransformed-tsc-es5.js",
+          "test/fixtures/untransformed.js",
+          "test/smoke/fixture/checks.js",
+          "test/smoke/fixture/fake-dependency/index.js",
+          "test/smoke/fixture/main.js",
+          "test/smoke/fixture/vite.config.js"
+        ],
+        "reason": "The 25 JavaScript files of 2026-11-25 stay JavaScript: fixtures of untransformed and compiled code, the apps of the bundler and smoke tests, the debugger scenarios that the site shows as JavaScript, and configs that a tool reads as JavaScript (stryker, next). The list only gets shorter, and a new JavaScript file fails."
+      },
+      "trust-policy": {
+        "ignore": [
+          "pnpm-workspace.yaml"
+        ],
+        "reason": "pnpm-workspace.yaml has no trustPolicy on 2026-11-25. A trust policy changes which versions an install takes, so it gets its own pull request with a full CI run. The end: a pull request that fixes the repository rules of the conventions check."
+      },
+      "cue-preset": {
+        "ignore": [
+          "site/tsconfig.json"
+        ],
+        "reason": "The site has its own tsconfig.json on 2026-11-25, not a preset of @mark1russell7/cue. The end: a pull request that fixes the repository rules of the conventions check."
+      },
+      "no-build-output": {
+        "ignore": [
+          "site/build/"
+        ],
+        "reason": "Git keeps 44 files of site/build/ on 2026-11-25. The end: a pull request that fixes the repository rules of the conventions check."
+      },
+      "api-report-script": {
+        "off": "The repository has no API report on 2026-11-25. The end: a pull request that fixes the repository rules of the conventions check."
+      },
+      "roadmap-parses": {
+        "ignore": [
+          ".github/site.json"
+        ],
+        "reason": ".github/site.json names no roadmap on 2026-11-25. The end: a pull request that fixes the repository rules of the conventions check."
+      },
+      "runner-budget": {
+        "ignore": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/mutation.yml",
+          ".github/workflows/pages.yml",
+          ".github/workflows/security.yml"
+        ],
+        "reason": "On 2026-11-25 the matrices of ci.yml have no max-parallel, mutation.yml has no concurrency group, and three schedules start at another minute. The end: a pull request that moves ci.yml to reusable-ci.yml of the template, with the word of the owner for the change to the release path (release.yml calls ci.yml)."
+      },
+      "main-runs-finish": {
+        "ignore": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/security.yml"
+        ],
+        "reason": "On 2026-11-25 the concurrency groups of ci.yml and security.yml end with the ref and cancel a run in progress. The end: a pull request that moves ci.yml to reusable-ci.yml of the template, with the word of the owner for the change to the release path (release.yml calls ci.yml)."
+      },
+      "push-main-only": {
+        "ignore": [
+          ".github/workflows/ci.yml"
+        ],
+        "reason": "On 2026-11-25 ci.yml starts on each push and has no workflow_dispatch. The end: a pull request that moves ci.yml to reusable-ci.yml of the template, with the word of the owner for the change to the release path (release.yml calls ci.yml)."
+      },
+      "playwright-install": {
+        "ignore": [
+          ".github/workflows/ci.yml",
+          ".github/site.json"
+        ],
+        "reason": "On 2026-11-25 ci.yml and the site build install the browsers with their own command. The end: a pull request that moves ci.yml to reusable-ci.yml of the template, with the word of the owner for the change to the release path (release.yml calls ci.yml)."
+      },
+      "pages-after-release": {
+        "ignore": [
+          ".github/workflows/pages.yml"
+        ],
+        "reason": "On 2026-11-25 pages.yml does not start after the workflow Release. The end: a pull request that moves ci.yml to reusable-ci.yml of the template, with the word of the owner for the change to the release path (release.yml calls ci.yml)."
+      },
+      "shared-ci": {
+        "off": "ci.yml runs its own jobs: the Node.js matrix, the browser tests, the smoke test, the bundlers, Babel, the site and the release check. release.yml calls ci.yml as its verify job. The end: a pull request that moves ci.yml to reusable-ci.yml of the template, with the word of the owner for the change to the release path (release.yml calls ci.yml)."
+      }
+    }
   }
 }
