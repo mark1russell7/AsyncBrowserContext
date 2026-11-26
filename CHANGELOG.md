@@ -1,5 +1,12 @@
 # Change history
 
+## 0.3.3
+
+This version changes no code of the package, so it is a patch version.
+
+- CI runs the check of `@mark1russell7/conventions`. The settings of its rules are in `package.json`, with the reason of each exception.
+- The typecheck examines the legacy tests and the Vitest configuration of mutation testing.
+
 ## 0.3.2
 
 This version fixes a bug, so it is a patch version.
