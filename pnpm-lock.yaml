@@ -31,7 +31,7 @@ importers:
     devDependencies:
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
-        version: 0.2.5
+        version: 0.2.6
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.10.0
@@ -88,7 +88,7 @@ importers:
         version: 0.5.0(zod@4.6.7)
       '@mark1russell7/site-pages':
         specifier: ^0.8.0
-        version: 0.8.6
+        version: 0.8.7
       '@observablehq/plot':
         specifier: ^0.6.17
         version: 0.6.19
@@ -805,16 +805,16 @@ packages:
     resolution: {integrity: sha512-z5Ia9gDuS/I9pV/4rOoRx3o2DAhW2VE2UYoqIlHo88pmLPX7SWJcympg2N+QS9sSA6Dn0vTPcicxeDX6oXzAGw==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/rigor-generators@0.2.5':
-    resolution: {integrity: sha512-YoOAjjypZv76QtJ6SMEySljVoZdMDSQdGD7vUQXM/O43d18nW4AyEUOlfqNQSw4cmmML0646TNXktlIhNDjKuw==}
+  '@mark1russell7/rigor-generators@0.2.6':
+    resolution: {integrity: sha512-twMYvM//nGt/oumhZ2uFiXpC+ve59B1Zl8hinUnAaru4Vy5MiybhKggrESyDhvc519dWIGTbwWd000hsLkhVsA==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.2.4':
     resolution: {integrity: sha512-0L075rT+toD6edxEwDdZHiFzHP4+dJrI64Pw5gh9V33VwCfNRUMQY90AooDpMgVcC9cuxHNXegDLSOYU9ZMIlA==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/site-pages@0.8.6':
-    resolution: {integrity: sha512-WX/2Sna3H1bzLSleYuKQYuzrLF7kQjSMG79Pnysw0v1mNga95t18bS82u/zfQksPiZSicXSLmR+ye5YHfYNx4w==}
+  '@mark1russell7/site-pages@0.8.7':
+    resolution: {integrity: sha512-0U814F6nv69ueZ82B+PKkHH/Y8qapXNTFo2KMchvfqBcEkYh+2eQYAGdPzJANR+xni9HJZVpeC2nu+/lCeaEDQ==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -3538,13 +3538,13 @@ snapshots:
 
   '@mark1russell7/rigor-generators@0.1.18': {}
 
-  '@mark1russell7/rigor-generators@0.2.5': {}
+  '@mark1russell7/rigor-generators@0.2.6': {}
 
   '@mark1russell7/rigor-statistics@0.2.4':
     dependencies:
       '@mark1russell7/rigor-generators': 0.1.18
 
-  '@mark1russell7/site-pages@0.8.6':
+  '@mark1russell7/site-pages@0.8.7':
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.4
 
