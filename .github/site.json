@@ -14,5 +14,6 @@
   "site-check": true,
   "site-check-pages": "/explore/playground/,/,/releases/,/status/",
   "site-check-probe": "site/src/check-probe.ts",
-  "data-stamps": "site/dist/data-stamps.json"
+  "data-stamps": "site/dist/data-stamps.json",
+  "site-check-bare-errors": "fail"
 }
