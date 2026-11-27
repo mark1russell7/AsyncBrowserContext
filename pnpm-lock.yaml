@@ -30,11 +30,11 @@ importers:
         version: 8.0.5(@babel/core@8.1.0)
     devDependencies:
       '@mark1russell7/conventions':
-        specifier: ^0.55.2
-        version: 0.55.2
+        specifier: ^0.56.0
+        version: 0.56.0
       '@mark1russell7/rigor-generators':
         specifier: ^0.2.0
-        version: 0.2.7
+        version: 0.2.8
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.10.0
@@ -795,8 +795,8 @@ packages:
     resolution: {integrity: sha512-qunnV1QThYsI0rXeOFRgaXpZFFw+ZLLnIG0jYioql5WiYrqCPe+eROgLn4l/cRegXU3Y1t4OEnUfW6izovteFA==}
     engines: {node: '>=22.13'}
 
-  '@mark1russell7/conventions@0.55.2':
-    resolution: {integrity: sha512-LUOWcKY2a/7Vs/oHtQQjF/aTcmg8iyb1F8E9omW5tH7SoB0J4W60gyktkj5MWw8kkFZhz6ReykPhCgtVrTynHQ==}
+  '@mark1russell7/conventions@0.56.0':
+    resolution: {integrity: sha512-GXx6q5GEGo8VmXrSo1vpraLT6Qbed+J9RzW1ezEOWVs/V09g+1oJ+VpwNHXBbri5h8FErg1/pdi3GRSyFMAw6w==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -817,8 +817,8 @@ packages:
     resolution: {integrity: sha512-z5Ia9gDuS/I9pV/4rOoRx3o2DAhW2VE2UYoqIlHo88pmLPX7SWJcympg2N+QS9sSA6Dn0vTPcicxeDX6oXzAGw==}
     engines: {node: '>=22'}
 
-  '@mark1russell7/rigor-generators@0.2.7':
-    resolution: {integrity: sha512-7UwfykXyUqZBHZPNf/tHI2ExwsCTZLPmTqdl1FdmilkmWptdNy30PU8QEeF0u/LQ0W4OUv78r2rAS+PtQJOBug==}
+  '@mark1russell7/rigor-generators@0.2.8':
+    resolution: {integrity: sha512-mOAbp1MAeA691c+TykkkTOrESWj6JdoCAjzpx8Ffja4fvWaA9m0p+lo90W6kdRPiENyZmxy3iBle1VMPlbYBPg==}
     engines: {node: '>=22'}
 
   '@mark1russell7/rigor-statistics@0.2.4':
@@ -830,8 +830,8 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  '@mark1russell7/text@0.0.20':
-    resolution: {integrity: sha512-HrjBak4BE0fDC+bLzFi/c4NDCHqiUm7VhYR5YhJmkApRSB8mUOao4bFiO9Jy3xwpsCGJCj4echVDCUxXjV+3NA==}
+  '@mark1russell7/text@0.0.21':
+    resolution: {integrity: sha512-Y0ZNBrHHeIo9LPJc0dWJrhjQUoK+PQHgotitEaJo3J6xppYPIBqJ0AXQBHjzpdoL7xUWYCqriFNe+WA/4S15KQ==}
     engines: {node: '>=22.12'}
 
   '@mdx-js/mdx@3.1.1':
@@ -3546,10 +3546,10 @@ snapshots:
 
   '@mark1russell7/code-shape@0.0.1': {}
 
-  '@mark1russell7/conventions@0.55.2':
+  '@mark1russell7/conventions@0.56.0':
     dependencies:
       '@mark1russell7/code-shape': 0.0.1
-      '@mark1russell7/text': 0.0.20
+      '@mark1russell7/text': 0.0.21
       yaml: 2.9.1
 
   '@mark1russell7/quantity@0.5.1(zod@4.6.7)':
@@ -3562,7 +3562,7 @@ snapshots:
 
   '@mark1russell7/rigor-generators@0.1.18': {}
 
-  '@mark1russell7/rigor-generators@0.2.7': {}
+  '@mark1russell7/rigor-generators@0.2.8': {}
 
   '@mark1russell7/rigor-statistics@0.2.4':
     dependencies:
@@ -3572,7 +3572,7 @@ snapshots:
     dependencies:
       '@mark1russell7/rigor-statistics': 0.2.4
 
-  '@mark1russell7/text@0.0.20': {}
+  '@mark1russell7/text@0.0.21': {}
 
   '@mdx-js/mdx@3.1.1':
     dependencies:
